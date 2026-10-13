@@ -38,8 +38,10 @@
   其中 reward/config 的回滚还需移除 `lambda4`、fragmentation normalization 和小碎片配置；环境与
   baseline 恢复旧的 workload/fragmentation 逻辑；executor 恢复旧 `RegionGenerator`/`CoveragePath`
   调用。之后运行 `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证回滚结果。
-  本项目当前没有 Git 历史，实际恢复已修改文件需要使用外部备份或对应旧版文件；本条记录列出的文件
-  和逆向操作作为回滚清单。
+  该重构随项目文件一并进入 `a166a95` 初始提交，因此 Git 中没有此重构之前的 executor 版本，
+  不能单独回退到重构前代码；如需恢复该旧版本，需要从外部备份或旧版文件取回。后续修改应单独提交，
+  可使用 `git revert <commit SHA>` 生成可审查、可推送的回滚提交。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证回滚结果。
 
 ---
 
