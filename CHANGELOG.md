@@ -1,11 +1,20 @@
 # 修改日志（Change Log）
 
-本项目不是 git 仓库，故每次代码修改都记录在此，便于回滚。条目按时间倒序（最新在上）。
+本项目已纳入 git 仓库（`https://github.com/lqy7333-del/graph-uav-cpp.git`），本文件仍保留作为代码变更的可读说明。条目按时间倒序（最新在上）。
 每次修改请追加一节，写明：**文件 / 变更（旧→新）/ 原因 / 回滚方法**。
 
 ---
 
 ## 2026-10-13
+
+### 8. 项目初始化为 Git 仓库并推送到 GitHub
+- **文件**：`.gitignore`（新增 `.claude/`、`coverage_env/results/` 两行）；项目根目录初始化 `.git/`。
+- **变更（旧 → 新）**：项目由「非 git 仓库、靠 CHANGELOG 记录回滚」改为「git 仓库，本地 `main`
+  分支已 commit（`initial commit`）并推送到 `https://github.com/lqy7333-del/graph-uav-cpp.git`」。
+  `.gitignore` 额外排除本地工具状态（`.claude/`）与可再生成产物（`coverage_env/results/` 约 190MB
+  日志/图片）；`__pycache__`、`.pytest_cache` 等此前已排除。
+- **原因**：用户要求用 GitHub 做代码版本回退（不额外编写说明文档）。
+- **回滚方法**：删除 `.git/` 目录即回到纯文件 + CHANGELOG 记录状态；`.gitignore` 新增的两行直接删去即可。
 
 ### 7. Boundary-aware Coverage Executor 重构
 - **文件**：新增 `coverage_env/planner/growth_edge.py`、`boundary_region_generator.py`、
