@@ -103,6 +103,8 @@ class InstanceGenerator:
                     "alpha": float(energy_config["alpha"]),
                     "beta": float(energy_config["beta"]),
                 },
+                max_payload=uav_config.get("max_payload"),
+                payload_per_area=float(uav_config.get("payload_per_area", 0.0)),
             )
             for index in range(int(uav_config["num_uav"]))
         ]

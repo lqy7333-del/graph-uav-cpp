@@ -28,6 +28,8 @@ class UAV:
         *,
         alpha: Optional[float] = None,
         beta: Optional[float] = None,
+        max_payload: Optional[float] = None,
+        payload_per_area: float = 0.0,
     ) -> None:
         """Initialize static vehicle parameters and an empty dynamic state."""
         self.uav_id = uav_id
@@ -35,6 +37,12 @@ class UAV:
         self.speed = self._positive_value("speed", speed)
         self.coverage_width = self._positive_value("coverage_width", coverage_width)
         self.sensor_width = self._positive_value("sensor_width", sensor_width)
+        self.max_payload = self._positive_value(
+            "max_payload", max_energy if max_payload is None else max_payload
+        )
+        self.payload_per_area = self._nonnegative_value(
+            "payload_per_area", payload_per_area
+        )
 
         parameters = dict(energy_consumption_parameters or {})
         self.alpha = self._nonnegative_value(
@@ -48,6 +56,7 @@ class UAV:
 
         self.current_position: Optional[Position2D] = None
         self.remaining_energy = self.max_energy
+        self.remaining_payload = self.max_payload
         self.total_distance = 0.0
         self.covered_area = 0.0
         self.visited_fields: list[Union[str, int]] = []
@@ -110,16 +119,23 @@ class UAV:
         )
         area = self._nonnegative_value("area", area)
         energy = self.calculate_energy(distance, area)
+        payload = self.payload_per_area * area
         if energy > self.remaining_energy:
             raise ValueError(
                 f"UAV {self.uav_id!r} needs {energy:.3f} Wh but has "
                 f"{self.remaining_energy:.3f} Wh remaining."
+            )
+        if payload > self.remaining_payload:
+            raise ValueError(
+                f"UAV {self.uav_id!r} needs {payload:.3f} payload but has "
+                f"{self.remaining_payload:.3f} remaining."
             )
 
         self.current_position = waypoints[-1]
         self.current_path = list(executed_path)
         self.total_distance += distance
         self.remaining_energy -= energy
+        self.remaining_payload -= payload
         self.covered_area += area
         self.last_energy_consumption = energy
         self.total_energy_consumed += energy
@@ -134,6 +150,7 @@ class UAV:
         """Restore the UAV and its cumulative task state at ``position``."""
         self.current_position = self._validate_position(position)
         self.remaining_energy = self.max_energy
+        self.remaining_payload = self.max_payload
         self.total_distance = 0.0
         self.covered_area = 0.0
         self.visited_fields.clear()
@@ -142,10 +159,19 @@ class UAV:
         self.total_energy_consumed = 0.0
 
     def get_state(self) -> dict:
-        """Return the dynamic position, energy, distance, and coverage state."""
+        """Return dynamic state plus the static capability and payload fields."""
+        energy_ratio = self.remaining_energy / self.max_energy if self.max_energy > 0.0 else 0.0
+        payload_ratio = self.remaining_payload / self.max_payload if self.max_payload > 0.0 else 0.0
         return {
             "position": self.current_position,
             "remaining_energy": self.remaining_energy,
+            "max_energy": self.max_energy,
+            "speed": self.speed,
+            "coverage_width": self.coverage_width,
+            "max_payload": self.max_payload,
+            "remaining_payload": self.remaining_payload,
+            "energy_ratio": energy_ratio,
+            "payload_ratio": payload_ratio,
             "total_distance": self.total_distance,
             "covered_area": self.covered_area,
         }

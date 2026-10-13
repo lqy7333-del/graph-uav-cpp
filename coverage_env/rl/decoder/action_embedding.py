@@ -1,4 +1,4 @@
-"""Embedding of spatial policy actions and global context."""
+"""Embedding of spatial policy actions with entry/exit role semantics."""
 
 from __future__ import annotations
 
@@ -7,15 +7,24 @@ import torch.nn as nn
 
 
 class ActionEmbedding(nn.Module):
-    """Concatenate selected Field, entry Boundary, and exit Boundary vectors."""
+    """Concatenate selected Field and role-tagged Boundary vectors.
+
+    Entry and exit boundaries share the same Boundary embedding table; the two
+    learnable role vectors ``r_entry``/``r_exit`` make the two slots carry
+    distinct entry/exit semantics.
+    """
 
     def __init__(self, hidden_dim: int = 128) -> None:
         super().__init__()
         self.hidden_dim = int(hidden_dim)
         self.output_dim = 3 * self.hidden_dim
+        self.r_entry = nn.Parameter(torch.empty(self.hidden_dim))
+        self.r_exit = nn.Parameter(torch.empty(self.hidden_dim))
+        nn.init.normal_(self.r_entry, mean=0.0, std=0.1)
+        nn.init.normal_(self.r_exit, mean=0.0, std=0.1)
 
     def forward(self, actions, field_embedding, boundary_embedding, graph):
-        """Return candidate vectors with shape ``[N, 3 * hidden_dim]``."""
+        """Return ``[z_F, z_B(e_in)+r_entry, z_B(e_out)+r_exit]`` per candidate."""
         if not actions:
             return field_embedding.new_empty((0, self.output_dim))
         field_indices, entry_indices, exit_indices = [], [], []
@@ -31,20 +40,7 @@ class ActionEmbedding(nn.Module):
         fi = torch.tensor(field_indices, dtype=torch.long, device=device)
         ei = torch.tensor(entry_indices, dtype=torch.long, device=device)
         xi = torch.tensor(exit_indices, dtype=torch.long, device=device)
-        return torch.cat((field_embedding[fi], boundary_embedding[ei],
-                          boundary_embedding[xi]), dim=-1)
-
-
-class GlobalEncoder(nn.Module):
-    """Project UAV and depot features to the action-context dimension."""
-
-    def __init__(self, input_dim: int = 5, hidden_dim: int = 128) -> None:
-        super().__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim), nn.GELU(), nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, hidden_dim), nn.GELU(),
-        )
-
-    def forward(self, global_feature):
-        """Return a global context vector of shape ``[hidden_dim]``."""
-        return self.network(global_feature.reshape(1, -1)).squeeze(0)
+        z_field = field_embedding[fi]
+        z_entry = boundary_embedding[ei] + self.r_entry
+        z_exit = boundary_embedding[xi] + self.r_exit
+        return torch.cat((z_field, z_entry, z_exit), dim=-1)

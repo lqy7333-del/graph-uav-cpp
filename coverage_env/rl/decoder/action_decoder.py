@@ -7,7 +7,13 @@ import torch.nn as nn
 
 from coverage_env.rl.action_mask import get_action_mask
 from coverage_env.rl.action_space import ActionGenerator, CoverageAction
-from coverage_env.rl.decoder.action_embedding import ActionEmbedding, GlobalEncoder
+from coverage_env.rl.decoder.action_embedding import ActionEmbedding
+from coverage_env.rl.decoder.global_state_encoder import (
+    GlobalStateEncoder,
+    build_depot_feature,
+    build_graph_context,
+    build_uav_feature,
+)
 from coverage_env.rl.decoder.value_encoder import ValueEncoder
 from coverage_env.rl.encoder.hetero_encoder import CoverageGraphEncoder
 from coverage_env.rl.graph.graph_builder import GraphBuilder
@@ -58,7 +64,9 @@ class CoveragePolicy(nn.Module):
         self.action_generator = ActionGenerator()
         hidden_dim = self.encoder.hidden_dim
         self.action_embedding = ActionEmbedding(hidden_dim=hidden_dim)
-        self.global_encoder = GlobalEncoder(input_dim=5, hidden_dim=hidden_dim)
+        self.global_state_encoder = GlobalStateEncoder(
+            graph_dim=2 * hidden_dim, uav_dim=10, depot_dim=2, hidden_dim=hidden_dim
+        )
         decoder_input_dim = self.action_embedding.output_dim + hidden_dim
         self.action_decoder = ActionDecoder(decoder_input_dim, hidden_dim)
         self.value_encoder = ValueEncoder(hidden_dim)
@@ -90,7 +98,7 @@ class CoveragePolicy(nn.Module):
             )
         mask = torch.tensor(mask_values, dtype=torch.bool, device=device)
 
-        global_embedding = self.global_encoder(embeddings["global_feature"])
+        global_embedding = self._build_global_embedding(embeddings, environment, state)
         action_vectors = self.action_embedding(
             actions,
             embeddings["field_embedding"],
@@ -126,13 +134,43 @@ class CoveragePolicy(nn.Module):
             "graph": graph,
         }
 
-    def encode_graph(self, graph):
+    @staticmethod
+    def _global_sources(environment, state):
+        """Resolve ``(uav_source, depot_source)`` from environment or state dict."""
+        if environment is not None and getattr(environment, "uavs", None):
+            return environment.uavs[0], environment.depot
+        if isinstance(state, dict):
+            uavs = state.get("uavs", {})
+            if uavs:
+                return next(iter(uavs.values())), state.get("depot", {})
+        return None, None
+
+    def _build_global_embedding(self, embeddings, environment=None, state=None):
+        """Build the global context ``z_G`` from graph pooling, UAV, and depot."""
+        device = embeddings["field_embedding"].device
+        uav_source, depot_source = self._global_sources(environment, state)
+        g_graph = build_graph_context(
+            embeddings["field_embedding"], embeddings["boundary_embedding"]
+        )
+        uav_dim = self.global_state_encoder.uav_dim
+        depot_dim = self.global_state_encoder.depot_dim
+        x_uav = (
+            build_uav_feature(uav_source).to(device)
+            if uav_source is not None else torch.zeros(uav_dim, device=device)
+        )
+        x_depot = (
+            build_depot_feature(depot_source).to(device)
+            if depot_source is not None else torch.zeros(depot_dim, device=device)
+        )
+        return self.global_state_encoder(g_graph, x_uav, x_depot)
+
+    def encode_graph(self, graph, environment=None, state=None):
         """Encode a saved graph without generating candidates or action masks."""
         device = next(self.parameters()).device
         if hasattr(graph, "to"):
             graph = graph.to(device)
         embeddings = self.encoder(graph)
-        global_embedding = self.global_encoder(embeddings["global_feature"])
+        global_embedding = self._build_global_embedding(embeddings, environment, state)
         return embeddings, global_embedding
 
     @staticmethod

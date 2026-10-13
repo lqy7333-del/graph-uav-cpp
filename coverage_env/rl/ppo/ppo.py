@@ -13,30 +13,22 @@ from coverage_env.rl.ppo.loss import compute_advantage
 
 
 class ValueNetwork(nn.Module):
-    """Critic that pools Field/Boundary embeddings and global context."""
+    """Critic that maps the global context ``z_G`` to a scalar value."""
 
     def __init__(self, hidden_dim: int = 128) -> None:
         super().__init__()
         self.hidden_dim = int(hidden_dim)
         self.network = nn.Sequential(
-            nn.Linear(3 * self.hidden_dim, self.hidden_dim),
+            nn.Linear(self.hidden_dim, self.hidden_dim),
             nn.Tanh(),
             nn.Linear(self.hidden_dim, self.hidden_dim // 2),
             nn.Tanh(),
             nn.Linear(self.hidden_dim // 2, 1),
         )
 
-    def forward(self, field_embedding, boundary_embedding, global_embedding):
+    def forward(self, global_embedding):
         """Return scalar values with shape ``[batch, 1]``."""
-        field_pool = self._pool(field_embedding)
-        boundary_pool = self._pool(boundary_embedding)
-        global_pool = global_embedding.reshape(-1, self.hidden_dim)
-        return self.network(torch.cat((field_pool, boundary_pool, global_pool), dim=-1))
-
-    def _pool(self, embeddings):
-        if embeddings.shape[0] == 0:
-            return embeddings.new_zeros((1, self.hidden_dim))
-        return embeddings.mean(dim=0, keepdim=True)
+        return self.network(global_embedding.reshape(-1, self.hidden_dim))
 
 
 class PPOAgent:
@@ -64,23 +56,17 @@ class PPOAgent:
 
     def value_from_output(self, output) -> torch.Tensor:
         """Evaluate the critic from an actor forward result."""
-        embeddings = output["encoder_output"]
-        return self.critic(
-            embeddings["field_embedding"].detach(),
-            embeddings["boundary_embedding"].detach(),
-            output["global_embedding"].detach(),
-        ).squeeze(-1)
+        return self.critic(output["global_embedding"].detach()).squeeze(-1)
 
     @torch.no_grad()
-    def value_for_graph(self, graph) -> float:
+    def value_for_graph(self, graph, environment=None) -> float:
         """Estimate V(s) for a saved graph without generating actions or masks."""
         was_training = self.actor.training
         self.actor.eval()
-        embeddings, global_embedding = self.actor.encode_graph(graph)
-        value = self.critic(
-            embeddings["field_embedding"], embeddings["boundary_embedding"],
-            global_embedding,
-        ).reshape(()).item()
+        _embeddings, global_embedding = self.actor.encode_graph(
+            graph, environment=environment
+        )
+        value = self.critic(global_embedding).reshape(()).item()
         self.actor.train(was_training)
         return float(value)
 

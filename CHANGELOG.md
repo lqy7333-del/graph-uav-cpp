@@ -7,6 +7,32 @@
 
 ## 2026-10-13
 
+### 9. Phase 11 设计修正：Global State + Entry/Exit Role Embedding
+- **文件**：新增 `coverage_env/rl/decoder/global_state_encoder.py`、
+  `coverage_env/tests/test_global_context_and_role_embedding.py`；修改
+  `coverage_env/rl/decoder/action_embedding.py`、`action_decoder.py`、`decoder/__init__.py`、
+  `coverage_env/rl/ppo/ppo.py`、`coverage_env/rl/trainer/trainer.py`、
+  `coverage_env/env/uav.py`、`coverage_env/env/instance_generator.py`、`coverage_env/config/default.yaml`。
+- **变更（旧 → 新）**：
+  1) Action embedding 由 `[z_F, z_B(e_in), z_B(e_out)]` + 5 维 `GlobalEncoder(global_feature)` 改为
+     `[z_F, z_B(e_in)+r_entry, z_B(e_out)+r_exit, z_G]`（仍为 4×128=512 维）。新增可学习角色向量
+     `r_entry`/`r_exit`，显式区分 boundary 入口/出口语义；entry/exit 仍共享同一张 boundary embedding 表。
+  2) 新增 `GlobalStateEncoder`：`z_G = MLP(concat(g_graph, x_UAV, x_Depot))`，其中
+     `g_graph = concat(MeanPool(Z_F), MeanPool(Z_B))`；`x_UAV` 为 10 维
+     `[E_max,Q_max,speed,coverage_width,x,y,E_remaining,Q_remaining,energy_ratio,payload_ratio]`；
+     `x_Depot` 为 2 维 depot 坐标。删除旧 `GlobalEncoder`。
+  3) Critic（`ppo.py` 的 `ValueNetwork`）由「pool field/boundary + 5 维 global」改为直接消费 `z_G`；
+     `value_for_graph` 增加 `environment` 参数，trainer 相应传参。
+  4) UAV 新增 `max_payload`/`remaining_payload`/`payload_per_area`（默认 0 不消耗），在 reset/get_state/
+     execute_path 维护；instance_generator 与 config 接线。
+- **原因**：旧 action embedding 缺少全局状态（无 UAV 能力/药量、无图池化），且 entry/exit 无角色语义，
+  策略无法适应不同能力 UAV 或区分入口/出口。
+- **回滚方法**：删除新增的 2 个文件；`action_embedding.py` 恢复无 role 向量的 3 段拼接并恢复 `GlobalEncoder`；
+  `action_decoder.py` 恢复 `GlobalEncoder(embeddings["global_feature"])` 构建 global_embedding；
+  `ppo.py` 的 `ValueNetwork` 恢复 3 输入（field/boundary/global pooling）；`trainer.py` 恢复
+  `value_for_graph(next_graph)` 单参调用；`uav.py` 删除 payload 三字段及相关逻辑；`instance_generator.py`/
+  `default.yaml` 删除 payload 接线。之后运行 `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+
 ### 8. 项目初始化为 Git 仓库并推送到 GitHub
 - **文件**：`.gitignore`（新增 `.claude/`、`coverage_env/results/` 两行）；项目根目录初始化 `.git/`。
 - **变更（旧 → 新）**：项目由「非 git 仓库、靠 CHANGELOG 记录回滚」改为「git 仓库，本地 `main`
