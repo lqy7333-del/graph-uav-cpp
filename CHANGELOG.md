@@ -7,6 +7,32 @@
 
 ## 2026-10-13
 
+### 10. Environment 真实药量消耗 + 转移/作业路径分离
+- **文件**：新增 `coverage_env/tests/test_payload_and_transfer_separation.py`；修改
+  `coverage_env/env/uav.py`、`coverage_env/planner/configuration_executor.py`、
+  `coverage_env/env/environment.py`、`coverage_env/config/default.yaml`。
+- **变更（旧 → 新）**：
+  1) `UAV.execute_path` 返回新增 `payload_consumption`/`remaining_payload`；新增
+     `total_payload_consumed` 累计药耗（`__init__`/`reset`/`execute_path` 维护）。
+  2) `ConfigurationExecutor.execute` 由单个 `execute_path(total_path, area)` 拆为三次显式调用：
+     `entry_transit(area=0)` → `coverage(area=covered_area)` → `exit_transit(area=0)`；
+     `CoverageExecutionResult` 新增 `payload`/`transfer_distance`/`coverage_distance`。
+  3) `environment.py`：execution record/feedback 记录 `payload`/`transfer_distance`/`coverage_distance`；
+     `get_summary` 增加 `total_payload`/`remaining_payload`；`estimate_workload` 缓存 key 加
+     `remaining_payload`；`_estimate_workload_uncached` 用 `remaining_payload / payload_per_area`
+     封顶可达面积；`_refine_workload_for_execution` 额外校验药量。
+  4) `default.yaml`：`payload_per_area: 0.0 → 0.001`，`max_payload: 100.0 → 500.0`（占位，保证当前
+     5~20 地块场景药量不成为硬约束；约束逻辑已就绪，后续按真实药量/系数再调）。
+- **原因**：此前药量未真实消耗；转移与作业路径在能耗/药量上未显式分离；workload 估算未考虑药量。
+  现在转移只耗电 `alpha*distance`（不耗药），作业耗电 `alpha*distance + beta*area` 且耗药
+  `gamma*area`（`gamma = payload_per_area`）；药量作为硬约束参与可行性（不足则 action 不可行）。
+- **回滚方法**：删除新增测试文件；`uav.py` 移除 `payload_consumption`/`remaining_payload` 返回字段与
+  `total_payload_consumed`；`configuration_executor.py` 恢复单次 `execute_path(total_path, area)` 并删除
+  result 的三个新字段；`environment.py` 移除 payload/transfer/coverage 记录、`get_summary` 药量字段、
+  `estimate_workload` 药量封顶与缓存 key、`_refine` 药量校验；`default.yaml` 恢复
+  `payload_per_area: 0.0`、`max_payload: 100.0`。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+
 ### 9. Phase 11 设计修正：Global State + Entry/Exit Role Embedding
 - **文件**：新增 `coverage_env/rl/decoder/global_state_encoder.py`、
   `coverage_env/tests/test_global_context_and_role_embedding.py`；修改

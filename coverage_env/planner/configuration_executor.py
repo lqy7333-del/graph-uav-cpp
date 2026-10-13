@@ -36,6 +36,9 @@ class CoverageExecutionResult:
     total_path: list[Point2D]
     distance: float
     energy: float
+    payload: float
+    transfer_distance: float
+    coverage_distance: float
     covered_area: float
     field_id: str | int
     uav_id: str | int
@@ -134,12 +137,36 @@ class ConfigurationExecutor:
         )
 
         covered_area = float(sum(point.point_area for point in region))
-        feedback = uav.execute_path(total_path, area=covered_area)
+        entry_feedback = uav.execute_path(entry_transit_path, area=0.0)
+        coverage_feedback = uav.execute_path(coverage_path, area=covered_area)
+        exit_feedback = uav.execute_path(exit_transit_path, area=0.0)
         for point in region:
             point.covered = True
         remaining_points = field.get_uncovered_points()
         if field.field_id not in uav.visited_fields:
             uav.visited_fields.append(field.field_id)
+
+        entry_distance = float(entry_feedback["path_length"])
+        exit_distance = float(exit_feedback["path_length"])
+        scan_transit_distance = sum(
+            self._path_length(path) for path in sweep_plan.scan_transit_paths
+        )
+        spray_distance = sum(
+            hypot(end[0] - start[0], end[1] - start[1])
+            for start, end in sweep_plan.coverage_strokes
+        )
+        distance = entry_distance + float(coverage_feedback["path_length"]) + exit_distance
+        energy = (
+            float(entry_feedback["energy_consumption"])
+            + float(coverage_feedback["energy_consumption"])
+            + float(exit_feedback["energy_consumption"])
+        )
+        payload = (
+            float(entry_feedback["payload_consumption"])
+            + float(coverage_feedback["payload_consumption"])
+            + float(exit_feedback["payload_consumption"])
+        )
+        transfer_distance = entry_distance + scan_transit_distance + exit_distance
 
         return CoverageExecutionResult(
             region=region,
@@ -152,8 +179,11 @@ class ConfigurationExecutor:
             scan_transit_paths=sweep_plan.scan_transit_paths,
             exit_transit_path=exit_transit_path,
             total_path=total_path,
-            distance=float(feedback["path_length"]),
-            energy=float(feedback["energy_consumption"]),
+            distance=distance,
+            energy=energy,
+            payload=payload,
+            transfer_distance=transfer_distance,
+            coverage_distance=spray_distance,
             covered_area=covered_area,
             field_id=field.field_id,
             uav_id=uav.uav_id,
@@ -218,6 +248,14 @@ class ConfigurationExecutor:
             if not result or point != result[-1]:
                 result.append(point)
         return result
+
+    @staticmethod
+    def _path_length(path: list[Point2D]) -> float:
+        """Return the Euclidean length of a waypoint sequence."""
+        return sum(
+            hypot(end[0] - start[0], end[1] - start[1])
+            for start, end in zip(path[:-1], path[1:])
+        )
 
     @classmethod
     def _join_paths(cls, *paths: list[Point2D]) -> list[Point2D]:

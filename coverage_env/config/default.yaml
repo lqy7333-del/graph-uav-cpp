@@ -34,8 +34,8 @@ uav:
   speed: 8.0
   coverage_width: 10.0
   sensor_width: 5.0
-  max_payload: 100.0
-  payload_per_area: 0.0
+  max_payload: 500.0
+  payload_per_area: 0.001
   energy:
     alpha: 0.20
     beta: 0.02

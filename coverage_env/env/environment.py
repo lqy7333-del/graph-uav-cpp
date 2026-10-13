@@ -287,6 +287,9 @@ class CoverageEnvironment(FieldEnvironment):
             "total_path": list(result.total_path),
             "distance": result.distance,
             "energy": result.energy,
+            "payload": result.payload,
+            "transfer_distance": result.transfer_distance,
+            "coverage_distance": result.coverage_distance,
             "coverage": result.covered_area,
             "orientation": result.orientation,
             "uav_id": result.uav_id,
@@ -302,6 +305,9 @@ class CoverageEnvironment(FieldEnvironment):
             "path": list(result.total_path),
             "distance": result.distance,
             "energy": result.energy,
+            "payload": result.payload,
+            "transfer_distance": result.transfer_distance,
+            "coverage_distance": result.coverage_distance,
             "coverage": result.covered_area,
             "entry_boundary_id": configuration.entry_boundary_id,
             "exit_boundary_id": configuration.exit_boundary_id,
@@ -471,6 +477,7 @@ class CoverageEnvironment(FieldEnvironment):
             action.field_id, action.entry_boundary_id, action.exit_boundary_id,
             tuple(uav.current_position or self.depot.get_position()),
             float(uav.remaining_energy),
+            float(uav.remaining_payload),
             tuple(point.id for point in field.get_uncovered_points()),
         )
         if cache_key in self._action_estimate_cache:
@@ -507,6 +514,10 @@ class CoverageEnvironment(FieldEnvironment):
             return 0.0
         remaining_area = sum(point.point_area for point in field.get_uncovered_points())
         maximum_area = min(reachable_area, remaining_area)
+        if uav.payload_per_area > 0.0:
+            maximum_area = min(
+                maximum_area, uav.remaining_payload / uav.payload_per_area
+            )
         if maximum_area <= 0.0:
             return 0.0
 
@@ -632,6 +643,8 @@ class CoverageEnvironment(FieldEnvironment):
                 result.exit_boundary_point[1] - depot.position[1],
             )
             total_required = result.energy + trial_uav.alpha * return_distance
+            if result.payload > self.uavs[0].remaining_payload + 1e-8:
+                return False
             return total_required <= self.uavs[0].remaining_energy + 1e-8
 
         # The rough energy model is usually conservative enough. Check its
@@ -810,6 +823,10 @@ class CoverageEnvironment(FieldEnvironment):
             "covered_area": covered_area,
             "remaining_energy": {
                 uav.uav_id: uav.remaining_energy for uav in self.uavs
+            },
+            "total_payload": sum(uav.total_payload_consumed for uav in self.uavs),
+            "remaining_payload": {
+                uav.uav_id: uav.remaining_payload for uav in self.uavs
             },
             "completed_fields": completed_fields,
             "uav_trajectory": {

@@ -63,6 +63,7 @@ class UAV:
         self.current_path: list[Position2D] = []
         self.last_energy_consumption = 0.0
         self.total_energy_consumed = 0.0
+        self.total_payload_consumed = 0.0
 
     @staticmethod
     def _positive_value(name: str, value: float) -> float:
@@ -139,10 +140,13 @@ class UAV:
         self.covered_area += area
         self.last_energy_consumption = energy
         self.total_energy_consumed += energy
+        self.total_payload_consumed += payload
         return {
             "path_length": distance,
             "energy_consumption": energy,
+            "payload_consumption": payload,
             "remaining_energy": self.remaining_energy,
+            "remaining_payload": self.remaining_payload,
             "final_position": self.current_position,
         }
 
@@ -157,6 +161,7 @@ class UAV:
         self.current_path.clear()
         self.last_energy_consumption = 0.0
         self.total_energy_consumed = 0.0
+        self.total_payload_consumed = 0.0
 
     def get_state(self) -> dict:
         """Return dynamic state plus the static capability and payload fields."""
