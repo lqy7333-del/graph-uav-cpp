@@ -1,0 +1,102 @@
+"""Node and global feature construction for field-boundary graphs."""
+
+from __future__ import annotations
+
+from math import atan2, degrees, pi
+
+import torch
+
+
+def _angle_to_unit(angle_degrees: float) -> float:
+    """Map an unoriented axis angle in degrees to a stable [-1, 1] value."""
+    return max(-1.0, min(1.0, float(angle_degrees) / 90.0))
+
+
+class FieldFeatureBuilder:
+    """Build fixed five-dimensional, relation-free Field node features."""
+
+    def __init__(self, max_area: float, max_perimeter: float) -> None:
+        if max_area <= 0.0 or max_perimeter <= 0.0:
+            raise ValueError("max_area and max_perimeter must be positive.")
+        self.max_area = float(max_area)
+        self.max_perimeter = float(max_perimeter)
+
+    def build(self, environment) -> torch.Tensor:
+        """Return rows ``[area_norm, perimeter_norm, compactness, orientation, remaining_ratio]``."""
+        rows = []
+        for field in environment.fields:
+            total_grid_area = sum(point.point_area for point in field.grid_points)
+            remaining = sum(point.point_area for point in field.grid_points if not point.covered)
+            remaining_ratio = (
+                remaining / total_grid_area if total_grid_area > 0.0 else 1.0
+            )
+            compactness = (
+                4.0 * pi * field.area / (field.perimeter ** 2)
+                if field.perimeter > 0.0 else 0.0
+            )
+            rows.append([
+                min(1.0, field.area / self.max_area),
+                min(1.0, field.perimeter / self.max_perimeter),
+                max(0.0, min(1.0, compactness)),
+                _angle_to_unit(field.orientation),
+                max(0.0, min(1.0, remaining_ratio)),
+            ])
+        return torch.tensor(rows, dtype=torch.float32).reshape(-1, 5)
+
+
+class BoundaryFeatureBuilder:
+    """Build fixed two-dimensional, relation-free Boundary node features."""
+
+    def __init__(self, max_boundary_length: float) -> None:
+        if max_boundary_length <= 0.0:
+            raise ValueError("max_boundary_length must be positive.")
+        self.max_boundary_length = float(max_boundary_length)
+
+    def build(self, environment, boundaries=None) -> torch.Tensor:
+        """Return rows ``[length_norm, orientation]`` for boundary nodes."""
+        boundaries = boundaries or [
+            (field, boundary)
+            for field in environment.fields
+            for boundary in field.boundaries
+        ]
+        rows = []
+        for _field, boundary in boundaries:
+            angle = degrees(atan2(
+                boundary.tangent_vector[1], boundary.tangent_vector[0]
+            ))
+            # Boundary segments are unoriented axes: normalize modulo 180 degrees.
+            angle = (angle + 90.0) % 180.0 - 90.0
+            rows.append([
+                min(1.0, boundary.length / self.max_boundary_length),
+                _angle_to_unit(angle),
+            ])
+        return torch.tensor(rows, dtype=torch.float32).reshape(-1, 2)
+
+
+class GlobalFeatureBuilder:
+    """Build the five-value UAV/depot global feature vector."""
+
+    def __init__(self, position_scale_m: float = 10_000.0) -> None:
+        if position_scale_m <= 0.0:
+            raise ValueError("position_scale_m must be positive.")
+        self.position_scale_m = float(position_scale_m)
+
+    def build(self, environment) -> torch.Tensor:
+        """Return ``[uav_x, uav_y, energy_ratio, depot_x, depot_y]``."""
+        if environment.uavs:
+            uav = environment.uavs[0]
+            position = uav.current_position or environment.depot.get_position()
+            energy_ratio = uav.remaining_energy / uav.max_energy
+        else:
+            position = environment.depot.get_position()
+            energy_ratio = 0.0
+        depot = environment.depot.get_position()
+
+        def normalize(value):
+            return max(-1.0, min(1.0, float(value) / self.position_scale_m))
+
+        return torch.tensor([
+            normalize(position[0]), normalize(position[1]),
+            max(0.0, min(1.0, energy_ratio)),
+            normalize(depot[0]), normalize(depot[1]),
+        ], dtype=torch.float32)

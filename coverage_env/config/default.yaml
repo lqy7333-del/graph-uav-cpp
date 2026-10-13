@@ -1,0 +1,92 @@
+environment:
+  coordinate_system:
+    type: WGS84
+  num_fields:
+    min: 5
+    max: 20
+  workspace:
+    min_lat: 31.20
+    max_lat: 31.25
+    min_lon: 121.42
+    max_lon: 121.52
+  random_seed: 20261012
+  max_episode_steps_per_field: 12
+
+field_generator:
+  field_size:
+    min_area: 4000.0
+    max_area: 8000.0
+  shape:
+    min_vertices: 6
+    max_vertices: 10
+    irregularity: 0.22
+  min_field_spacing: 40.0
+  resolution:
+    grid_resolution: 10.0
+
+depot:
+  type: random
+  position: null
+
+uav:
+  num_uav: 1
+  max_energy: 30000.0
+  speed: 8.0
+  coverage_width: 10.0
+  sensor_width: 5.0
+  energy:
+    alpha: 0.20
+    beta: 0.02
+    energy_margin: 0.20
+
+coverage:
+  default_workload: 0.45
+  min_workload: 0.01
+  max_workload: 0.50
+
+plot:
+  show_grid: true
+  save_result: true
+  show: false
+  output_dir: results
+  save_gif: false
+
+rl:
+  gamma: 0.99
+  learning_rate: 0.0003
+  batch_size: 64
+  workload_options: [0.1, 0.2, 0.3, 0.5]
+  return_to_depot: true
+  reward_weights:
+    lambda1: 1.0
+    lambda2: 1.0
+    lambda3: 1.0
+    lambda4: 0.1
+  reward_normalization:
+    distance_scale_m: null
+    energy_scale_wh: null
+    coverage_scale_m2: null
+    fragmentation_scale: 1.0
+  fragmentation_small_component_max_points: 4
+  graph:
+    max_area: 8000.0
+    max_perimeter: 500.0
+    max_boundary_length: 200.0
+    position_scale_m: 10000.0
+    global_distance_scale_m: 10000.0
+    d_near_m: 1500.0
+  encoder:
+    hidden_dim: 128
+    num_heads: 4
+    dropout: 0.1
+
+ppo:
+  learning_rate: 0.0003
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_ratio: 0.2
+  entropy_coef: 0.01
+  value_coef: 0.5
+  epochs: 4
+  batch_size: 64
+  max_grad_norm: 0.5
