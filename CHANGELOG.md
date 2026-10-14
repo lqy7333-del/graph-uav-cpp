@@ -7,6 +7,28 @@
 
 ## 2026-10-14
 
+### 13. 地块几何缩小 + UAV 参数按真实农业无人机标定
+- **文件**：修改 `coverage_env/config/default.yaml`。
+- **变更（旧 → 新）**：
+  1) `field_generator.field_size`：`min_area 4000.0 → 1000.0`、`max_area 8000.0 → 6000.0`（地块面积 1000~6000 m²，实测均值约 3813 m²）。
+  2) `field_generator.shape`：`min_vertices 6 → 3`、`max_vertices 10 → 5`（顶点数 3~5）。
+  3) `uav`：`max_energy 30000.0 → 1500.0`、`max_payload 500.0 → 50.0`、
+     `payload_per_area 0.001 → 0.003`。
+- **原因**：
+  1) 地块顶点数/面积过大导致一次 `step_configuration` 几何规划耗时 5~11 秒（热点在
+     sweep planner 的可见性图路径搜索，region_geometry 顶点随格点数膨胀）；缩小后实测降到
+     约 0.72 秒，缓解测试/训练慢的问题。
+  2) 原 `max_energy=30000`/`max_payload=500` 为「保证 5~20 地块不成为硬约束」的占位值；现按
+     真实农业无人机（大疆 T60/T100、极飞 P150）标定：电池约 1500 Wh、药箱约 50 L、亩用量约
+     2 L/亩（`payload_per_area=0.003`，即 0.003 药量/m²）。
+- **回滚方法**：恢复 `default.yaml` 上述 6 个值（面积 4000/8000、顶点 6/10、
+  max_energy 30000、max_payload 500、payload_per_area 0.001）。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+- **已知影响**：缩小参数后，默认 20 地块场景下单架次仅能覆盖约 3 个地块（能量先耗尽，见
+  `alpha` 系数偏高的说明），依赖「能量/药量不成为约束」的旧集成测试（如
+  `test_nearest_neighbor_episode.py` 期望 10/10 episode 覆盖完所有地块）将不再成立，需后续
+  更新基线或启用自动补给。
+
 ### 12. 自动补给（auto resupply）：资源耗尽时自动返航补满
 - **文件**：修改 `coverage_env/env/uav.py`、`coverage_env/env/environment.py`、
   `coverage_env/config/default.yaml`；新增 `coverage_env/tests/test_auto_resupply.py`。

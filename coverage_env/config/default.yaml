@@ -14,11 +14,11 @@ environment:
 
 field_generator:
   field_size:
-    min_area: 4000.0
-    max_area: 8000.0
+    min_area: 1000.0
+    max_area: 6000.0
   shape:
-    min_vertices: 6
-    max_vertices: 10
+    min_vertices: 3
+    max_vertices: 5
     irregularity: 0.22
   min_field_spacing: 40.0
   resolution:
@@ -30,12 +30,12 @@ depot:
 
 uav:
   num_uav: 1
-  max_energy: 30000.0
+  max_energy: 1500.0
   speed: 8.0
   coverage_width: 10.0
   sensor_width: 5.0
-  max_payload: 500.0
-  payload_per_area: 0.001
+  max_payload: 50.0
+  payload_per_area: 0.003
   energy:
     alpha: 0.20
     beta: 0.02
