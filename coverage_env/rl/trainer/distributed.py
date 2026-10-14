@@ -1,0 +1,179 @@
+"""Single-training, multi-GPU Distributed Data Parallel (DDP) trainer.
+
+Each rank runs its own environment (different seed) and collects a fixed-length
+rollout. The model is wrapped in :class:`DistributedDataParallel` so gradients
+are all-reduced across ranks, keeping a single shared set of parameters.
+
+The fixed rollout length is what makes DDP viable here: the existing
+``Trainer`` updates once per *complete episode*, and episode length varies with
+the sampled fields. DDP requires every rank to issue the same number of
+backward passes, so we collect exactly ``rollout_steps`` transitions per update
+and reset the environment whenever an episode ends.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import socket
+from copy import deepcopy
+
+import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+from coverage_env.config import load_config
+from coverage_env.env.instance_generator import InstanceGenerator
+from coverage_env.rl.buffer.rollout_buffer import RolloutBuffer
+from coverage_env.rl.decoder.action_decoder import CoveragePolicy
+from coverage_env.rl.ppo.ppo import PPOAgent
+from coverage_env.rl.trainer.trainer import _clone_graph
+
+
+def _free_port() -> int:
+    """Return an available TCP port for the NCCL rendezvous."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+class DistributedTrainer:
+    """Collect a fixed-length rollout per rank, then one synchronized PPO update."""
+
+    def __init__(self, environment, agent, *, rank: int = 0, world_size: int = 1) -> None:
+        self.environment = environment
+        self.agent = agent
+        self.rank = int(rank)
+        self.world_size = int(world_size)
+        self.buffer = RolloutBuffer()
+
+    def train(self, num_updates: int, rollout_steps: int) -> None:
+        """Run ``num_updates`` synchronized updates of ``rollout_steps`` steps each."""
+        for update_idx in range(1, num_updates + 1):
+            # Sampling is stochastic and must not feed the autograd graph.
+            self.agent.actor.eval()
+            state = self.environment.reset()
+            rollout_reward = 0.0
+
+            for _ in range(rollout_steps):
+                with torch.no_grad():
+                    output = self.agent.actor(state, environment=self.environment)
+                    distribution = output["action_distribution"]
+                    while distribution.numel() == 0 or float(distribution.detach().sum()) <= 0.0:
+                        state = self.environment.reset()
+                        output = self.agent.actor(state, environment=self.environment)
+                        distribution = output["action_distribution"]
+                    action_index = int(torch.multinomial(distribution, 1).item())
+                    action = output["actions"][action_index]
+                    log_prob = torch.log(distribution[action_index].clamp_min(1e-12))
+                    value = self.agent.value_from_output(output)
+
+                next_state, reward, env_done, _info = self.environment.step(action)
+                rollout_reward += float(reward)
+                with torch.no_grad():
+                    # DDP does not proxy custom attributes; reach the wrapped
+                    # CoveragePolicy via ``.module`` for graph construction and
+                    # encoding (``value_for_graph`` also assumes the raw actor).
+                    next_graph = self.agent.actor.module.graph_builder.build_graph(self.environment)
+                    if env_done:
+                        next_value = 0.0
+                    else:
+                        _embeddings, global_embedding = self.agent.actor.module.encode_graph(
+                            next_graph, environment=self.environment
+                        )
+                        next_value = self.agent.critic(global_embedding).reshape(()).item()
+
+                self.buffer.add(
+                    {
+                        "observation": deepcopy(state),
+                        "graph": _clone_graph(output["graph"]),
+                        "actions": list(output["actions"]),
+                        "mask": output["mask"].detach().cpu().tolist(),
+                    },
+                    action,
+                    reward,
+                    {
+                        "observation": deepcopy(next_state),
+                        "graph": _clone_graph(next_graph),
+                    },
+                    env_done,
+                    log_prob.detach().item(),
+                    value.detach().item(),
+                    next_value,
+                )
+                state = self.environment.reset() if env_done else next_state
+
+            # Gradients are synchronized during backward, so the model must be
+            # in training mode here for DDP to register its reduce hooks.
+            self.agent.actor.train()
+            self.agent.critic.train()
+            stats = self.agent.update(self.buffer)
+            self.buffer.clear()
+
+            if self.rank == 0:
+                print(
+                    f"[DDP] update {update_idx}/{num_updates} | steps={rollout_steps} "
+                    f"reward={rollout_reward:.3f} actor_loss={stats['actor_loss']:.5f} "
+                    f"critic_loss={stats['critic_loss']:.5f}",
+                    flush=True,
+                )
+
+
+def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
+    """One distributed process bound to GPU ``rank``."""
+    dist.init_process_group("nccl", init_method="env://", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
+
+    config = load_config()
+    config["environment"]["num_fields"] = {"min": args.num_fields, "max": args.num_fields}
+    config["ppo"].update({"epochs": args.ppo_epochs, "batch_size": args.batch_size})
+
+    # Same model init seed on every rank so parameters start identical; the
+    # environment seed differs per rank so each rank samples different fields.
+    torch.manual_seed(args.seed)
+    environment = InstanceGenerator(config).generate(
+        num_fields=args.num_fields, seed=args.seed + rank
+    )
+
+    actor = CoveragePolicy(environment, config=config).to(rank)
+    agent = PPOAgent(actor, config, device=rank)
+    agent.actor = DDP(agent.actor, device_ids=[rank], find_unused_parameters=True)
+    agent.critic = DDP(agent.critic, device_ids=[rank])
+
+    trainer = DistributedTrainer(environment, agent, rank=rank, world_size=world_size)
+    trainer.train(args.num_updates, args.rollout_steps)
+
+    # A single number that must match across ranks after all-reduce.
+    with torch.no_grad():
+        checksum = sum(float(param.sum()) for param in agent.actor.module.parameters())
+    print(f"[rank {rank}] actor param checksum = {checksum:.6f}", flush=True)
+
+    dist.barrier()
+    dist.destroy_process_group()
+
+
+def main() -> None:
+    """Parse arguments and launch one process per GPU."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--num-fields", type=int, default=5)
+    parser.add_argument("--num-updates", type=int, default=5)
+    parser.add_argument("--rollout-steps", type=int, default=32)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--ppo-epochs", type=int, default=2)
+    parser.add_argument("--batch-size", type=int, default=32)
+    args = parser.parse_args()
+
+    world_size = torch.cuda.device_count()
+    if world_size < 1:
+        raise SystemExit("No CUDA GPUs available.")
+    if args.num_updates <= 0 or args.rollout_steps <= 0:
+        raise SystemExit("num-updates and rollout-steps must be positive.")
+
+    os.environ["MASTER_ADDR"] = "127.0.0.1"
+    os.environ["MASTER_PORT"] = str(_free_port())
+    mp.spawn(_worker, args=(world_size, args), nprocs=world_size, join=True)
+
+
+if __name__ == "__main__":
+    main()
