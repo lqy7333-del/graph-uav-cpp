@@ -7,6 +7,22 @@
 
 ## 2026-10-14
 
+### 14. 缩小 workspace + 调低 alpha，使 payload 成为主约束、电量宽裕
+- **文件**：修改 `coverage_env/config/default.yaml`。
+- **变更（旧 → 新）**：
+  1) `environment.workspace`：`min_lat 31.20→31.218`、`max_lat 31.25→31.232`、
+     `min_lon 121.42→121.462`、`max_lon 121.52→121.478`（workspace 由约 5.5×9.5 km 缩到
+     约 1.5×1.5 km）。
+  2) `field_generator.min_field_spacing`：`40.0 → 15.0`。
+  3) `uav.energy.alpha`：`0.20 → 0.08`。
+- **原因**：workspace 过大导致 20 个小地块散布（实测地块最近邻间距均值约 900 m、最大 3.8 km，
+  depot 到地块均值约 3.3 km、最大 7.6 km），`alpha·distance` 的转移能耗把能量吃光，能量先于药量
+  耗尽。缩小 workspace 后地块紧凑（间距均值约 280 m、depot 约 700 m），并调低 alpha 降低移动
+  能耗，使 payload 成为主约束、电量宽裕。实测（20 地块、不补给 greedy、8 个 seed）：一次作业
+  平均覆盖 4.2 个地块，药量先耗尽（剩余约 0.4%），能量还剩约 45.7%。
+- **回滚方法**：恢复 `default.yaml` 的 workspace 四个值、`min_field_spacing: 40.0`、
+  `alpha: 0.20`。之后运行 `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+
 ### 13. 地块几何缩小 + UAV 参数按真实农业无人机标定
 - **文件**：修改 `coverage_env/config/default.yaml`。
 - **变更（旧 → 新）**：

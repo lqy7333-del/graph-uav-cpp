@@ -5,10 +5,10 @@ environment:
     min: 5
     max: 20
   workspace:
-    min_lat: 31.20
-    max_lat: 31.25
-    min_lon: 121.42
-    max_lon: 121.52
+    min_lat: 31.218
+    max_lat: 31.232
+    min_lon: 121.462
+    max_lon: 121.478
   random_seed: 20261012
   max_episode_steps_per_field: 12
 
@@ -20,7 +20,7 @@ field_generator:
     min_vertices: 3
     max_vertices: 5
     irregularity: 0.22
-  min_field_spacing: 40.0
+  min_field_spacing: 15.0
   resolution:
     grid_resolution: 10.0
 
@@ -37,7 +37,7 @@ uav:
   max_payload: 50.0
   payload_per_area: 0.003
   energy:
-    alpha: 0.20
+    alpha: 0.08
     beta: 0.02
     energy_margin: 0.20
 
