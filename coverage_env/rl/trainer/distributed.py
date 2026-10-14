@@ -41,12 +41,15 @@ def _free_port() -> int:
 class DistributedTrainer:
     """Collect a fixed-length rollout per rank, then one synchronized PPO update."""
 
-    def __init__(self, environment, agent, *, rank: int = 0, world_size: int = 1) -> None:
+    def __init__(self, environment, agent, *, rank: int = 0, world_size: int = 1,
+                 checkpoint_dir=None, checkpoint_every: int = 50) -> None:
         self.environment = environment
         self.agent = agent
         self.rank = int(rank)
         self.world_size = int(world_size)
         self.buffer = RolloutBuffer()
+        self.checkpoint_dir = checkpoint_dir
+        self.checkpoint_every = int(checkpoint_every)
 
     def train(self, num_updates: int, rollout_steps: int) -> None:
         """Run ``num_updates`` synchronized updates of ``rollout_steps`` steps each."""
@@ -112,12 +115,58 @@ class DistributedTrainer:
             self.buffer.clear()
 
             if self.rank == 0:
+                summary = self.environment.get_summary()
+                row = {
+                    "update": update_idx,
+                    "reward": round(rollout_reward, 4),
+                    "actor_loss": round(stats["actor_loss"], 6),
+                    "critic_loss": round(stats["critic_loss"], 6),
+                    "coverage_ratio": round(summary["coverage_ratio"], 4),
+                    "total_distance": round(summary["total_distance"], 1),
+                }
                 print(
                     f"[DDP] update {update_idx}/{num_updates} | steps={rollout_steps} "
-                    f"reward={rollout_reward:.3f} actor_loss={stats['actor_loss']:.5f} "
-                    f"critic_loss={stats['critic_loss']:.5f}",
+                    f"reward={rollout_reward:.3f} coverage={summary['coverage_ratio']:.1%} "
+                    f"actor_loss={stats['actor_loss']:.5f} critic_loss={stats['critic_loss']:.5f}",
                     flush=True,
                 )
+                self._append_log(row)
+                if self.checkpoint_dir and update_idx % self.checkpoint_every == 0:
+                    self._save_checkpoint(update_idx)
+
+
+    def _append_log(self, row: dict) -> None:
+        """Append one training row to the CSV log (rank 0 only)."""
+        if self.checkpoint_dir is None:
+            return
+        from pathlib import Path
+
+        log_path = Path(self.checkpoint_dir) / "train_log.csv"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        write_header = not log_path.exists()
+        with log_path.open("a", encoding="utf-8") as stream:
+            if write_header:
+                stream.write(",".join(row.keys()) + "\n")
+            stream.write(",".join(str(value) for value in row.values()) + "\n")
+
+    def _save_checkpoint(self, update_idx: int) -> None:
+        """Save actor/critic/optimizer state without the DDP ``module.`` prefix."""
+        if self.checkpoint_dir is None:
+            return
+        from pathlib import Path
+
+        path = Path(self.checkpoint_dir) / f"ckpt_update_{update_idx}.pt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint = {
+            "actor": self.agent.actor.module.state_dict(),
+            "critic": self.agent.critic.module.state_dict(),
+            "actor_optimizer": self.agent.actor_optimizer.state_dict(),
+            "critic_optimizer": self.agent.critic_optimizer.state_dict(),
+            "update_count": self.agent.update_count,
+            "update_idx": update_idx,
+        }
+        torch.save(checkpoint, path)
+        print(f"[rank 0] saved checkpoint -> {path}", flush=True)
 
 
 def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
@@ -141,7 +190,10 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
     agent.actor = DDP(agent.actor, device_ids=[rank])
     agent.critic = DDP(agent.critic, device_ids=[rank])
 
-    trainer = DistributedTrainer(environment, agent, rank=rank, world_size=world_size)
+    trainer = DistributedTrainer(
+        environment, agent, rank=rank, world_size=world_size,
+        checkpoint_dir=args.checkpoint_dir, checkpoint_every=args.checkpoint_every,
+    )
     trainer.train(args.num_updates, args.rollout_steps)
 
     # A single number that must match across ranks after all-reduce.
@@ -156,12 +208,14 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
 def main() -> None:
     """Parse arguments and launch one process per GPU."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--num-fields", type=int, default=5)
-    parser.add_argument("--num-updates", type=int, default=5)
-    parser.add_argument("--rollout-steps", type=int, default=32)
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--ppo-epochs", type=int, default=2)
-    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--num-fields", type=int, default=20)
+    parser.add_argument("--num-updates", type=int, default=200)
+    parser.add_argument("--rollout-steps", type=int, default=128)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--ppo-epochs", type=int, default=4)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--checkpoint-dir", type=str, default="coverage_env/results/checkpoints")
+    parser.add_argument("--checkpoint-every", type=int, default=50)
     args = parser.parse_args()
 
     world_size = torch.cuda.device_count()
