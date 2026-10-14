@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+from copy import deepcopy
 from typing import Dict, Iterable, Union
 
 from coverage_env.env.depot import Depot
@@ -102,6 +103,9 @@ class CoverageEnvironment(FieldEnvironment):
         self._reachable_area_cache: dict = {}
         self._component_cache: dict = {}
         self._action_estimate_cache: dict = {}
+        self._growth_selection_cache: dict = {}
+        self._growth_area_cache: dict = {}
+        self._consecutive_failures = 0
 
     def _align_field_coordinate_frames(self) -> None:
         """Put all fields in the first field's projected local XY frame.
@@ -137,6 +141,9 @@ class CoverageEnvironment(FieldEnvironment):
         self._reachable_area_cache.clear()
         self._component_cache.clear()
         self._action_estimate_cache.clear()
+        self._growth_selection_cache.clear()
+        self._growth_area_cache.clear()
+        self._consecutive_failures = 0
         self.episode_logger.reset()
         state = self.get_state()
         # Preserve the Phase 3 reset contract (reset()[uav_id]) while returning
@@ -352,47 +359,63 @@ class CoverageEnvironment(FieldEnvironment):
     def step(self, action) -> tuple[dict, float, bool, dict]:
         """Apply one action and return ``(next_state, reward, done, info)``.
 
-        Invalid or infeasible actions raise ``ValueError`` before state
-        mutation. Legacy callers can continue to use ``step_configuration``
-        for its original feedback dictionary; old ``step`` feedback-key reads
-        are also supported during migration.
+        Expected planning/resource failures become penalized transitions with
+        no physical state change. Legacy callers can continue to use
+        ``step_configuration`` for its original feedback dictionary.
         """
         from coverage_env.planner.configuration import CoverageConfiguration
         from coverage_env.rl.action_space import CoverageAction
         from coverage_env.rl.reward import calculate_reward
 
         before_state = self.get_state()
-        if isinstance(action, CoverageAction):
-            workload = self.estimate_workload(action, before_state)
-            workload = self._refine_workload_for_execution(action, workload)
-            if workload <= 0.0:
-                raise ValueError("No positive feasible workload for selected action.")
-            configuration = CoverageConfiguration(
-                action.field_id, action.entry_boundary_id,
-                action.exit_boundary_id, workload,
-            )
-        elif isinstance(action, CoverageConfiguration):
-            configuration = action
-            spatial = CoverageAction(
-                action.field_id, action.entry_boundary_id, action.exit_boundary_id
-            )
-            maximum = self.estimate_workload(spatial, before_state)
-            maximum = self._refine_workload_for_execution(spatial, maximum)
-            if action.workload_ratio > maximum + 1e-8:
-                raise ValueError(
-                    "Requested workload exceeds the environment-estimated "
-                    "feasible workload."
+        try:
+            if isinstance(action, CoverageAction):
+                workload = self.estimate_workload(action, before_state)
+                workload = self._refine_workload_for_execution(action, workload)
+                if workload <= 0.0:
+                    return self._failed_step(
+                        action, before_state,
+                        "No positive feasible workload for selected action.",
+                    )
+                configuration = CoverageConfiguration(
+                    action.field_id, action.entry_boundary_id,
+                    action.exit_boundary_id, workload,
                 )
-        else:
-            raise ValueError("action must be a CoverageAction spatial decision.")
-        selected_field = self.get_field(configuration.field_id)
-        small_component_limit = int(
-            self.rl_config.get("fragmentation_small_component_max_points", 4)
-        )
-        fragmentation_before = self._fragmentation_summary(
-            selected_field, small_component_limit
-        )
-        feedback = self.step_configuration(configuration)
+            elif isinstance(action, CoverageConfiguration):
+                configuration = action
+                spatial = CoverageAction(
+                    action.field_id, action.entry_boundary_id, action.exit_boundary_id
+                )
+                maximum = self.estimate_workload(spatial, before_state)
+                maximum = self._refine_workload_for_execution(spatial, maximum)
+                if action.workload_ratio > maximum + 1e-8:
+                    return self._failed_step(
+                        action, before_state,
+                        "Requested workload exceeds the environment-estimated "
+                        "feasible workload.",
+                    )
+            else:
+                return self._failed_step(
+                    action, before_state,
+                    "action must be a CoverageAction or CoverageConfiguration.",
+                )
+        except (KeyError, ValueError, TypeError, RuntimeError, IndexError) as exc:
+            return self._failed_step(action, before_state, str(exc))
+
+        snapshot = self._capture_physical_state()
+        try:
+            selected_field = self.get_field(configuration.field_id)
+            small_component_limit = int(
+                self.rl_config.get("fragmentation_small_component_max_points", 4)
+            )
+            fragmentation_before = self._fragmentation_summary(
+                selected_field, small_component_limit
+            )
+            feedback = self.step_configuration(configuration)
+        except (KeyError, ValueError, TypeError, RuntimeError, IndexError) as exc:
+            self._restore_physical_state(snapshot)
+            return self._failed_step(action, before_state, str(exc))
+
         fragmentation_after = self._fragmentation_summary(
             selected_field, small_component_limit
         )
@@ -410,6 +433,7 @@ class CoverageEnvironment(FieldEnvironment):
         )
         result = self._execution_records[-1]
         info = {
+            "success": True,
             "selected_action": {
                 "field_id": configuration.field_id,
                 "entry_boundary_id": configuration.entry_boundary_id,
@@ -437,6 +461,8 @@ class CoverageEnvironment(FieldEnvironment):
             self.rl_config,
             **scales,
         )
+        self._growth_area_cache.clear()
+        self._consecutive_failures = 0
         done = self.is_done()
         if done:
             try:
@@ -448,6 +474,60 @@ class CoverageEnvironment(FieldEnvironment):
                 info["return_to_depot"] = return_feedback
         next_state = self.get_state()
         return EnvironmentStep(next_state, reward, done, info)
+
+    def _capture_physical_state(self) -> dict:
+        """Snapshot mutable mission state so failed execution can roll back."""
+        return {
+            "uavs": [deepcopy(uav.__dict__) for uav in self.uavs],
+            "covered": [
+                [(point, point.covered) for point in field.grid_points]
+                for field in self.fields
+            ],
+            "trajectories": deepcopy(self._mission_trajectories),
+            "records": len(self._execution_records),
+            "logs": len(self.episode_logger._transitions),
+        }
+
+    def _restore_physical_state(self, snapshot: dict) -> None:
+        """Restore UAV, coverage, trajectory, and log state after a failed step."""
+        for uav, saved in zip(self.uavs, snapshot["uavs"]):
+            uav.__dict__.clear()
+            uav.__dict__.update(saved)
+        for field_points in snapshot["covered"]:
+            for point, was_covered in field_points:
+                point.covered = was_covered
+        self._mission_trajectories = snapshot["trajectories"]
+        del self._execution_records[snapshot["records"]:]
+        del self.episode_logger._transitions[snapshot["logs"]:]
+        self._action_estimate_cache.clear()
+
+    def _failed_step(self, action, before_state: dict, reason: str):
+        """Return a penalized, non-mutating failure transition for PPO."""
+        self._consecutive_failures += 1
+        threshold = max(1, int(self.rl_config.get("failure_termination_threshold", 5)))
+        done = self._consecutive_failures >= threshold
+        next_state = self.get_state()
+        failure_penalty = float(self.rl_config.get("failure_penalty", -1.0))
+        info = {
+            "success": False,
+            "failed": True,
+            "failure_reason": reason or "Selected action could not be executed.",
+            "action": action,
+            "selected_field": getattr(action, "field_id", None),
+            "entry_boundary": getattr(action, "entry_boundary_id", None),
+            "exit_boundary": getattr(action, "exit_boundary_id", None),
+            "workload": getattr(action, "workload_ratio", 0.0),
+            "path_length": 0.0,
+            "energy": 0.0,
+            "payload": 0.0,
+            "coverage_gain": 0.0,
+            "exit_point": None,
+            "failure_count": self._consecutive_failures,
+        }
+        self.episode_logger.log_transition(
+            before_state, action, info, next_state
+        )
+        return EnvironmentStep(next_state, failure_penalty, done, info)
 
     def get_action_candidates(self, workload_options=None):
         """Generate currently possible high-level actions."""
@@ -499,17 +579,31 @@ class CoverageEnvironment(FieldEnvironment):
             return 0.0
         if entry.length <= 0.0 or exit_boundary.length <= 0.0:
             return 0.0
-        from coverage_env.planner.boundary_region_generator import BoundaryRegionGenerator
         from coverage_env.planner.configuration_executor import ConfigurationExecutor
+        from coverage_env.planner.boundary_region_generator import BoundaryRegionGenerator
         from coverage_env.planner.growth_edge import GrowthEdgeSelector
 
         current = uav.current_position or self.depot.get_position()
         entry_point = ConfigurationExecutor._project_to_boundary(entry, current)
         try:
-            growth_selection = GrowthEdgeSelector().select(field, entry, exit_boundary)
-            reachable_area = BoundaryRegionGenerator().max_reachable_area(
-                field, growth_selection.growth_edge
+            selection_key = (field.field_id, entry.id, exit_boundary.id)
+            growth_selection = self._growth_selection_cache.get(selection_key)
+            if growth_selection is None:
+                growth_selection = GrowthEdgeSelector().select(
+                    field, entry, exit_boundary
+                )
+                self._growth_selection_cache[selection_key] = growth_selection
+            coverage_key = (
+                field.field_id,
+                tuple(point.id for point in field.get_uncovered_points()),
+                growth_selection.growth_edge.id,
             )
+            reachable_area = self._growth_area_cache.get(coverage_key)
+            if reachable_area is None:
+                reachable_area = BoundaryRegionGenerator().max_reachable_area(
+                    field, growth_selection.growth_edge
+                )
+                self._growth_area_cache[coverage_key] = reachable_area
         except (ValueError, KeyError):
             return 0.0
         remaining_area = sum(point.point_area for point in field.get_uncovered_points())
@@ -526,24 +620,26 @@ class CoverageEnvironment(FieldEnvironment):
             exit_boundary.center[0] - self.depot.position[0],
             exit_boundary.center[1] - self.depot.position[1],
         )
-        reserve = uav.alpha * return_distance
-        available = uav.remaining_energy - reserve - uav.alpha * entry_distance
-        if available <= 0.0:
+        if uav.remaining_energy <= 0.0:
             return 0.0
 
         width = max(float(uav.coverage_width), 1e-9)
         alpha, beta = max(0.0, uav.alpha), max(0.0, uav.beta)
+        safety_factor = max(
+            1.0, float(self.rl_config.get("fast_estimate_safety_factor", 1.25))
+        )
         def estimated_energy(area):
             sweep = 1.25 * (area / width + 2.0 * sqrt(max(area, 0.0)))
-            return alpha * sweep + beta * area
+            estimated_route = entry_distance + sweep + return_distance
+            return safety_factor * (alpha * estimated_route + beta * area)
 
-        if estimated_energy(maximum_area) <= available:
+        if estimated_energy(maximum_area) <= uav.remaining_energy:
             feasible_area = maximum_area
         else:
             low, high = 0.0, maximum_area
             for _ in range(40):
                 mid = (low + high) / 2.0
-                if estimated_energy(mid) <= available:
+                if estimated_energy(mid) <= uav.remaining_energy:
                     low = mid
                 else:
                     high = mid
@@ -554,50 +650,9 @@ class CoverageEnvironment(FieldEnvironment):
         if feasible_area + 1e-9 < point_area:
             return 0.0
         maximum_ratio = min(1.0, feasible_area / remaining_area)
-        # Preflight a one-cell region with a reduced direction set. The exact
-        # selected action is rechecked by _refine_workload_for_execution
-        # before any state mutation; evaluating every full sweep candidate in
-        # the mask would repeat expensive geometry work for every boundary pair.
-        probe_ratio = min(maximum_ratio, point_area / remaining_area)
-        if not self._preview_action_feasible(action, probe_ratio):
-            return 0.0
+        # Keep action-mask evaluation inexpensive. The selected action is
+        # checked against the exact planner and resource use in ``step``.
         return maximum_ratio
-
-    def _preview_action_feasible(self, action, workload_ratio: float) -> bool:
-        """Check a one-cell region and a few representative sweep directions."""
-        from coverage_env.planner.boundary_aware_sweep import BoundaryAwareSweepPlanner
-        from coverage_env.planner.boundary_region_generator import BoundaryRegionGenerator
-
-        field = self.get_field(action.field_id)
-        try:
-            entry = field.get_boundary(action.entry_boundary_id)
-            exit_edge = field.get_boundary(action.exit_boundary_id)
-            remaining_area = sum(
-                point.point_area for point in field.get_uncovered_points()
-            )
-            selection = BoundaryRegionGenerator().generate(
-                field, entry, exit_edge, workload_ratio,
-                workload_reference_area=remaining_area,
-            )
-            if not selection.region:
-                return False
-            center_dx = exit_edge.center[0] - entry.center[0]
-            center_dy = exit_edge.center[1] - entry.center[1]
-            from math import atan2, degrees
-
-            directions = [field.orientation, field.orientation + 90.0]
-            if abs(center_dx) + abs(center_dy) > 1e-9:
-                directions.append(degrees(atan2(center_dy, center_dx)))
-            current = self.uavs[0].current_position or self.depot.get_position()
-            BoundaryAwareSweepPlanner().plan(
-                selection.region, field, entry, exit_edge,
-                current_position=current,
-                lane_spacing=self.uavs[0].coverage_width,
-                candidate_directions=directions,
-            )
-            return True
-        except (ValueError, KeyError, RuntimeError, IndexError):
-            return False
 
     def _refine_workload_for_execution(self, action, upper_bound: float) -> float:
         """Check estimated workload against the real executor without mutation."""

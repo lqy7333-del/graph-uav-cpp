@@ -211,11 +211,14 @@ class BoundaryGuidedPlannerTests(unittest.TestCase):
         self.assertEqual(mask, [1])  # Spatial action remains feasible for a partial strip.
 
         before = environment.get_state()
-        with self.assertRaises(ValueError):
-            environment.step(CoverageConfiguration(
-                field.field_id, entry.id, exit_edge.id, 1.0
-            ))
+        next_state, reward, done, info = environment.step(CoverageConfiguration(
+            field.field_id, entry.id, exit_edge.id, 1.0
+        ))
         self.assertEqual(environment.get_state(), before)
+        self.assertEqual(next_state, before)
+        self.assertLess(reward, 0.0)
+        self.assertFalse(done)
+        self.assertTrue(info["failed"])
 
     def test_reward_penalizes_new_fragmentation_without_changing_action_shape(self):
         field = make_field()

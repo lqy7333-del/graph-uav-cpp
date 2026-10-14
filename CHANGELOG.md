@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-10-14
+
+### 11. PPO 快速可行性筛选与失败 transition
+- **文件**：修改 `coverage_env/env/environment.py`、`coverage_env/config/default.yaml`、
+  `coverage_env/tests/validation/test_constraint_feasibility.py`、
+  `coverage_env/tests/test_boundary_guided_planner.py`；新增
+  `coverage_env/tests/test_failed_action_transition.py`。
+- **变更（旧 → 新）**：动作 mask 的 workload 估算不再对每个候选 action 调用完整覆盖路径预检；
+  改用 entry 距离、估计扫描距离、返航距离、覆盖面积能耗和可用药量的快速保守估算，并缓存
+  boundary growth selection 与当前未覆盖状态下的可达面积。新增 `rl.fast_estimate_safety_factor`
+  （默认 1.25）用于抬高快速估算成本。选中动作在执行层仍使用实际 planner 和资源量精确校验。
+  `step()` 对预检或执行阶段的预期规划/资源错误返回负奖励失败 transition，不抛异常；若执行过程中
+  已产生部分 UAV/覆盖更新，会先回滚位置、电量、药量、覆盖状态、轨迹和执行记录。失败 transition
+  的状态不变、距离/能耗/药耗/覆盖增益为零，并写入 episode log。连续失败达到
+  `rl.failure_termination_threshold`（默认 5）时结束当前 episode，让 Trainer 正常开始后续 episode。
+- **原因**：避免训练时对数百个候选动作重复运行几何 planner，并保证单个边缘资源失败不会中断 PPO
+  rollout 或留下部分执行状态。
+- **回滚方法**：恢复 `environment.py` 的 `_preview_action_feasible()` 实现/调用及原有抛错流程；删除新增失败
+  transition 测试，并恢复两个已修改测试中的异常断言；移除 `default.yaml` 中三个 `rl` 新配置项。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+
 ## 2026-10-13
 
 ### 10. Environment 真实药量消耗 + 转移/作业路径分离

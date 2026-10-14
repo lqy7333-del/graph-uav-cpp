@@ -7,35 +7,29 @@ from coverage_env.tests.validation.support import (
 
 
 class ConstraintFeasibilityTests(ValidationTestCase):
-    def test_invalid_boundary_and_insufficient_energy_are_atomic(self):
+    def test_invalid_boundary_and_insufficient_energy_return_failure_transition(self):
         environment = make_environment(max_energy=100_000.0)
         invalid_action = make_action(entry="B99")
         before = environment.get_state()
-        error = None
-        try:
-            environment.step(invalid_action)
-        except (KeyError, ValueError) as exc:
-            error = f"{type(exc).__name__}: {exc}"
+        next_state, reward, done, info = environment.step(invalid_action)
         after = environment.get_state()
         self.assert_transition(
-            error is not None and before == after,
-            before=before, action=invalid_action, result=error, after=after,
-            message="Invalid boundary should fail before modifying state.",
+            info["failed"] and reward < 0.0 and before == after == next_state
+            and not done,
+            before=before, action=invalid_action, result=info, after=after,
+            message="Invalid boundary should return a non-mutating failure transition.",
         )
 
         low_energy = make_environment(max_energy=0.01)
         action = make_action()
         before = low_energy.get_state()
-        error = None
-        try:
-            low_energy.step(action)
-        except ValueError as exc:
-            error = f"{type(exc).__name__}: {exc}"
+        next_state, reward, done, info = low_energy.step(action)
         after = low_energy.get_state()
         self.assert_transition(
-            error is not None and before == after,
-            before=before, action=action, result=error, after=after,
-            message="Insufficient energy should fail atomically.",
+            info["failed"] and reward < 0.0 and before == after == next_state
+            and not done,
+            before=before, action=action, result=info, after=after,
+            message="Insufficient energy should return an atomic failure transition.",
         )
 
     def test_configuration_rejects_out_of_range_workload(self):

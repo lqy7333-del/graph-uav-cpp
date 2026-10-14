@@ -59,6 +59,12 @@ rl:
   batch_size: 64
   workload_options: [0.1, 0.2, 0.3, 0.5]
   return_to_depot: true
+  # Inflate fast feasibility estimates to avoid edge-of-budget false positives.
+  fast_estimate_safety_factor: 1.25
+  # A failed sampled action is a normal transition; stop a stuck episode after
+  # several consecutive failures so training can proceed to the next episode.
+  failure_penalty: -1.0
+  failure_termination_threshold: 5
   reward_weights:
     lambda1: 1.0
     lambda2: 1.0
