@@ -106,6 +106,8 @@ class CoverageEnvironment(FieldEnvironment):
         self._growth_selection_cache: dict = {}
         self._growth_area_cache: dict = {}
         self._consecutive_failures = 0
+        self._resupply_count = 0
+        self._termination_reason: str | None = None
 
     def _align_field_coordinate_frames(self) -> None:
         """Put all fields in the first field's projected local XY frame.
@@ -144,6 +146,8 @@ class CoverageEnvironment(FieldEnvironment):
         self._growth_selection_cache.clear()
         self._growth_area_cache.clear()
         self._consecutive_failures = 0
+        self._resupply_count = 0
+        self._termination_reason = None
         self.episode_logger.reset()
         state = self.get_state()
         # Preserve the Phase 3 reset contract (reset()[uav_id]) while returning
@@ -463,8 +467,12 @@ class CoverageEnvironment(FieldEnvironment):
         )
         self._growth_area_cache.clear()
         self._consecutive_failures = 0
-        done = self.is_done()
-        if done:
+        info["auto_resupply"] = False
+        info["resupply_count"] = self._resupply_count
+
+        if self._all_fields_complete():
+            done = True
+            info["termination_reason"] = "mission_complete"
             try:
                 return_feedback = self.finalize_episode()
             except ValueError as exc:
@@ -472,6 +480,23 @@ class CoverageEnvironment(FieldEnvironment):
             if return_feedback is not None:
                 reward += calculate_reward(return_feedback, self.rl_config, **scales)
                 info["return_to_depot"] = return_feedback
+        else:
+            actions = self.get_action_candidates()
+            feasible = bool(actions) and any(self.get_action_mask(actions))
+            if feasible:
+                done = False
+            else:
+                resupply = self._attempt_auto_resupply()
+                if resupply is not None:
+                    reward += calculate_reward(
+                        resupply["return_feedback"], self.rl_config, **scales
+                    )
+                    info.update(resupply["info"])
+                    done = False
+                else:
+                    done = True
+                    info["termination_reason"] = self._termination_reason
+
         next_state = self.get_state()
         return EnvironmentStep(next_state, reward, done, info)
 
@@ -726,6 +751,66 @@ class CoverageEnvironment(FieldEnvironment):
 
         return get_action_mask(self.get_action_candidates() if actions is None else actions, self)
 
+    def _has_feasible_action_at_full_resources(self) -> bool:
+        """Probe whether any action is feasible at the depot with full resources."""
+        if not self.uavs:
+            return False
+        uav = self.uavs[0]
+        saved = (uav.current_position, uav.remaining_energy, uav.remaining_payload)
+        try:
+            uav.current_position = self.depot.get_position()
+            uav.remaining_energy = uav.max_energy
+            uav.remaining_payload = uav.max_payload
+            actions = self.get_action_candidates()
+            if not actions:
+                return False
+            return any(self.get_action_mask(actions))
+        finally:
+            uav.current_position, uav.remaining_energy, uav.remaining_payload = saved
+
+    def _attempt_auto_resupply(self) -> dict | None:
+        """Auto-return + refill when resource depletion blocks every action.
+
+        Returns ``{"return_feedback": ..., "info": ...}`` when resupply completed,
+        or ``None`` after setting ``self._termination_reason`` for termination.
+        """
+        if not self.rl_config.get("allow_auto_resupply", True):
+            self._termination_reason = "auto_resupply_disabled"
+            return None
+        if not self._has_feasible_action_at_full_resources():
+            self._termination_reason = "no_feasible_action_at_full_resources"
+            return None
+        uav = self.uavs[0]
+        from math import hypot
+
+        start = uav.current_position or self.depot.get_position()
+        depot = self.depot.get_position()
+        return_distance = hypot(start[0] - depot[0], start[1] - depot[1])
+        return_energy = uav.alpha * return_distance
+        if uav.remaining_energy < return_energy:
+            self._termination_reason = "return_infeasible"
+            return None
+
+        before_energy = uav.remaining_energy
+        before_payload = uav.remaining_payload
+        return_feedback = self.return_to_depot()
+        replenished = uav.replenish()
+        self._resupply_count += 1
+        info = {
+            "auto_resupply": True,
+            "resupply_count": self._resupply_count,
+            "return_distance": float(return_feedback["distance"]),
+            "return_energy": float(return_feedback["energy"]),
+            "remaining_energy_before_resupply": before_energy,
+            "remaining_payload_before_resupply": before_payload,
+            "remaining_energy_after_resupply": uav.remaining_energy,
+            "remaining_payload_after_resupply": uav.remaining_payload,
+            "resupply_reason": "no_feasible_coverage_action",
+            "energy_recharged": float(replenished["energy_recharged"]),
+            "payload_resupplied": float(replenished["payload_resupplied"]),
+        }
+        return {"return_feedback": return_feedback, "info": info}
+
     def _all_fields_complete(self) -> bool:
         """Return True when every field has no uncovered grid points."""
         return all(not field.get_uncovered_points() for field in self.fields)
@@ -883,6 +968,13 @@ class CoverageEnvironment(FieldEnvironment):
             "remaining_payload": {
                 uav.uav_id: uav.remaining_payload for uav in self.uavs
             },
+            "resupply_count": self._resupply_count,
+            "total_energy_recharged": sum(
+                uav.total_energy_recharged for uav in self.uavs
+            ),
+            "total_payload_resupplied": sum(
+                uav.total_payload_resupplied for uav in self.uavs
+            ),
             "completed_fields": completed_fields,
             "uav_trajectory": {
                 uav_id: list(path)

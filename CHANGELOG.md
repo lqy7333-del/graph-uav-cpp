@@ -7,6 +7,29 @@
 
 ## 2026-10-14
 
+### 12. 自动补给（auto resupply）：资源耗尽时自动返航补满
+- **文件**：修改 `coverage_env/env/uav.py`、`coverage_env/env/environment.py`、
+  `coverage_env/config/default.yaml`；新增 `coverage_env/tests/test_auto_resupply.py`。
+- **变更（旧 → 新）**：
+  1) `UAV` 新增 `replenish()`（能量/药量补满到上限，返回补入量），并新增累计字段
+     `total_energy_recharged`/`total_payload_resupplied`（`__init__`/`reset` 维护）。
+  2) `environment.py`：`step()` 中原 `done = self.is_done()` 改为——先判 `_all_fields_complete()`
+     （完成则 `mission_complete` 并 `finalize_episode`）；否则看 `get_action_mask` 是否还有可行动作，
+     无可行动作时调用 `_attempt_auto_resupply()`：若返航不可行或补满后仍无可行动作则正常终止（记录
+     `termination_reason`），否则 UAV 返航 + 补满并继续（`done=False`）。新增
+     `_has_feasible_action_at_full_resources()`（在 depot 满资源下探测是否有可行动作）与
+     `_attempt_auto_resupply()`（返航 + 补满，info 带 `auto_resupply`/`resupply_count`/返航成本/补入量）。
+     `get_summary()` 增加 `resupply_count`/`total_energy_recharged`/`total_payload_resupplied`。
+  3) `default.yaml`：新增 `rl.allow_auto_resupply: true`。
+- **原因**：此前 UAV 能量/药量耗尽导致所有动作不可行时 episode 直接终止，即使任务还没完成；现在
+  在确认「满资源下仍存在可行动作」的前提下自动返航补满，让单次任务可覆盖更大范围（测试用 payload
+  受限场景验证跨地块补给）。
+- **回滚方法**：删除 `test_auto_resupply.py`；`uav.py` 移除 `replenish()` 与两个累计字段；`environment.py`
+  将 `step()` 的 done 判定恢复为 `done = self.is_done()`，删除 `_has_feasible_action_at_full_resources`/
+  `_attempt_auto_resupply`/`_resupply_count`/`_termination_reason` 及 `get_summary()` 三个新字段；
+  `default.yaml` 删除 `allow_auto_resupply`。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+
 ### 11. PPO 快速可行性筛选与失败 transition
 - **文件**：修改 `coverage_env/env/environment.py`、`coverage_env/config/default.yaml`、
   `coverage_env/tests/validation/test_constraint_feasibility.py`、

@@ -64,6 +64,8 @@ class UAV:
         self.last_energy_consumption = 0.0
         self.total_energy_consumed = 0.0
         self.total_payload_consumed = 0.0
+        self.total_energy_recharged = 0.0
+        self.total_payload_resupplied = 0.0
 
     @staticmethod
     def _positive_value(name: str, value: float) -> float:
@@ -150,6 +152,19 @@ class UAV:
             "final_position": self.current_position,
         }
 
+    def replenish(self) -> dict:
+        """Refill energy and payload to capacity and report the replenished amounts."""
+        energy_recharged = self.max_energy - self.remaining_energy
+        payload_resupplied = self.max_payload - self.remaining_payload
+        self.remaining_energy = self.max_energy
+        self.remaining_payload = self.max_payload
+        self.total_energy_recharged += energy_recharged
+        self.total_payload_resupplied += payload_resupplied
+        return {
+            "energy_recharged": energy_recharged,
+            "payload_resupplied": payload_resupplied,
+        }
+
     def reset(self, position: Position2D) -> None:
         """Restore the UAV and its cumulative task state at ``position``."""
         self.current_position = self._validate_position(position)
@@ -162,6 +177,8 @@ class UAV:
         self.last_energy_consumption = 0.0
         self.total_energy_consumed = 0.0
         self.total_payload_consumed = 0.0
+        self.total_energy_recharged = 0.0
+        self.total_payload_resupplied = 0.0
 
     def get_state(self) -> dict:
         """Return dynamic state plus the static capability and payload fields."""

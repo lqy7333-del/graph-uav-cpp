@@ -59,6 +59,8 @@ rl:
   batch_size: 64
   workload_options: [0.1, 0.2, 0.3, 0.5]
   return_to_depot: true
+  # Auto-return + refill when every coverage action becomes infeasible.
+  allow_auto_resupply: true
   # Inflate fast feasibility estimates to avoid edge-of-budget false positives.
   fast_estimate_safety_factor: 1.25
   # A failed sampled action is a normal transition; stop a stuck episode after
