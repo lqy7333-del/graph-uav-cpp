@@ -14,7 +14,6 @@ from coverage_env.rl.decoder.global_state_encoder import (
     build_graph_context,
     build_uav_feature,
 )
-from coverage_env.rl.decoder.value_encoder import ValueEncoder
 from coverage_env.rl.encoder.hetero_encoder import CoverageGraphEncoder
 from coverage_env.rl.graph.graph_builder import GraphBuilder
 
@@ -69,7 +68,6 @@ class CoveragePolicy(nn.Module):
         )
         decoder_input_dim = self.action_embedding.output_dim + hidden_dim
         self.action_decoder = ActionDecoder(decoder_input_dim, hidden_dim)
-        self.value_encoder = ValueEncoder(hidden_dim)
 
     def forward(
         self, state: dict, environment=None, graph=None,
@@ -116,11 +114,6 @@ class CoveragePolicy(nn.Module):
         else:
             distribution = scores.new_zeros((scores.shape[0],))
 
-        state_embedding = self.value_encoder(
-            embeddings["field_embedding"],
-            embeddings["boundary_embedding"],
-            global_embedding,
-        )
         return {
             "actions": actions,
             "mask": mask,
@@ -129,7 +122,6 @@ class CoveragePolicy(nn.Module):
             "action_distribution": distribution,
             "global_embedding": global_embedding,
             "action_input": action_context,
-            "state_embedding": state_embedding,
             "encoder_output": embeddings,
             "graph": graph,
         }

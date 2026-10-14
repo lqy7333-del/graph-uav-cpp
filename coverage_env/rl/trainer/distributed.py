@@ -138,7 +138,7 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
 
     actor = CoveragePolicy(environment, config=config).to(rank)
     agent = PPOAgent(actor, config, device=rank)
-    agent.actor = DDP(agent.actor, device_ids=[rank], find_unused_parameters=True)
+    agent.actor = DDP(agent.actor, device_ids=[rank])
     agent.critic = DDP(agent.critic, device_ids=[rank])
 
     trainer = DistributedTrainer(environment, agent, rank=rank, world_size=world_size)
