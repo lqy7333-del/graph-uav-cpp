@@ -177,7 +177,7 @@ class CoveragePolicy(nn.Module):
     def sample_action(output, *, generator=None) -> CoverageAction:
         """Sample one feasible action from a forward result."""
         distribution = output["action_distribution"]
-        if distribution.numel() == 0 or float(distribution.sum()) <= 0.0:
+        if distribution.numel() == 0 or float(distribution.detach().sum()) <= 0.0:
             raise RuntimeError("No feasible spatial action is available.")
         index = int(torch.multinomial(distribution, 1, generator=generator).item())
         return output["actions"][index]
@@ -186,7 +186,7 @@ class CoveragePolicy(nn.Module):
     def greedy_action(output) -> CoverageAction:
         """Select the highest-probability feasible action."""
         distribution = output["action_distribution"]
-        if distribution.numel() == 0 or float(distribution.sum()) <= 0.0:
+        if distribution.numel() == 0 or float(distribution.detach().sum()) <= 0.0:
             raise RuntimeError("No feasible spatial action is available.")
         index = int(distribution.argmax().item())
         return output["actions"][index]

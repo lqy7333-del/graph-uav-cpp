@@ -40,7 +40,7 @@ class Trainer:
             while steps < self.max_steps:
                 output = self.agent.actor(state, environment=self.environment)
                 distribution = output["action_distribution"]
-                if distribution.numel() == 0 or float(distribution.sum()) <= 0.0:
+                if distribution.numel() == 0 or float(distribution.detach().sum()) <= 0.0:
                     break
                 action_index = int(torch.multinomial(distribution, 1).item())
                 action = output["actions"][action_index]

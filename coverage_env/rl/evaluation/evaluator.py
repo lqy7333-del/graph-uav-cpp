@@ -29,7 +29,7 @@ class Evaluator:
             for _step in range(self.max_steps):
                 output = self.actor(state, environment=self.environment)
                 distribution = output["action_distribution"]
-                if distribution.numel() == 0 or float(distribution.sum()) <= 0.0:
+                if distribution.numel() == 0 or float(distribution.detach().sum()) <= 0.0:
                     break
                 action = self.actor.greedy_action(output)
                 next_state, reward, done, _info = self.environment.step(action)

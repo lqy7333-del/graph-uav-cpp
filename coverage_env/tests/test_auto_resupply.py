@@ -155,7 +155,7 @@ class AutoResupplyTests(unittest.TestCase):
         for _ in range(100):
             output = policy(state, environment=environment)
             distribution = output["action_distribution"]
-            self.assertGreater(float(distribution.sum()), 0.0)
+            self.assertGreater(float(distribution.detach().sum()), 0.0)
             action = policy.greedy_action(output)
             state, _reward, done, _info = environment.step(action)
             if done:
