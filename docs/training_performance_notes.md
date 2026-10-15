@@ -152,11 +152,13 @@ encoder 前向 = 8 × 64 = 512 次 / 轮 update
 - `dropout > 0` 时两条路径的 dropout mask 排布不同：统计等价、逐位不等价。默认
   `rl.encoder.dropout = 0.1`，所以这是「两种都合法的正则化实现」，不是 bug；等价性测试
   用 `dropout=0` 做逐位比对。
-- **顺带发现的既有问题（本次未修）**：`update()` 调用 actor 时不传 `environment`，
-  于是 `CoveragePolicy.forward` 回落到 `self.environment`（trainer 绑定的那个活环境），
-  `_global_sources` 便优先使用**当前**环境的 UAV/depot，而不是 transition 里存的状态。
-  这会让 replay 的首个 epoch 的 ratio ≠ 1。批量路径忠实复现了同一行为（两边都用同一个
-  environment），因此二者仍然一致；但建议后续单独修（让 replay 用 transition 的 `state`）。
+- **顺带发现并已修复的既有问题**：`update()` 调用 actor 时不传 `environment`，于是
+  `CoveragePolicy.forward` 回落到 `self.environment`（trainer 绑定的那个活环境），而
+  `_global_sources` 原先**优先**使用当前环境的 UAV/depot，而不是 transition 里存的
+  `state`。replay 时环境已推进过整段 rollout，导致首个 epoch 的 `ratio ≠ 1`，PPO 的
+  on-policy 修正被污染。现已改为**优先用 transition 的 `state`**，环境仅作无 state 时的
+  兜底。实测：修复前 `max|Δlog-prob| = 4.7e-3`、`ratio ∈ [0.9953, 1.0024]`；修复后
+  **`Δ = 0.0`、`ratio ≡ 1.0`**。回归测试见 `coverage_env/tests/test_ppo_replay_state.py`。
 
 复现：`python coverage_env/tests/test_batched_policy_update.py`（打印逐量 diff 与双设备
 update 计时）；测试 `python -m unittest coverage_env.tests.test_batched_policy_update`（7 项）。

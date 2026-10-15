@@ -7,6 +7,44 @@
 
 ## 2026-10-15
 
+### 18. 修复 PPO replay 用错全局状态：`_global_sources` 改为优先 transition 的 state
+- **文件**：修改 `coverage_env/rl/decoder/action_decoder.py`（`_global_sources`）、
+  `docs/training_performance_notes.md`；新增
+  `coverage_env/tests/test_ppo_replay_state.py`。
+- **变更（旧 → 新）**：`CoveragePolicy._global_sources(environment, state)` 原先**先看
+  environment**——只要 `environment.uavs` 非空就直接返回 `environment.uavs[0]` /
+  `environment.depot`，`state` 只在没有 environment 时才用。现改为**先看 `state`**：
+  从 `state["uavs"]` / `state["depot"]` 取 UAV 与 depot 特征，缺哪一项才回落到
+  environment（`state=None` 或没有 `uavs` 时行为不变，例如 rollout 期的
+  `value_for_graph`）。
+- **原因**：`PPOAgent.update()` 调 actor 时不传 `environment`，`forward` 回落到
+  trainer 绑定的活环境；而 replay 发生在整段 rollout **之后**，环境早已推进，于是重算出的
+  `z_G`（进而 log-prob 与 value）与采集时记录的不一致。这直接破坏 on-policy 假设：
+  首个 epoch 的 `ratio ≠ 1`，clipped surrogate 从一开始就在优化错误目标，critic 的
+  回归目标也自相矛盾。属于条目 17 记录时顺带发现、当时未修的既有问题。
+- **实测（10 条 transition，dropout=0，把活环境改到远离 rollout 终点后重算 log-prob）**：
+
+  | | max abs Δlog-prob | ratio 范围 |
+  | --- | --- | --- |
+  | 修复前（env 优先） | 4.73e-03 | [0.9953, 1.0024] |
+  | 修复后（state 优先） | **0.00e+00** | **[1.0000, 1.0000]** |
+
+  即修复后 replay 与采集**逐位一致**，`ratio ≡ 1`。
+- **为什么不影响 rollout**：rollout 时传入的 `state` 就是当前状态，`build_uav_feature` /
+  `build_depot_feature` 对「UAV 对象」与「state dict」两条分支产生**完全相同**的向量
+  （`get_state()` 已包含 `position/max_energy/max_payload/speed/coverage_width/
+  remaining_energy/remaining_payload`）。新增测试
+  `test_uav_and_depot_features_agree_between_object_and_state` 与
+  `test_rollout_encoding_is_unchanged` 守住这一点。
+- **影响**：会改变训练行为（这是修复本身的目的——首个 epoch 的 ratio 从 ≠1 变成 =1）。
+  若需复现旧行为（不推荐），把 `_global_sources` 的优先级改回 environment 优先即可。
+- **回滚方法**：`git revert <本提交 SHA>`（或恢复 `_global_sources` 的 environment 优先
+  逻辑），删除 `test_ppo_replay_state.py`。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+- **测试**：新增 `test_ppo_replay_state.py` 6 项（对象/state 特征一致、`_global_sources`
+  优先级与兜底、stale 环境不影响 replay、逐条与批量 replay 均复现 stored log-prob、
+  rollout 编码不变）。
+
 ### 17. 图 batch 化接入 update()：action embedding 切片 + 批量策略前向（默认关闭）
 - **文件**：修改 `coverage_env/rl/encoder/batched_encoder.py`、
   `coverage_env/rl/decoder/action_embedding.py`、
@@ -43,10 +81,10 @@
      测试用 `dropout=0`；默认 `dropout=0.1` 下属两种都合法的正则化实现。
   3) `places=5` 之类的**绝对**容差在这里不适用（`critic_loss` ~484，逐次前向差 ~1e-7 经多个
      optimizer step 放大到 ~1e-5），测试改用相对容差 1e-4。
-- **顺带发现的既有问题（本次未修，建议单独处理）**：`update()` 调 actor 时不传
-  `environment`，`CoveragePolicy.forward` 回落到 `self.environment`，于是
-  `_global_sources` 优先取**当前**环境的 UAV/depot，而不是 transition 存下的 `state`——
-  replay 的首个 epoch 的 ratio 因此 ≠ 1。批量路径忠实复现同一行为，故两者仍一致。
+- **顺带发现的既有问题**：`update()` 调 actor 时不传 `environment`，
+  `CoveragePolicy.forward` 回落到 `self.environment`，于是 `_global_sources` 优先取
+  **当前**环境的 UAV/depot 而非 transition 存下的 `state`——replay 首个 epoch 的 ratio
+  因此 ≠ 1。**已由条目 18 修复**（本条提交时批量路径忠实复现了同一行为，故两者仍一致）。
 - **回滚方法**：`git revert <本提交 SHA>`；或删除 `test_batched_policy_update.py`、
   `encode_graph_batch`、`ActionEmbedding` 的两个 offset 参数、`GlobalStateEncoder.forward_batched`、
   `CoveragePolicy.forward_batched`、`PPOAgent.update` 的 `batched` 参数与两个 helper

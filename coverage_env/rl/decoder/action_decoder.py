@@ -222,14 +222,29 @@ class CoveragePolicy(nn.Module):
 
     @staticmethod
     def _global_sources(environment, state):
-        """Resolve ``(uav_source, depot_source)`` from environment or state dict."""
-        if environment is not None and getattr(environment, "uavs", None):
-            return environment.uavs[0], environment.depot
-        if isinstance(state, dict):
-            uavs = state.get("uavs", {})
-            if uavs:
-                return next(iter(uavs.values())), state.get("depot", {})
-        return None, None
+        """Resolve ``(uav_source, depot_source)``, preferring the stored state.
+
+        PPO replay must condition on the observation saved with the transition:
+        by the time ``update()`` runs, the live environment has advanced past the
+        rollout, so its UAV/depot no longer describe the transition being
+        replayed. Using them makes the replayed ``z_G`` — and therefore the
+        log-probs and values — inconsistent with the ones recorded during
+        collection, so the on-policy ratio is not 1 at the first epoch.
+
+        The environment stays available as a fallback for callers that have no
+        state dict, such as ``value_for_graph`` during rollout (where the
+        environment is current anyway).
+        """
+        state = state if isinstance(state, dict) else {}
+        uavs = state.get("uavs") or {}
+        uav_source = next(iter(uavs.values()), None)
+        depot_source = state.get("depot") or None
+        if environment is not None:
+            if uav_source is None and getattr(environment, "uavs", None):
+                uav_source = environment.uavs[0]
+            if depot_source is None:
+                depot_source = environment.depot
+        return uav_source, depot_source
 
     def _build_global_embedding(self, embeddings, environment=None, state=None):
         """Build the global context ``z_G`` from graph pooling, UAV, and depot."""
