@@ -65,7 +65,11 @@ class ValueWarmStartTests(unittest.TestCase):
         module = agent.critic.module if hasattr(agent.critic, "module") else agent.critic
 
         self.assertFalse(agent._value_bias_initialized)
-        self.assertAlmostEqual(float(module.network[-1].bias.item()), 0.0, places=6)
+        # nn.Linear initialises the bias uniformly, not to zero; the point is
+        # that it does not yet sit at the return mean.
+        self.assertNotAlmostEqual(
+            float(module.network[-1].bias.item()), -18.0, places=3
+        )
 
         agent._warm_start_value_bias(torch.tensor([-18.0, -20.0, -16.0]))
         self.assertTrue(agent._value_bias_initialized)
