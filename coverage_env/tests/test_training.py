@@ -161,5 +161,36 @@ class CheckpointResumeTests(unittest.TestCase):
         self.assertEqual(len(trainer.buffer), 0)
 
 
+class AdvantageConfigTests(unittest.TestCase):
+    """The GAE bias/variance knob must actually reach the agent."""
+
+    def _agent(self, config: dict):
+        config["environment"]["num_fields"] = {"min": 5, "max": 5}
+        environment = InstanceGenerator(config).generate(num_fields=5, seed=3)
+        return PPOAgent(CoveragePolicy(environment, config=config), config)
+
+    def test_gae_lambda_override_reaches_the_agent(self):
+        config = load_config(DEFAULT_CONFIG_PATH)
+        self.assertAlmostEqual(self._agent(config).gae_lambda, 0.95)
+        config["ppo"]["gae_lambda"] = 0.0
+        self.assertAlmostEqual(self._agent(config).gae_lambda, 0.0)
+
+    def test_lower_lambda_shrinks_the_advantage_scale(self):
+        """A lambda near 0 uses the low-variance one-step residual."""
+        from coverage_env.rl.ppo.loss import compute_advantage
+
+        rewards = torch.tensor([-3.0, -3.0, -3.0, -3.0])
+        values = torch.tensor([-10.0, -8.0, -6.0, -4.0])
+        next_values = torch.tensor([-8.0, -6.0, -4.0, -6.0])
+        dones = torch.tensor([0.0, 0.0, 0.0, 1.0])
+        high, _ = compute_advantage(
+            rewards, values, next_values, dones, 0.99, 0.95
+        )
+        low, _ = compute_advantage(
+            rewards, values, next_values, dones, 0.99, 0.0
+        )
+        self.assertLess(float(low.var()), float(high.var()))
+
+
 if __name__ == "__main__":
     unittest.main()

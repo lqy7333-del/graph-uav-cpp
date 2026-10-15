@@ -7,6 +7,26 @@
 
 ## 2026-10-15
 
+### 30. `--gae-lambda` 可命令行覆盖（优势估计的偏差/方差权衡）
+- **文件**：修改 `coverage_env/rl/trainer/distributed.py`、
+  `coverage_env/tests/test_training.py`。
+- **变更（旧 → 新）**：`distributed.py` 新增 `--gae-lambda FLOAT`（缺省 `None` = 保留
+  `default.yaml` 的 0.95），在 `_worker` 里覆盖 `config["ppo"]["gae_lambda"]`；
+  原先 `--ppo-epochs` / `--batch-size` 的覆盖逻辑合并为 `ppo_overrides`。
+- **原因**：条目 29 证明了「步长机制」对 actor 无效（actor lr 10× 实测更差），
+  瓶颈是**policy-gradient 的信号质量**而非步长。`A(s,a)` 目前用 λ=0.95 的 GAE，
+  几乎等于「该动作之后的全部回报」，其方差被 episode 结果噪声主导（实测同一实例内
+  回报 sd ≈ 3.0，而动作质量能带来的差异只有 ~2）。λ→0 时 `A ≈ r + γV(s′) − V(s)`，
+  是方差低得多的动作质量估计；**低 λ 引入的偏差只在 critic 不准时才有害，而当前
+  EV = 0.92，正好满足使用它的前提** —— 这是修 critic 换来的、此前用不了的杠杆。
+- **注意**：`epochs` 增大**不是**同类杠杆 —— 它只是在同一批 advantage 上多走几步，
+  等价于增大步长，按条目 29 的结果预期无效；只有新的数据或更低方差的 advantage
+  估计才治本。
+- **测试**：新增 `AdvantageConfigTests`（`gae_lambda` 覆盖确实到达 agent；
+  λ=0 时 advantage 的方差小于 λ=0.95）。
+- **实验（进行中）**：从 `run_fields_5_20_final/ckpt_update_200.pt` 续训 50 轮，
+  λ = 0.0 与 0.5 各一档，之后在 20 个固定实例上做逐实例配对评估。
+
 ### 29. actor 学习率独立可配（默认 10× = 3e-3）；更正「梯度裁剪限制步长」的误判
 - **文件**：修改 `coverage_env/rl/ppo/ppo.py`、`coverage_env/config/default.yaml`、
   `coverage_env/tests/test_training.py`。

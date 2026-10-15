@@ -248,7 +248,10 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
         config["environment"]["num_fields"] = {
             "min": args.num_fields, "max": args.num_fields,
         }
-    config["ppo"].update({"epochs": args.ppo_epochs, "batch_size": args.batch_size})
+    ppo_overrides = {"epochs": args.ppo_epochs, "batch_size": args.batch_size}
+    if args.gae_lambda is not None:
+        ppo_overrides["gae_lambda"] = args.gae_lambda
+    config["ppo"].update(ppo_overrides)
 
     # Same model init seed on every rank so parameters start identical; the
     # environment seed differs per rank so each rank samples different fields.
@@ -300,6 +303,11 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--ppo-epochs", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument(
+        "--gae-lambda", type=float, default=None,
+        help="Override ppo.gae_lambda. Lower trades advantage bias for much "
+             "lower variance, which only pays off with an accurate critic.",
+    )
     parser.add_argument("--checkpoint-dir", type=str, default="coverage_env/results/checkpoints")
     parser.add_argument("--checkpoint-every", type=int, default=50)
     parser.add_argument(
