@@ -211,6 +211,45 @@ update 计时）；测试 `python -m unittest coverage_env.tests.test_batched_po
 | **候选动作剪枝** | 用启发式（距离下界、可达面积）先淘汰明显不可行/劣质组合 | 减少 30%~70% 候选 | 中 | 中：改变动作空间与策略表达，需重训验证 |
 | **几何计算下沉 C++** | 项目名 `graph-uav-cpp` 的长期方向：planner/可见性图用 C++ 实现 | 数量级 | 高 | 中-高：绑定/构建/可维护性 |
 
+### P3 补充：已实现的两步优化（不改算法，rollout 约 5.7×）
+
+先 profile 定位，再分两步落地（`cef3fc2`、`a689c83`），**算法一行未改**：
+
+```
+20 地块 / 6 步 rollout，cProfile（总计 4.98s）
+step                                    4.289s  (86%)
+ └ ConfigurationExecutor.execute        3.821s
+    └ BoundaryAwareSweepPlanner.plan     3.801s
+       └ _materialize_strokes            3.647s
+          └ _connector                   3.639s
+             └ _shortest_path_inside_polygon  3.586s (194 calls, 18.5ms each) ← 72%
+                ├ covers_scalar          1.538s (229,604 calls)
+                └ LineString 构造        1.572s (234,496 calls)
+```
+
+| 步骤 | 做法 | 为什么不算改算法 | 实测 |
+| --- | --- | --- | --- |
+| ① `cef3fc2` | `prep(polygon.buffer(1e-7)).covers(...)` 替换裸 `.covers(...)` | 同一个谓词，只是 prepared geometry 缓存了内部索引；顶点集合/遍历顺序/边插入顺序/Dijkstra 全不变 | connector 8.38 → 4.26 ms/call（**1.97×**，296 次真实调用逐点一致）；8 步 rollout 7.58s → 3.88s |
+| ② `a689c83` | 按 region 缓存「多边形内部顶点对」可见性（`pair_cache`，`plan()` 内创建、随几何体销毁） | 一次 `plan()` 只有一个 `region_geometry` 却重复查询 **12.7~19.4 次**；O(V²) 里约 **88%** 是「多边形自身顶点两两之间」，只取决于几何体，与 `start/end` 无关 | 3.92s → 1.34s（**2.90×**）；输出 `distance=10921.693648 coverage=0.397438`、轨迹 sha256 三次运行全同 |
+| ①+② | | | **7.58s → 1.34s，约 5.66×** |
+
+踩过的坑与结论：
+
+- **一开始怀疑 `polygon.buffer(1e-7)` 重复计算是大头——实测只有 0.025 ms，完全不是。**
+  真实成本就是那 23 万次谓词本身，所以「prepared geometry」才是对症的。
+- **numpy 向量化 `linestrings + covers` 反而更慢**（V≈32 时 382 vs 286 ms）：候选对太少，
+  构造数组的开销盖过收益。
+- **`_refine_workload_for_execution` 里每次 `is_feasible` 的 `deepcopy(field_copy)`
+  只占 rollout 约 2%**（0.105s / 4.98s），不值得为它引入快照/回滚逻辑。
+- 边插入顺序会影响 Dijkstra 的并列择优。现有双重循环恰好使每个邻接表按「伙伴下标升序」
+  排列，因此按同样顺序合并缓存边即可保证逐点一致——这也是差分测试能全过的原因。
+- 回归测试 `tests/test_visibility_connector.py` 用四种手段钉住行为：凹多边形黄金路径逐点断言、
+  端点与包含性、prepared 谓词逐对一致（合成 + 真实区域 >500 对）、
+  以及真实输入上 **cached vs uncached 逐点一致**。
+
+仍然属于「改算法」、因此**没有**动的：减少 `_refine` 的二分探测次数、用空间索引剪枝可见性
+候选、更换路径搜索、跨 step 复用几何（coverage 状态每步都变）。
+
 ---
 
 ## 优先级建议

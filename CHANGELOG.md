@@ -7,6 +7,60 @@
 
 ## 2026-10-15
 
+### 20. 可见性图连接器优化第二步：按 region 缓存多边形内部可见性子图
+- **文件**：修改 `coverage_env/planner/coverage_path.py`、
+  `coverage_env/planner/boundary_aware_sweep.py`、
+  `coverage_env/tests/test_visibility_connector.py`。
+- **变更（旧 → 新）**：
+  1) `_shortest_path_inside_polygon` 新增 keyword-only 参数 `pair_cache`（默认 `None`，
+     行为与原来完全一致）；对 `first >= 2` 的顶点对查表/写表，
+     `start`/`end` 参与的顶点对永不缓存。
+  2) `BoundaryAwareSweepPlanner.plan` 每次调用建一个 `visibility_pairs` 字典，透传给
+     `_materialize_strokes` → `_connector`；字典生命周期与 `region_geometry` 一致，
+     因此天然有界，不存在全局缓存增长或跨几何体下标串味的问题。
+  3) `_connector` 由 `@staticmethod` 改为实例方法以携带该字典（仓库内无其他调用点）。
+- **原因**：一次 `plan()` 只构造一个 `region_geometry`，却要为每个候选方向 / `reverse_lanes`
+  反复调用 `_connector`；实测同一几何体平均被查 **12.7~19.4 次**。而
+  `_shortest_path_inside_polygon` 的 O(V²) 谓词扫描里约 **88%** 是「多边形自身顶点两两之间」
+  ——这部分只取决于几何体，与 `start`/`end` 无关，是纯重复计算。
+- **不改变算法**：顶点集合、候选对的遍历顺序、边插入顺序（决定 Dijkstra 的并列择优）
+  全部保持原样，只是跳过重复的 `covers` 谓词。
+- **实测（固定权重与动作序列的 8 步 rollout，三次测量）**：
+  改前 3.92s → 改后 **1.34~1.36s（2.90×）**；输出完全一致：
+  `distance=10921.693648 coverage=0.397438`，
+  trajectory `sha256=18599effde4501b3`（含/不含该步骤三次运行全部相同）。
+- **回滚方法**：`git revert a689c83`；或删除 `pair_cache` 参数、`plan()` 里的
+  `visibility_pairs`、`_materialize_strokes`/`_connector` 的透传参数，并把 `_connector`
+  还原为 `@staticmethod`。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+- **测试**：`test_visibility_connector` 增至 6 项，新增「真实输入上 cached vs uncached
+  逐点一致」与「只缓存多边形顶点对、不缓存 start/end」；planner/validation 相关 33 项通过。
+
+### 19. 可见性图连接器优化第一步：prepared geometry 加速重复 covers 谓词
+- **文件**：修改 `coverage_env/planner/coverage_path.py`；新增
+  `coverage_env/tests/test_visibility_connector.py`。
+- **变更（旧 → 新）**：`_shortest_path_inside_polygon` 里把 `polygon.buffer(1e-7)` 提出来
+  只算一次，并用 `shapely.prepared.prep(...).covers()` 替换裸 `.covers()`：
+  ```python
+  visible = prep(polygon.buffer(1e-7))
+  if visible.covers(direct): ...
+  ```
+- **原因**：该函数是 rollout 的 CPU 热点（约占 72%），成本来自约 **23 万次** shapely
+  `covers` 谓词与约 **23 万次** `LineString` 构造。prepared geometry 会缓存内部空间索引，
+  重复谓词快约 2 倍。（顺带发现：`polygon.buffer(1e-7)` 本身只要 0.025 ms，不是收益来源，
+  原先算了两次也只是顺手合并。）
+- **不改变算法**：顶点集合、O(V²) 候选对、遍历顺序、边插入顺序、Dijkstra 全部不变，
+  只替换谓词实现。
+- **实测（20 地块、`seed=42`，同一批 296 次 connector 调用逐输入 A/B）**：
+  改前 8.38 ms/call → 改后 4.26 ms/call，**1.97×**，输出逐点完全一致；
+  端到端 8 步 rollout：7.58s → 3.88s（约 **1.95×**，重复测稳定）。
+- **回滚方法**：`git revert cef3fc2`（把 `prep(...)` 还原为 `polygon.buffer(1e-7).covers(...)`），
+  删除 `test_visibility_connector.py`。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+- **测试**：新增 `test_visibility_connector.py` 4 项 —— 凹多边形黄金路径逐点断言（4 用例）、
+  端点与包含性、prepared 谓词在合成几何与真实区域几何上与标量 `covers` 逐对一致（>500 对）。
+  另跑 planner 相关 30 项测试全通过。
+
 ### 18. 修复 PPO replay 用错全局状态：`_global_sources` 改为优先 transition 的 state
 - **文件**：修改 `coverage_env/rl/decoder/action_decoder.py`（`_global_sources`）、
   `docs/training_performance_notes.md`；新增
