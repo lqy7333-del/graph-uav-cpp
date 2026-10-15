@@ -7,6 +7,25 @@
 
 ## 2026-10-15
 
+### 29. actor 学习率独立可配（默认 10× = 3e-3）；更正「梯度裁剪限制步长」的误判
+- **文件**：修改 `coverage_env/rl/ppo/ppo.py`、`coverage_env/config/default.yaml`、
+  `coverage_env/tests/test_training.py`。
+- **更正（重要）**：条目 28 里「`actor_grad_norm ≈ max_grad_norm`，说明 actor 步长受限」
+  这个推断是**错的**。实测验证：`clip_grad_norm_` 只对梯度做**统一缩放**，而 Adam 对
+  统一缩放**不变**（`m/√v` 不变），所以裁剪对 Adam 是 **no-op**，不构成任何步长限制。
+  （实测：同一参数、同方向、梯度缩放 5 倍，8 步 Adam 后最大差 3e-8。）已把这条写进代码
+  注释，避免以后再拿 `grad_norm` 当「受限」的证据。
+- **变更（旧 → 新）**：`ppo` 新增 `actor_learning_rate`（缺省回落到 `learning_rate`），
+  actor / critic 各自独立建 Adam；`default.yaml` 设 `actor_learning_rate: 0.003`（10×）。
+- **保留下来的依据（比裁剪那条弱）**：Adam 每参数每步走 ≈ `lr`，故 `lr × steps` 限定一次
+  训练中参数能走多远。共享 3e-4、200 轮 × 8 minibatch → actor 总位移仅约 0.48；
+  critic 当初正是靠 10× 才够到 return 的量程。
+  但 entropy 已经动过（4.40 → 3.76），说明 actor 并非完全走不动，所以这条依据不足以定论。
+- **因此本次是实证而非推理**：用 `--resume ckpt_update_200.pt` 续训 50 轮（actor lr 10×），
+  再在 **20 个固定实例上做逐实例配对评估**，与 ckpt_200 对比。
+- **测试**：`CriticLearningRateTests` 扩为 `LearningRateTests`（两者都高于基准、可独立覆盖、
+  缺省回落基准）。
+
 ### 28. 正式训练（200 轮，5~20 地块泛化）结果：critic 已修好，但均值仍无显著提升
 - **运行**：`coverage_env/results/run_fields_5_20_final/`，`--num-updates 200 --seed 42`，
   未指定 `--num-fields`（=> `[5,20]` 每 episode 重采样），`critic_learning_rate=3e-3`。

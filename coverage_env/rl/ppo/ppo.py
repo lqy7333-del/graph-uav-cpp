@@ -55,18 +55,22 @@ class PPOAgent:
             )
         self.critic = ValueNetwork(critic_input_dim, actor.encoder.hidden_dim).to(self.device)
         learning_rate = float(self.config.get("learning_rate", 3e-4))
-        # The critic regresses returns whose scale is set by the reward (here an
-        # offset of about -18 with a spread of about 11). Adam moves a parameter
-        # by roughly `lr` per step, so at the shared default the value head would
-        # need hundreds of updates just to reach the right output scale -- its
-        # final-layer weights start near +-0.06 and must grow roughly 10x. A
-        # separate, larger critic rate targets exactly that; the actor's rate is
-        # tuned for the policy-gradient signal and must not be raised with it.
+        # Each optimizer gets its own rate. Adam moves a parameter by roughly
+        # `lr` per step, so `lr x steps` bounds how far a network can travel in a
+        # whole run: at the shared 3e-4 over 200 updates (8 minibatches each) the
+        # actor can only move ~0.5 in total, and the critic needed 10x to span
+        # the return range at all (explained_variance was stuck at ~0 until then).
+        actor_learning_rate = float(
+            self.config.get("actor_learning_rate", learning_rate)
+        )
         critic_learning_rate = float(
             self.config.get("critic_learning_rate", learning_rate)
         )
+        self.actor_learning_rate = actor_learning_rate
         self.critic_learning_rate = critic_learning_rate
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=learning_rate)
+        self.actor_optimizer = torch.optim.Adam(
+            self.actor.parameters(), lr=actor_learning_rate
+        )
         self.critic_optimizer = torch.optim.Adam(
             self.critic.parameters(), lr=critic_learning_rate
         )
@@ -78,6 +82,10 @@ class PPOAgent:
         self.epochs = int(self.config.get("epochs", 4))
         self.batch_size = int(self.config.get("batch_size", 64))
         self.max_grad_norm = float(self.config.get("max_grad_norm", 0.5))
+        # NOTE: `max_grad_norm` only *rescales* the gradient, and Adam is
+        # invariant to a uniform gradient rescale (verified), so clipping does
+        # not limit the step size. Do not read `grad_norm == max_grad_norm` as
+        # evidence that a network is step-limited; `lr` is the only lever.
         self.update_count = 0
         self._value_bias_initialized = False
 

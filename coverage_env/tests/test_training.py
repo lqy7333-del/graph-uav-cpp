@@ -80,36 +80,40 @@ class ValueWarmStartTests(unittest.TestCase):
         self.assertAlmostEqual(float(module.network[-1].bias.item()), -18.0, places=5)
 
 
-class CriticLearningRateTests(unittest.TestCase):
-    """The critic needs a larger step size than the actor to fit return scale."""
+class LearningRateTests(unittest.TestCase):
+    """Adam's step is ~lr, so each network needs a rate sized to its own range."""
 
     def _agent(self, config: dict):
         config["environment"]["num_fields"] = {"min": 5, "max": 5}
         environment = InstanceGenerator(config).generate(num_fields=5, seed=3)
         return PPOAgent(CoveragePolicy(environment, config=config), config)
 
-    def test_default_config_gives_the_critic_a_larger_rate(self):
+    def test_default_config_raises_both_rates_above_the_base(self):
         agent = self._agent(load_config(DEFAULT_CONFIG_PATH))
-        actor_lr = agent.actor_optimizer.param_groups[0]["lr"]
-        critic_lr = agent.critic_optimizer.param_groups[0]["lr"]
-        self.assertGreater(critic_lr, actor_lr)
-        self.assertAlmostEqual(critic_lr, 10 * actor_lr, places=8)
+        self.assertGreater(agent.actor_learning_rate, 0.0003)
+        self.assertAlmostEqual(
+            agent.actor_optimizer.param_groups[0]["lr"], 0.003, places=8
+        )
+        self.assertAlmostEqual(
+            agent.critic_optimizer.param_groups[0]["lr"], 0.003, places=8
+        )
 
-    def test_rate_can_be_overridden(self):
+    def test_rates_can_be_overridden_independently(self):
         config = load_config(DEFAULT_CONFIG_PATH)
-        config["ppo"]["critic_learning_rate"] = 0.05
+        config["ppo"].update(
+            {"actor_learning_rate": 0.02, "critic_learning_rate": 0.05}
+        )
         agent = self._agent(config)
+        self.assertAlmostEqual(agent.actor_optimizer.param_groups[0]["lr"], 0.02)
         self.assertAlmostEqual(agent.critic_optimizer.param_groups[0]["lr"], 0.05)
-        self.assertAlmostEqual(agent.actor_optimizer.param_groups[0]["lr"], 0.0003)
 
-    def test_missing_key_falls_back_to_the_shared_rate(self):
+    def test_missing_keys_fall_back_to_the_shared_rate(self):
         config = load_config(DEFAULT_CONFIG_PATH)
+        config["ppo"].pop("actor_learning_rate", None)
         config["ppo"].pop("critic_learning_rate", None)
         agent = self._agent(config)
-        self.assertAlmostEqual(
-            agent.critic_optimizer.param_groups[0]["lr"],
-            agent.actor_optimizer.param_groups[0]["lr"],
-        )
+        self.assertAlmostEqual(agent.actor_optimizer.param_groups[0]["lr"], 0.0003)
+        self.assertAlmostEqual(agent.critic_optimizer.param_groups[0]["lr"], 0.0003)
 
 
 class CheckpointResumeTests(unittest.TestCase):
