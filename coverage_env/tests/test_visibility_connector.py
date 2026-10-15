@@ -57,6 +57,9 @@ def collect_connector_inputs(steps: int = 2, seed: int = 42) -> list[tuple]:
     """
     import coverage_env.planner.coverage_path as coverage_path
 
+    # Seed before building the policy so the captured trajectory (and therefore
+    # which connectors are exercised) is reproducible across runs.
+    torch.manual_seed(seed)
     config = load_config(DEFAULT_CONFIG_PATH)
     config["environment"]["num_fields"] = {"min": 20, "max": 20}
     environment = InstanceGenerator(config).generate(num_fields=20, seed=seed)
@@ -66,14 +69,13 @@ def collect_connector_inputs(steps: int = 2, seed: int = 42) -> list[tuple]:
     captured: list[tuple] = []
     original = coverage_path._shortest_path_inside_polygon
 
-    def spy(start, end, polygon):
+    def spy(start, end, polygon, *, pair_cache=None):
         if polygon is not None and start != end:
             captured.append((start, end, polygon))
-        return original(start, end, polygon)
+        return original(start, end, polygon, pair_cache=pair_cache)
 
     coverage_path._shortest_path_inside_polygon = spy
     try:
-        torch.manual_seed(seed)
         state = environment.reset()
         with torch.no_grad():
             for _ in range(steps):
@@ -158,14 +160,59 @@ class VisibilityConnectorTests(unittest.TestCase):
         self.assertGreater(checked, 500)
 
 
+    def test_pair_cache_matches_uncached_on_real_inputs(self):
+        """The per-region memo must not change a single waypoint."""
+        captured = collect_connector_inputs(steps=2)
+        by_geometry: dict[int, tuple] = {}
+        for start, end, geometry in captured:
+            by_geometry.setdefault(id(geometry), (geometry, []))[1].append((start, end))
+
+        checked = 0
+        reused = 0
+        for geometry, pairs in by_geometry.values():
+            cache: dict = {}
+            sizes = []
+            for start, end in pairs:
+                expected = _shortest_path_inside_polygon(start, end, geometry)
+                actual = _shortest_path_inside_polygon(
+                    start, end, geometry, pair_cache=cache
+                )
+                self.assertEqual(actual, expected, "cached route differs from uncached")
+                sizes.append(len(cache))
+                checked += 1
+            if len(pairs) > 1:
+                # Every connector of one geometry sees the same polygon-only
+                # pairs, so after the first call the memo must stop growing.
+                self.assertEqual(
+                    sizes[0], sizes[-1],
+                    "memo kept growing: polygon pairs are not being shared",
+                )
+                self.assertGreater(sizes[0], 0, "memo was never populated")
+                reused += 1
+        self.assertGreater(checked, 10, "too few connector calls to be meaningful")
+        self.assertGreater(reused, 0, "no geometry was queried more than once")
+
+    def test_pair_cache_is_ignored_for_the_two_endpoints(self):
+        """Only polygon-vertex pairs are memoised, never start/end pairs."""
+        cache: dict = {}
+        _shortest_path_inside_polygon((1.0, 9.0), (9.0, 9.0), U_SHAPE, pair_cache=cache)
+        self.assertTrue(cache)
+        for first, second in cache:
+            self.assertGreaterEqual(first, 2, "start/end pair was cached")
+            self.assertGreater(second, first)
+
+
 if __name__ == "__main__":
     import sys
 
     captured = collect_connector_inputs(steps=3)
-    geometries = {id(geometry) for _s, _e, geometry in captured}
+    geometries = {}
+    for _start, _end, geometry in captured:
+        geometries.setdefault(id(geometry), []).append(geometry)
     print(f"captured {len(captured)} connector calls over {len(geometries)} "
-          f"distinct region geometries")
+          f"distinct region geometries ({len(captured)/max(1,len(geometries)):.1f} per geometry)")
     for name, (start, end, expected) in GOLDEN_PATHS.items():
         actual = _shortest_path_inside_polygon(start, end, U_SHAPE)
-        print(f"  {name:16s}: {'MATCH' if [(round(x, 6), round(y, 6)) for x, y in actual] == expected else 'DIFFERS'}")
+        ok = [(round(x, 6), round(y, 6)) for x, y in actual] == expected
+        print(f"  {name:16s}: {'MATCH' if ok else 'DIFFERS'}")
     sys.exit(0)

@@ -71,6 +71,10 @@ class BoundaryAwareSweepPlanner:
             if candidate_directions is not None
             else self._candidate_directions(field, entry_edge, exit_edge)
         )
+        # Every candidate in this call shares `region_geometry`, so the
+        # polygon-only visibility pairs are computed once and reused by all of
+        # its connectors. The dict lives no longer than this geometry.
+        visibility_pairs: dict = {}
         for orientation in directions:
             lane_data = self._scan_intervals(
                 region_geometry, orientation, lane_spacing, region
@@ -99,6 +103,7 @@ class BoundaryAwareSweepPlanner:
                     candidate = self._materialize_strokes(
                         ordered_strokes, orientation, entry_edge, exit_edge,
                         current_position, region_geometry, lower_bound,
+                        visibility_pairs,
                     )
                 except ValueError:
                     # Some scan axes can divide a concave sampled region into
@@ -246,14 +251,16 @@ class BoundaryAwareSweepPlanner:
 
     def _materialize_strokes(
         self, ordered_strokes, orientation, entry_edge, exit_edge,
-        current_position, region_geometry, lower_bound,
+        current_position, region_geometry, lower_bound, visibility_pairs=None,
     ):
         """Build actual in-region connectors for one promising DP candidate."""
         route = [ordered_strokes[0][0]]
         connectors = []
         for start, end in ordered_strokes:
             if route[-1] != start:
-                connector = self._connector(route[-1], start, region_geometry)
+                connector = self._connector(
+                    route[-1], start, region_geometry, visibility_pairs
+                )
                 connectors.append(connector)
                 route.extend(connector[1:])
             if route[-1] != end:
@@ -277,8 +284,7 @@ class BoundaryAwareSweepPlanner:
             region_geometry=region_geometry,
         )
 
-    @staticmethod
-    def _connector(start, end, geometry):
+    def _connector(self, start, end, geometry, visibility_pairs=None):
         """Connect strokes inside their generated coverage geometry."""
         if start == end:
             return [start]
@@ -290,7 +296,9 @@ class BoundaryAwareSweepPlanner:
         # silently drawing a chord through uncovered geometry.
         from coverage_env.planner.coverage_path import _shortest_path_inside_polygon
 
-        path = _shortest_path_inside_polygon(start, end, geometry)
+        path = _shortest_path_inside_polygon(
+            start, end, geometry, pair_cache=visibility_pairs
+        )
         if not geometry.buffer(1e-5).covers(LineString(path)):
             raise ValueError("No connector exists inside the generated coverage region.")
         return path

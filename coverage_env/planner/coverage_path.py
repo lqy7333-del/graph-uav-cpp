@@ -319,8 +319,22 @@ def _shortest_path_inside_polygon(
     start: Point2D,
     end: Point2D,
     polygon: BaseGeometry | None,
+    *,
+    pair_cache: dict | None = None,
 ) -> list[Point2D]:
-    """Find a shortest visibility-graph connector inside the field polygon."""
+    """Find a shortest visibility-graph connector inside the field polygon.
+
+    ``pair_cache`` optionally memoises the visibility and length of vertex pairs
+    that lie entirely inside ``polygon``: those depend only on the polygon, so
+    every connector for the same region would recompute the same ~88% of the
+    O(V^2) predicate sweep. The candidate set, the edge insertion order (and
+    therefore the returned route) are identical with or without the cache; it
+    only skips repeated ``covers`` calls.
+
+    The dict must describe exactly one geometry, and the caller owns its
+    lifetime (``BoundaryAwareSweepPlanner.plan`` builds one per region). The two
+    extra points ``start``/``end`` are never cached.
+    """
     if start == end:
         return [start]
     direct = LineString([start, end])
@@ -345,6 +359,20 @@ def _shortest_path_inside_polygon(
     graph: list[list[tuple[float, int]]] = [[] for _ in vertices]
     for first in range(len(vertices)):
         for second in range(first + 1, len(vertices)):
+            if pair_cache is not None and first >= 2:
+                # Both endpoints are polygon vertices, so this pair is shared by
+                # every connector of this geometry.
+                hit = pair_cache.get((first, second))
+                if hit is None:
+                    segment = LineString([vertices[first], vertices[second]])
+                    hit = pair_cache[(first, second)] = (
+                        bool(visible.covers(segment)), segment.length,
+                    )
+                is_visible, length = hit
+                if is_visible:
+                    graph[first].append((length, second))
+                    graph[second].append((length, first))
+                continue
             segment = LineString([vertices[first], vertices[second]])
             if visible.covers(segment):
                 graph[first].append((segment.length, second))
