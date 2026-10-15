@@ -7,6 +7,31 @@
 
 ## 2026-10-15
 
+### 32. 给每个候选动作加显式空间特征，让 actor 能表达「去最近的地块」
+- **文件**：新增 `coverage_env/rl/decoder/action_spatial.py`、
+  `coverage_env/tests/test_action_spatial_features.py`；修改
+  `coverage_env/rl/decoder/action_decoder.py`、`coverage_env/tests/test_policy_forward.py`。
+- **背景（条目 31 的根因）**：图的节点特征不含位置、边特征全是相对量（图平移不变），
+  绝对位置只在 `z_G` 里被全局广播，对每个候选动作相同 —— 所以 actor 在结构上无法表达
+  「去最近的地块」。实测策略选中最近地块的比例仅 18.2%（随机 ~11.7%），
+  而一个平凡的最近地块启发式比它好 21%（−34.50 vs −43.76）。
+- **变更（旧 → 新）**：`action_context` 由 `concat(action_vectors, z_G)` 改为
+  `concat(action_vectors, x_action_spatial, z_G)`，decoder 输入由 512 变 **517**
+  （384 + 5 + 128）。`x_action_spatial` 每行 5 维，全部归一化到 `[0, 1]`：
+  `[UAV→地块质心, UAV→entry boundary, depot→地块质心, depot→entry boundary,
+  entry→exit]`，尺度 `distance_scale_m = 2000`（与 site 摘要一致）。
+  几何来源**优先取 transition 的 state**（与 `_global_sources` / `_site_source` 同理由，
+  replay 时 environment 已经走到别处），缺失几何时退化为全零而不是抛异常。
+- **影响**：decoder 首层输入维度变化，**旧 checkpoint 不兼容**，必须从头训练。
+- **测试**：新增 4 项 —— 形状/取值范围/Environment 与 state 结果逐位一致；
+  `UAV→entry` 这一列对候选的排序与真实几何排序完全相同（这是本改动的核心断言）；
+  `action_context` 里确实嵌入了这块特征；几何缺失时退化为零。
+  另把 `test_policy_forward` 里硬编码的 `4 * 128` 改为由模块维度推导（原写法会
+  在维度变化时误报）。全量 121 项，仍只有 2 个改动前即存在的失败。
+- **验证（进行中）**：架构已变，需从零训练。计划 100 轮，在第 25/50/100 轮用
+  **20 个固定实例的配对 greedy 评估** + **「选中最近地块比例」**双重指标，
+  与基线曲线（untrained −44.50 / ckpt_50 −44.59 / ckpt_100 −44.54）和启发式（−34.50）对比。
+
 ### 31. 根因定位：actor 的动作表示里**没有位置**，策略在结构上无法算「最近地块」
 - **背景**：条目 26（修 critic，EV 0→0.92）、29（actor lr 10×）、30（λ=0）三个干预
   都没能让均值 reward 显著改善。于是先建立**参照系**，再查表示能力。
