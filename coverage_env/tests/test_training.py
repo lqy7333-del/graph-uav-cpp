@@ -88,12 +88,14 @@ class LearningRateTests(unittest.TestCase):
         environment = InstanceGenerator(config).generate(num_fields=5, seed=3)
         return PPOAgent(CoveragePolicy(environment, config=config), config)
 
-    def test_default_config_raises_both_rates_above_the_base(self):
+    def test_default_config_keeps_the_actor_at_the_base_rate(self):
+        """Measured: a 10x actor rate made the greedy policy worse, so it stays base."""
         agent = self._agent(load_config(DEFAULT_CONFIG_PATH))
-        self.assertGreater(agent.actor_learning_rate, 0.0003)
+        self.assertAlmostEqual(agent.actor_learning_rate, 0.0003, places=8)
         self.assertAlmostEqual(
-            agent.actor_optimizer.param_groups[0]["lr"], 0.003, places=8
+            agent.actor_optimizer.param_groups[0]["lr"], 0.0003, places=8
         )
+        # The critic's 10x, by contrast, is measured-good and kept.
         self.assertAlmostEqual(
             agent.critic_optimizer.param_groups[0]["lr"], 0.003, places=8
         )

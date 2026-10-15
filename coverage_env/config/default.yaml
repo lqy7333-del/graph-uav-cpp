@@ -111,14 +111,17 @@ rl:
 ppo:
   learning_rate: 0.0003
   # Each optimizer gets its own rate. Adam moves a parameter by roughly lr per
-  # step, so `lr x steps` bounds how far a network can travel in a whole run;
-  # at the shared 3e-4 over 200 updates the actor can only move ~0.5 in total,
-  # and the critic sat at explained_variance ~0 until its rate was raised 10x.
+  # step, so `lr x steps` bounds how far a network can travel in a whole run.
+  # The critic sat at explained_variance ~0 until its rate was raised 10x, so it
+  # keeps 10x. The actor was TESTED at 10x (resume ckpt_200 -> 250, 20 fixed
+  # instances, paired): delta = -0.83 +- 1.59, t = -0.52, sd 4.62 -> 7.13, i.e.
+  # no gain and less consistency. The actor's policy-gradient estimate is noisy,
+  # so faster movement chases noise; it stays at the base rate.
   # Both fall back to `learning_rate` when omitted.
   #
   # NOTE: max_grad_norm does NOT limit the step size -- it only rescales the
   # gradient, and Adam is invariant to a uniform rescale.
-  actor_learning_rate: 0.003
+  actor_learning_rate: 0.0003
   critic_learning_rate: 0.003
   gamma: 0.99
   gae_lambda: 0.95

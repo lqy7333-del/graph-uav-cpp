@@ -23,8 +23,25 @@
   但 entropy 已经动过（4.40 → 3.76），说明 actor 并非完全走不动，所以这条依据不足以定论。
 - **因此本次是实证而非推理**：用 `--resume ckpt_update_200.pt` 续训 50 轮（actor lr 10×），
   再在 **20 个固定实例上做逐实例配对评估**，与 ckpt_200 对比。
-- **测试**：`CriticLearningRateTests` 扩为 `LearningRateTests`（两者都高于基准、可独立覆盖、
-  缺省回落基准）。
+- **实测结果：候选 1 失败，方向为负。** 运行 `coverage_env/results/run_resume_actor_lr10x/`
+  （201→250，exit 0，`ratio_std` 0.13→0.20、`entropy` 3.76→3.56 证明 actor 确实动得更快）：
+
+  | policy | greedy 均值 | sd |
+  | --- | --- | --- |
+  | ckpt_200（actor lr 3e-4） | −43.76 | **4.62** |
+  | ckpt_250（actor lr 3e-3） | −44.59 | **7.13** |
+
+  **配对 delta = −0.83 ± 1.59，t = −0.52，8/20 改善，95% CI [−3.94, +2.29]**
+  —— 不显著，点估计为负，且**一致性反而变差**（sd 4.62 → 7.13，把条目 28 里唯一的
+  稳健收益部分抵消掉了）。
+- **解释**：步长机制**不能从 critic 迁移到 actor**。critic 有明确的回归目标（return），
+  步长大 → 更快逼近好的拟合；actor 的 policy-gradient 估计是**噪声主导**的，
+  步长大 → 更快地在噪声上跑偏。这与条目 28 的观察一致：策略会变确定（entropy 下降）
+  但均值不动。**瓶颈是信号而非步长。**
+- **因此 `default.yaml` 把 `actor_learning_rate` 保持为基准 0.0003**（配置项保留，
+  便于以后再试；`critic_learning_rate` 仍是实测有效的 0.003）。
+- **测试**：`LearningRateTests` 断言 actor 保持基准、critic 保持 10×，以及两者可独立覆盖 /
+  缺省回落基准。
 
 ### 28. 正式训练（200 轮，5~20 地块泛化）结果：critic 已修好，但均值仍无显著提升
 - **运行**：`coverage_env/results/run_fields_5_20_final/`，`--num-updates 200 --seed 42`，
