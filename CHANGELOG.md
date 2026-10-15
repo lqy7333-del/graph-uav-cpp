@@ -7,6 +7,35 @@
 
 ## 2026-10-15
 
+### 24. 修法 1：给 `z_G` 加入显式地块布局特征，修复 critic 无法预测 return
+- **文件**：修改 `coverage_env/rl/decoder/global_state_encoder.py`、
+  `coverage_env/rl/decoder/action_decoder.py`、
+  `coverage_env/tests/test_global_context_and_role_embedding.py`。
+- **变更（旧 → 新）**：
+  1) `global_state_encoder.py` 新增 `build_site_feature(source)`（12 维）与
+     `_site_tables()`：从 **Environment 或序列化 state dict** 计算
+     `[num_fields, total_area, depot↔地块距离的 mean/max/min/std,
+     地块两两距离的 mean/max/min/std, 地块面积 mean/std]`；新增 4 个归一化尺度
+     （`max_fields_scale` / `max_total_area_scale` / `site_distance_scale_m` /
+     `max_field_area_scale`）。
+  2) `GlobalStateEncoder` 新增 `site_dim`（默认 12）与 `site_feature` 入参，
+     `input_dim = graph_dim + uav_dim + depot_dim + site_dim`；`forward` 与
+     `forward_batched` 都经由 `_assemble()` 按固定顺序拼接。
+  3) `CoveragePolicy` 新增 `_site_source()`（**优先用 transition 的 state**，与
+     `_global_sources` 同一理由），并在 `_build_global_embedding` 与 `forward_batched`
+     里计算并传入 `x_site`。
+- **原因**：`explained_variance` 48 轮恒为 0、`advantage_std ≈ return_std`，说明 critic
+  没减掉任何基线。**探针实验**（50 instance × 3 局，嵌套交叉验证）定位了根因：
+  可预测性上限 R²=0.864，但 `z_G` 只拿到 **0.140**，而 13 维显式空间特征拿到 **0.537**
+  —— `MeanPool` 对地块的**数量、顺序、位置**全不变，而 return（单位面积路程成本）恰恰
+  取决于 depot↔地块距离与地块散布。`num_fields` 单独仅 −0.054，说明归一化有效、缺的是几何。
+- **注意**：`z_G` 同时馈入 critic 与 actor 的每个动作上下文，所以这一改动**同时**让 actor
+  能看到布局摘要；网络首层输入由 268 维变为 280 维，**旧 checkpoint 不再兼容**。
+- **验证**：新增 3 项测试 —— `build_site_feature` 12 维且 Environment 与 state dict 逐位一致、
+  对地块顺序不变但对实例敏感、以及「整体平移地块必须改变 `z_G`」（因为池化对位置不变，
+  变化只能来自 `x_site`）。全量 109 项，仍只有 2 个改动前即存在的失败。
+- **回滚方法**：`git revert <本提交 SHA>`（并把 `GlobalStateEncoder` 的 `site_dim` 设回 0）。
+
 ### 23. PPO 训练诊断指标：定位「critic 收敛但 reward 不涨」
 - **文件**：修改 `coverage_env/rl/ppo/ppo.py`、`coverage_env/rl/trainer/distributed.py`。
 - **变更（旧 → 新）**：`PPOAgent.update()` 的返回字典新增

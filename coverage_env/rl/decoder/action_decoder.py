@@ -12,6 +12,7 @@ from coverage_env.rl.decoder.global_state_encoder import (
     GlobalStateEncoder,
     build_depot_feature,
     build_graph_context,
+    build_site_feature,
     build_uav_feature,
 )
 from coverage_env.rl.encoder.batched_encoder import (
@@ -68,8 +69,12 @@ class CoveragePolicy(nn.Module):
         self.action_generator = ActionGenerator()
         hidden_dim = self.encoder.hidden_dim
         self.action_embedding = ActionEmbedding(hidden_dim=hidden_dim)
+        # ``site_dim`` carries an explicit site-layout summary: pooled graph
+        # embeddings are position- and count-invariant, so without it neither the
+        # critic nor the actor can see where the fields are relative to the depot.
         self.global_state_encoder = GlobalStateEncoder(
-            graph_dim=2 * hidden_dim, uav_dim=10, depot_dim=2, hidden_dim=hidden_dim
+            graph_dim=2 * hidden_dim, uav_dim=10, depot_dim=2, site_dim=12,
+            hidden_dim=hidden_dim,
         )
         decoder_input_dim = self.action_embedding.output_dim + hidden_dim
         self.action_decoder = ActionDecoder(decoder_input_dim, hidden_dim)
@@ -159,11 +164,12 @@ class CoveragePolicy(nn.Module):
         # Per-transition global features; pooled graph context is per graph.
         uav_dim = self.global_state_encoder.uav_dim
         depot_dim = self.global_state_encoder.depot_dim
-        uav_features, depot_features = [], []
+        site_dim = self.global_state_encoder.site_dim
+        uav_features, depot_features, site_features = [], [], []
         for context in context_list:
-            uav_source, depot_source = self._global_sources(
-                environment, context["observation"]
-            )
+            observation = context["observation"]
+            uav_source, depot_source = self._global_sources(environment, observation)
+            site_source = self._site_source(environment, observation)
             uav_features.append(
                 build_uav_feature(uav_source).to(device)
                 if uav_source is not None else torch.zeros(uav_dim, device=device)
@@ -172,12 +178,17 @@ class CoveragePolicy(nn.Module):
                 build_depot_feature(depot_source).to(device)
                 if depot_source is not None else torch.zeros(depot_dim, device=device)
             )
+            site_features.append(
+                build_site_feature(site_source).to(device)
+                if site_source is not None else torch.zeros(site_dim, device=device)
+            )
         global_embeddings = self.global_state_encoder.forward_batched(
             batched_graph_context(
                 embeddings["field_embedding"], embeddings["boundary_embedding"], batch
             ),
             torch.stack(uav_features),
             torch.stack(depot_features),
+            torch.stack(site_features),
         )
 
         field_offsets = batch.field_offsets.tolist()
@@ -246,15 +257,31 @@ class CoveragePolicy(nn.Module):
                 depot_source = environment.depot
         return uav_source, depot_source
 
+    @staticmethod
+    def _site_source(environment, state):
+        """Resolve the layout source (fields + depot), preferring the stored state.
+
+        Same reasoning as ``_global_sources``: PPO replay must see the layout of
+        the transition's own instance, and by then the live environment has moved
+        on (or resampled a different instance entirely).
+        """
+        if isinstance(state, dict) and state.get("fields"):
+            return state
+        if environment is not None and getattr(environment, "fields", None):
+            return environment
+        return None
+
     def _build_global_embedding(self, embeddings, environment=None, state=None):
-        """Build the global context ``z_G`` from graph pooling, UAV, and depot."""
+        """Build ``z_G`` from graph pooling, UAV, depot, and site layout."""
         device = embeddings["field_embedding"].device
         uav_source, depot_source = self._global_sources(environment, state)
+        site_source = self._site_source(environment, state)
         g_graph = build_graph_context(
             embeddings["field_embedding"], embeddings["boundary_embedding"]
         )
         uav_dim = self.global_state_encoder.uav_dim
         depot_dim = self.global_state_encoder.depot_dim
+        site_dim = self.global_state_encoder.site_dim
         x_uav = (
             build_uav_feature(uav_source).to(device)
             if uav_source is not None else torch.zeros(uav_dim, device=device)
@@ -263,7 +290,11 @@ class CoveragePolicy(nn.Module):
             build_depot_feature(depot_source).to(device)
             if depot_source is not None else torch.zeros(depot_dim, device=device)
         )
-        return self.global_state_encoder(g_graph, x_uav, x_depot)
+        x_site = (
+            build_site_feature(site_source).to(device)
+            if site_source is not None else torch.zeros(site_dim, device=device)
+        )
+        return self.global_state_encoder(g_graph, x_uav, x_depot, x_site)
 
     def encode_graph(self, graph, environment=None, state=None):
         """Encode a saved graph without generating candidates or action masks."""
