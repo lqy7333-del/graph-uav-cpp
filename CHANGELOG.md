@@ -7,6 +7,39 @@
 
 ## 2026-10-15
 
+### 28. 正式训练（200 轮，地块数量 5~20 泛化）结果：策略确有提升，但日志指标看不见
+- **运行**：`coverage_env/results/run_fields_5_20_final/`，`--num-updates 200 --seed 42`，
+  未指定 `--num-fields`（=> `[5,20]` 每 episode 重采样），`critic_learning_rate=3e-3`。
+  代码版本 `09b928d`。200/200 完成，exit 0，checkpoint 每 50 轮一份。
+- **训练日志（`mean_ep_reward` = on-policy 采样回报）看起来完全平**：
+  `OLS(reward ~ update)`：slope = **−0.00145 ± 0.00233，t = −0.62**；
+  首/末三分之一 −43.47 vs −43.73（t≈−0.7）。20 轮 block 均值在 −43.2 ~ −43.9 之间震荡。
+  同期内部指标却一路向好：`entropy` 4.40 → 3.76、`explained_variance` 0.67 → **0.92**、
+  `critic_loss` 52 → **9.6**；`corr(reward, mean_ep_fields) = −0.020`（跨地块归一化仍有效）。
+- **但把 checkpoint 拿出来在 10 个固定实例上做确定性（greedy）评估，曲线是明显上升的**：
+
+  | checkpoint | greedy（10 固定实例） | SE | sampled |
+  | --- | --- | --- | --- |
+  | untrained | −44.44 | 3.16 | −44.51 ± 1.08 |
+  | ckpt_50 | −45.00 | 2.36 | — |
+  | ckpt_100 | −45.31 | 2.46 | — |
+  | ckpt_150 | −42.27 | 1.36 | — |
+  | **ckpt_200** | **−42.11** | **1.29** | **−43.30 ± 0.98** |
+
+  即最终 **greedy 提升 2.33（+5.2%），SE 从 3.16 降到 1.29**；sampled 提升 1.21（+2.7%）。
+- **两个重要结论**：
+  1) **日志的「reward 不涨」主要是度量假象**：它记的是带探索的 on-policy 回报，且每个 update
+     抽到的地块组合不同（每轮 `mean_ep_reward` 的 sd ≈ 1.8，而真实提升只有 ~2）；
+     而确定性评估在固定实例上把 sd 压到 ~1.3 甚至更低，趋势立刻可见。
+  2) **提升发生在第 100~150 轮之间**，正好紧跟在 `explained_variance` 达到 0.85~0.9 之后
+     —— 印证了「修 critic 是使能条件、但有 ~50 轮滞后」，也说明条目 26 的修复确实起了作用。
+- **尚未处理**：greedy(−42.11) 与 sampled(−43.30) 之间还有 **1.19 的探索成本**，
+  对应 `entropy` 仍有 3.76（~100 候选的理论均匀值 ≈ 4.6）。降低 `entropy_coef` 有空间。
+  另外 ckpt_150 → ckpt_200 仍在改善（−42.27 → −42.11，EV 0.911 → 0.941），
+  说明继续训练可能还有收益。
+- **建议的下一步**：给 trainer 加「固定实例上的定期确定性评估」并写入日志（把学习曲线
+  的方差从 ~1.8 压到 <0.5），再用 `--resume` 续训对比。
+
 ### 27. DDP 训练支持从 checkpoint 续跑（`--resume`）
 - **文件**：修改 `coverage_env/rl/trainer/distributed.py`、`coverage_env/rl/ppo/ppo.py`、
   `coverage_env/tests/test_training.py`。
