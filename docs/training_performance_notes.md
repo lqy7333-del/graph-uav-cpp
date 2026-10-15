@@ -134,14 +134,17 @@ encoder 前向 = 8 × 64 = 512 次 / 轮 update
 2. **中风险高收益**：只 batch encoder（P1 折中）+ `torch.compile`（P1）。
 3. **高投入**：异步 collector（P3）、完整图 batch 化（P1）、actor/critic 合并（P2）。
 
-## 复现实验命令
+## 实测方法与复现说明
 
-```bash
-# rollout 分阶段耗时（单卡，20 地块）
-PYTHONPATH=. .venv/bin/python /tmp/profile_phases.py
+本文档数据来自两个一次性 profiling 脚本（**未纳入仓库**，按需重建）：
 
-# update 耗时（128 transition，epochs=4，batch 64/16，CUDA）
-PYTHONPATH=. .venv/bin/python /tmp/profile_update_gpu.py
-```
+1. **rollout 分阶段**：固定 20 地块实例，在**同一进程**内对每一步分别计时
+   `get_action_candidates() + get_action_mask()`、`actor(state)`、
+   `environment.step(action)`、`build_graph + encode_graph`；用
+   `torch.cuda.synchronize()` 夹住 GPU 段，取 8 步的中位数。
+2. **update 耗时**：先由同一实例跑出 128 条 transition 填入 `RolloutBuffer`，再用
+   `PPOAgent.update()` 计时（`epochs=4`，`batch_size` 分别取 64/16），对比 minibatch
+   数与 encoder 前向次数。
 
-（脚本为一次性 profiling 代码，未纳入仓库。）
+重建脚本时可直接复用 `coverage_env.rl.trainer.trainer._clone_graph` 保存 rollout 中
+的图快照。
