@@ -66,7 +66,9 @@ class PPOAgent:
         self.batch_size = int(self.config.get("batch_size", 64))
         self.max_grad_norm = float(self.config.get("max_grad_norm", 0.5))
         self.update_count = 0
-        self._value_bias_initialized = False
+        self._value_shift = 0.0
+        self._value_scale = 1.0
+        self._value_stats_initialized = False
 
     @staticmethod
     def _critic_features(output) -> torch.Tensor:
@@ -81,8 +83,10 @@ class PPOAgent:
         return output["global_embedding"]
 
     def value_from_output(self, output) -> torch.Tensor:
-        """Evaluate the critic from an actor forward result."""
-        return self.critic(self._critic_features(output).detach()).squeeze(-1)
+        """Evaluate the critic from an actor forward result (raw return scale)."""
+        return self._denormalize(
+            self.critic(self._critic_features(output).detach())
+        ).squeeze(-1)
 
     @torch.no_grad()
     def value_for_graph(self, graph, environment=None) -> float:
@@ -92,7 +96,7 @@ class PPOAgent:
         _embeddings, _global_embedding, critic_input = self.actor.encode_graph(
             graph, environment=environment
         )
-        value = self.critic(critic_input).reshape(()).item()
+        value = self._denormalize(self.critic(critic_input)).reshape(()).item()
         self.actor.train(was_training)
         return float(value)
 
@@ -119,7 +123,7 @@ class PPOAgent:
         # Diagnostic only: the raw advantage scale, captured *before* the
         # per-update normalization that makes its magnitude uninformative.
         advantage_std = self._tensor_std(advantages)
-        self._warm_start_value_bias(returns)
+        self._update_value_stats(returns)
         if len(advantages) > 1:
             advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
 
@@ -156,7 +160,9 @@ class PPOAgent:
                 # entropy bonus so the log can show which one drives the actor.
                 surrogate = torch.minimum(unclipped, clipped).mean()
                 actor_loss = -surrogate - self.entropy_coef * entropy
-                critic_loss = F.mse_loss(current_values, returns[batch_indices])
+                critic_loss = F.mse_loss(
+                    current_values, self._normalize(returns[batch_indices])
+                )
 
                 self.actor_optimizer.zero_grad(set_to_none=True)
                 actor_loss.backward()
@@ -188,7 +194,7 @@ class PPOAgent:
                     float(total_norm.detach().item())
                     if torch.is_tensor(total_norm) else float(total_norm)
                 )
-                predictions.append(current_values.detach())
+                predictions.append(self._denormalize(current_values.detach()))
                 targets.append(returns[batch_indices].detach())
 
         self.update_count += 1
@@ -224,27 +230,36 @@ class PPOAgent:
             "updates": 0,
         }
 
-    def _critic_module(self):
-        """Return the critic module, unwrapping DDP if present."""
-        return self.critic.module if hasattr(self.critic, "module") else self.critic
+    def _update_value_stats(self, returns: torch.Tensor) -> None:
+        """Track the return scale so the critic can regress O(1) targets.
 
-    def _warm_start_value_bias(self, returns: torch.Tensor) -> None:
-        """Initialise the critic's output bias to the observed mean return.
-
-        The reward is a path cost, so a return is a large negative offset plus a
-        much smaller state-dependent part. Adam moves a bias by roughly the
-        learning rate per step, so starting from zero the critic spends thousands
-        of steps just learning the offset (measured: ~0.5 per update while the
-        offset was ~18). That offset error dominates the loss, so the
-        state-dependent signal that ``explained_variance`` measures never gets
-        fitted. One warm start suffices because the offset is roughly constant.
+        Adam moves a parameter by roughly the learning rate per step, so asking
+        the critic to span the raw return range (offset ~-18, spread ~11) from
+        its default init needs far more steps than a 200-update run provides --
+        measured behaviour was a near-constant prediction that never fitted the
+        state-dependent part. Regressing ``(return - shift) / scale`` removes
+        both the offset and the scale problem, and the running estimate keeps it
+        valid as the returns drift during training.
         """
-        if self._value_bias_initialized or returns.numel() == 0:
+        if returns.numel() == 0:
             return
-        final_layer = self._critic_module().network[-1]
-        with torch.no_grad():
-            final_layer.bias.fill_(float(returns.mean().item()))
-        self._value_bias_initialized = True
+        mean = float(returns.mean().item())
+        std = float(returns.std(unbiased=False).item()) if returns.numel() > 1 else 0.0
+        std = max(std, 1e-3)
+        if self._value_stats_initialized:
+            self._value_shift = 0.99 * self._value_shift + 0.01 * mean
+            self._value_scale = 0.99 * self._value_scale + 0.01 * std
+        else:
+            self._value_shift, self._value_scale = mean, std
+            self._value_stats_initialized = True
+
+    def _normalize(self, returns: torch.Tensor) -> torch.Tensor:
+        """Map raw returns onto the critic's O(1) regression target."""
+        return (returns - self._value_shift) / self._value_scale
+
+    def _denormalize(self, values: torch.Tensor) -> torch.Tensor:
+        """Map the critic's output back to the original return scale."""
+        return values * self._value_scale + self._value_shift
 
     @staticmethod
     def _tensor_mean(values: torch.Tensor) -> float:
@@ -305,7 +320,9 @@ class PPOAgent:
             )
             log_probs.append(log_prob)
             entropy_rows.append(entropy)
-            values.append(self.value_from_output(output).reshape(()))
+            values.append(self.critic(
+                self._critic_features(output).detach()
+            ).squeeze(-1).reshape(()))
         return (
             torch.stack(log_probs),
             torch.stack(entropy_rows).mean(),
