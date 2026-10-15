@@ -365,7 +365,7 @@ class PPOAgent:
         }
 
     def save_checkpoint(self, path: str | Path) -> None:
-        """Save actor, critic, both optimizers, and update count."""
+        """Save actor, critic, both optimizers, update count, and warm-start flag."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         checkpoint = {
@@ -374,14 +374,25 @@ class PPOAgent:
             "actor_optimizer": self.actor_optimizer.state_dict(),
             "critic_optimizer": self.critic_optimizer.state_dict(),
             "update_count": self.update_count,
+            "value_bias_initialized": self._value_bias_initialized,
         }
         torch.save(checkpoint, path)
 
-    def load_checkpoint(self, path: str | Path, *, map_location=None) -> None:
-        """Restore a checkpoint created by ``save_checkpoint``."""
+    def load_checkpoint(self, path: str | Path, *, map_location=None) -> int:
+        """Restore a checkpoint and return the update index it was saved at.
+
+        The index lets a trainer resume from the next update instead of
+        restarting the run.
+        """
         checkpoint = torch.load(path, map_location=map_location or self.device, weights_only=False)
         self.actor.load_state_dict(checkpoint["actor"])
         self.critic.load_state_dict(checkpoint["critic"])
         self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
         self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])
         self.update_count = int(checkpoint.get("update_count", 0))
+        # Default to True for pre-existing checkpoints: re-running the warm start
+        # on a trained critic would clobber its learned output bias.
+        self._value_bias_initialized = bool(
+            checkpoint.get("value_bias_initialized", True)
+        )
+        return int(checkpoint.get("update_idx", self.update_count))

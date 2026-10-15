@@ -51,9 +51,13 @@ class DistributedTrainer:
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_every = int(checkpoint_every)
 
-    def train(self, num_updates: int, rollout_steps: int) -> None:
-        """Run ``num_updates`` synchronized updates of ``rollout_steps`` steps each."""
-        for update_idx in range(1, num_updates + 1):
+    def train(self, num_updates: int, rollout_steps: int, *, start_update: int = 1) -> None:
+        """Run ``num_updates`` synchronized updates of ``rollout_steps`` steps each.
+
+        ``start_update`` lets a resumed run continue at the next update index
+        while still using the same absolute target (``num_updates``).
+        """
+        for update_idx in range(max(1, start_update), num_updates + 1):
             # Sampling is stochastic and must not feed the autograd graph.
             self.agent.actor.eval()
             state = self.environment.reset()
@@ -253,6 +257,18 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
 
     actor = CoveragePolicy(environment, config=config).to(rank)
     agent = PPOAgent(actor, config, device=rank)
+
+    start_update = 1
+    if args.resume:
+        # Every rank loads the same shared checkpoint, before DDP wrapping so the
+        # state-dict keys carry no ``module.`` prefix. Rank 0 wrote it, so the
+        # file already exists when the others read it.
+        start_update = agent.load_checkpoint(args.resume) + 1
+        if rank == 0:
+            print(f"[rank 0] resumed from {args.resume} -> next update {start_update}",
+                  flush=True)
+        dist.barrier()
+
     agent.actor = DDP(agent.actor, device_ids=[rank])
     agent.critic = DDP(agent.critic, device_ids=[rank])
 
@@ -260,7 +276,7 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
         environment, agent, rank=rank, world_size=world_size,
         checkpoint_dir=args.checkpoint_dir, checkpoint_every=args.checkpoint_every,
     )
-    trainer.train(args.num_updates, args.rollout_steps)
+    trainer.train(args.num_updates, args.rollout_steps, start_update=start_update)
 
     # A single number that must match across ranks after all-reduce.
     with torch.no_grad():
@@ -286,6 +302,11 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--checkpoint-dir", type=str, default="coverage_env/results/checkpoints")
     parser.add_argument("--checkpoint-every", type=int, default=50)
+    parser.add_argument(
+        "--resume", type=str, default=None,
+        help="Checkpoint file to resume from; training continues at the next "
+             "update index and still targets --num-updates overall.",
+    )
     args = parser.parse_args()
 
     world_size = torch.cuda.device_count()

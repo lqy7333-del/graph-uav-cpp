@@ -112,5 +112,48 @@ class CriticLearningRateTests(unittest.TestCase):
         )
 
 
+class CheckpointResumeTests(unittest.TestCase):
+    """Checkpoints must carry enough state to continue a run."""
+
+    def _agent(self):
+        config = load_config(DEFAULT_CONFIG_PATH)
+        config["environment"]["num_fields"] = {"min": 5, "max": 5}
+        environment = InstanceGenerator(config).generate(num_fields=5, seed=3)
+        return PPOAgent(CoveragePolicy(environment, config=config), config)
+
+    def _critic_bias(self, agent):
+        module = agent.critic.module if hasattr(agent.critic, "module") else agent.critic
+        return float(module.network[-1].bias.item())
+
+    def test_load_returns_the_update_index_and_preserves_warm_start(self):
+        agent = self._agent()
+        agent.update_count = 7
+        agent._warm_start_value_bias(torch.tensor([-21.0]))
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            path = Path(directory) / "ckpt.pt"
+            agent.save_checkpoint(path)
+
+            restored = self._agent()
+            self.assertFalse(restored._value_bias_initialized)
+            self.assertEqual(restored.load_checkpoint(path), 7)
+            self.assertEqual(restored.update_count, 7)
+            # Resuming must not re-trigger the warm start and clobber the bias.
+            self.assertTrue(restored._value_bias_initialized)
+            self.assertAlmostEqual(self._critic_bias(restored), -21.0, places=5)
+
+    def test_train_skips_updates_a_checkpoint_already_covers(self):
+        from coverage_env.rl.trainer.distributed import DistributedTrainer
+
+        config = load_config(DEFAULT_CONFIG_PATH)
+        config["environment"]["num_fields"] = {"min": 5, "max": 5}
+        environment = InstanceGenerator(config).generate(num_fields=5, seed=3)
+        agent = PPOAgent(CoveragePolicy(environment, config=config), config)
+        trainer = DistributedTrainer(environment, agent)
+        trainer.train(3, 4, start_update=4)  # already past the target
+        self.assertEqual(agent.update_count, 0)
+        self.assertEqual(len(trainer.buffer), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

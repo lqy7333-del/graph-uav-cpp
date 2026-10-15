@@ -7,6 +7,32 @@
 
 ## 2026-10-15
 
+### 27. DDP 训练支持从 checkpoint 续跑（`--resume`）
+- **文件**：修改 `coverage_env/rl/trainer/distributed.py`、`coverage_env/rl/ppo/ppo.py`、
+  `coverage_env/tests/test_training.py`。
+- **变更（旧 → 新）**：
+  1) `DistributedTrainer.train(num_updates, rollout_steps, *, start_update=1)` 新增
+     `start_update`，循环从该 index 开始，`--num-updates` 仍表示**总目标轮数**。
+  2) `_worker` 新增 `--resume PATH`：在 **DDP 包装之前**把 checkpoint 载入
+     actor/critic/optimizer（这样 state_dict 键不带 `module.` 前缀），随后
+     `start_update = load 返回的 update 索引 + 1`；各 rank 读同一个共享文件，
+     载入后 `dist.barrier()` 再继续。
+  3) `PPOAgent.load_checkpoint` 返回值由 `None` 改为 **checkpoint 的 update 索引**；
+     并把 `_value_bias_initialized` 一并存取 —— 续跑时若不保留该标志，critic 的
+     偏置热启动会重新触发，把已训练好的输出偏置覆盖掉。对旧格式 checkpoint
+     该键缺省为 `True`（宁可不动，也不要覆盖）。
+- **原因**：长训练一旦中断（本项目已在第 88 轮因地块摆放崩溃丢过一次 40 分钟）就只能从头再来；
+  且「先跑 50 轮确认趋势再续跑」这种分阶段验证也需要它。
+- **影响**：续跑**不是**与「一次跑完」逐位等价的轨迹 —— torch/环境 RNG 状态没有存进
+  checkpoint，所以续跑后采样序列会分叉。对本用途（继续训练）无碍，但不要用它复现单次
+  长跑的确切轨迹。
+- **验证**：新增 2 项测试（载入返回 update 索引且保留热启动标志；
+  `train(3, 4, start_update=4)` 不执行任何更新）；4 卡 DDP 端到端实测
+  `--num-updates 1 --checkpoint-every 1` 存出 `ckpt_update_1.pt`，再
+  `--resume ckpt_update_1.pt --num-updates 2` 打印 `next update 2` 且只跑了 update 2，
+  actor checksum 由 870.000883 变为 869.665499（证明载入的权重确实被继续训练）。
+- **回滚方法**：`git revert <本提交 SHA>`。
+
 ### 26. 定位并修复「critic 解释不了 return 方差」：critic 独立学习率（已验证 EV 0→0.88）
 - **文件**：修改 `coverage_env/rl/ppo/ppo.py`、`coverage_env/config/default.yaml`、
   `coverage_env/tests/test_training.py`。
