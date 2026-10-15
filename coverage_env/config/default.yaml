@@ -110,6 +110,12 @@ rl:
 
 ppo:
   learning_rate: 0.0003
+  # The critic regresses raw returns (offset ~-18, spread ~11 here) and Adam
+  # moves a parameter by roughly lr per step, so the value head needs a much
+  # larger rate than the actor to reach the right output scale within a
+  # 200-update run: diagnostics showed explained_variance stuck at ~0 with the
+  # shared rate. Falls back to `learning_rate` when the key is omitted.
+  critic_learning_rate: 0.003
   gamma: 0.99
   gae_lambda: 0.95
   clip_ratio: 0.2

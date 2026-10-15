@@ -55,8 +55,21 @@ class PPOAgent:
             )
         self.critic = ValueNetwork(critic_input_dim, actor.encoder.hidden_dim).to(self.device)
         learning_rate = float(self.config.get("learning_rate", 3e-4))
+        # The critic regresses returns whose scale is set by the reward (here an
+        # offset of about -18 with a spread of about 11). Adam moves a parameter
+        # by roughly `lr` per step, so at the shared default the value head would
+        # need hundreds of updates just to reach the right output scale -- its
+        # final-layer weights start near +-0.06 and must grow roughly 10x. A
+        # separate, larger critic rate targets exactly that; the actor's rate is
+        # tuned for the policy-gradient signal and must not be raised with it.
+        critic_learning_rate = float(
+            self.config.get("critic_learning_rate", learning_rate)
+        )
+        self.critic_learning_rate = critic_learning_rate
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=learning_rate)
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=learning_rate)
+        self.critic_optimizer = torch.optim.Adam(
+            self.critic.parameters(), lr=critic_learning_rate
+        )
         self.gamma = float(self.config.get("gamma", 0.99))
         self.gae_lambda = float(self.config.get("gae_lambda", 0.95))
         self.clip_ratio = float(self.config.get("clip_ratio", 0.2))
