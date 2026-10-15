@@ -77,6 +77,43 @@ encoder 前向 = 8 × 64 = 512 次 / 轮 update
 | **`torch.compile` / CUDA Graph** | 编译 encoder/decoder 融合 kernel，或对固定形状做 CUDA Graph 捕获 | 1.3~2×（小图收益明显） | 低-中 | 中：地块数每 episode 变化 → 动态形状会反复重编译，需 `dynamic=True` 或 padding 到固定上限 |
 | **AMP / bfloat16** | 前向反向用 bf16 | ~2× GPU 吞吐 | 低-中 | 中：数值稳定性（GAT 的 softmax/scatter 一般安全，需回归测试） |
 
+### P1 补充：batch 化原型已实测验证（未接入训练）
+
+原型：`coverage_env/rl/encoder/batched_encoder.py` + 等价性测试
+`coverage_env/tests/test_batched_encoder_equivalence.py`（8 项通过）。
+
+结论（重要，降低了工作量估计）：
+
+1. **批量化比预想简单得多**——因为 batch 采用「所有 field 在前、所有 boundary 在后」的
+   类型分离布局，单图里的 `edge_index - n_field` 表达式**原样成立**（只需把 `n_field`
+   换成总 field 数），`FieldBoundaryEncoder` 也**不用改**。真正需要改的只有一处：
+   全局 mean pooling → 按 graph 分段 mean。原先估的「重写节点统一索引 / 掩码」
+   大半不必要。
+2. **数值等价**（在 CPU 上）：
+   - `field_embedding` / `boundary_embedding` / inter·intra·FB **attention**：
+     **逐位一致（max abs diff = 0.0）**，6 张不同地块数的真实实例全部通过。
+   - 只有 pooled `graph_context` 差 ~2e-7~5e-7（float32 量级）：`index_add_` 的累加
+     顺序与 `mean(dim=0)` 不同，属正常舍入。对下游 MLP 无实质影响。
+   - CUDA 上全部差异 ~1e-6（GEMM tiling 不同），仍属舍入。
+3. **实测加速（64 张图，4013 节点，纯 encoder forward）**：
+
+   | device | per-graph | batched | speedup |
+   | --- | --- | --- | --- |
+   | cpu | 338.4 ms | 278.3 ms | 1.22× |
+   | cuda | 98.1 ms | 6.6 ms | **14.9×** |
+
+   即：GPU 上 kernel launch 开销确实是主因（CPU 本身吞吐就够，收益很小）。
+   折算到 update：512 次前向 → 8 次，update 的 encoder 部分预计降到 ~1/15。
+
+4. **踩过的坑（已做成回归测试）**：一开始把每条边的 boundary 索引减成「本图内的
+   `[0, n_boundary_k)`」，导致 graph 1 的 boundary 落到 graph 0 的特征行上（索引重叠），
+   误差高达 1.0 但**不报错**——正好印证了上表「索引错位是主要坑」。
+   `test_boundary_indices_stay_inside_their_owning_graph` 现在守着这个不变量。
+
+5. **尚未验证的部分**（接入训练前仍需做）：action embedding 的 per-transition 切片、
+   RolloutBuffer 里的图快照如何批量 collate（rollout 时逐条存、update 时按 minibatch 拼）、
+   `attention_debug` 的多图语义、以及 critic 侧 `z_G` 的 per-graph 消费。
+
 ---
 
 ## P2. DDP all-reduce 频繁

@@ -7,6 +7,44 @@
 
 ## 2026-10-15
 
+### 16. 图 batch 化原型：disjoint-union 编码器 + 等价性验证（不接入训练）
+- **文件**：新增 `coverage_env/rl/encoder/batched_encoder.py`、
+  `coverage_env/tests/test_batched_encoder_equivalence.py`；修改
+  `docs/training_performance_notes.md`（P1 补充实测结论）。**未改任何训练路径代码。**
+- **变更（旧 → 新）**：
+  1) `batched_encoder.py` 新增 `collate_graphs()`（把 N 张单图拼成一张不连通大图：
+     field 全部在前、boundary 全部在后，边端点重映射到批的统一索引空间，并记录
+     `field/boundary/edge_batch` 与 per-graph offsets）、`segment_mean()`（按 graph 分段
+     均值）、`batched_graph_context()`（替代全局 mean 池化）、`BatchedGraph` 容器与
+     `BatchedCoverageGraphEncoder`（继承 `CoverageGraphEncoder`，共享权重，新增
+     `forward_batched()`；原 `forward()` 保持不变）。
+  2) 新增 8 项等价性与不变量测试：真实重采样实例逐位一致、跨字段边全空的退化场景、
+     单图批、`global_feature` 按图堆叠、边不跨分量、boundary 局部索引不越界（回归守卫）、
+     空批拒绝、CUDA 舍入级一致。
+  3) `docs/training_performance_notes.md` 的 P1 增补实测小节。
+- **原因**：用户要求先做一个「不接入训练、只验证大图拼接前后 encoder 输出逐位一致」的
+  原型，用来决定 P1（图 batch 化）是否值得落地。
+- **关键结论**：
+  1) 由于 batch 采用类型分离布局，单图里的 `edge_index - n_field` **原样成立**（换成总
+     field 数即可），`FieldBoundaryEncoder` 无需改动；真正要改的只有「全局 mean 池化 →
+     按图分段 mean」一处，比条目 15 文档里估计的工作量小很多。
+  2) CPU 上 `field_embedding`/`boundary_embedding`/三类 attention **逐位一致（diff=0.0）**；
+     仅 pooled `graph_context` 差 ~2e-7~5e-7（`index_add_` 与 `mean` 累加顺序不同）。
+     CUDA 上全部差异 ~1e-6（GEMM tiling）。
+  3) 实测加速（64 图 / 4013 节点 / 纯 encoder forward）：CPU 1.22×，**CUDA 14.9×**
+     （per-graph 98.1 ms → batched 6.6 ms），印证 GPU kernel launch 开销是主因。
+- **踩坑记录**：初版把每条边的 boundary 索引减成「本图内 `[0, n_boundary_k)`」，导致不同
+  图的 boundary 特征行**重叠**，输出误差约 1.0 却不抛异常；改为批级统一索引
+  （`edge_index - n_field_total`）后归零。该不变量已由
+  `test_boundary_indices_stay_inside_their_owning_graph` 守住。
+- **未完成（接入训练前仍需做）**：action embedding 的 per-transition 切片、rollout 图快照
+  的按 minibatch collate、`attention_debug` 多图语义、critic 侧 `z_G` 的 per-graph 消费。
+- **回滚方法**：删除新增的 2 个文件；把 `docs/training_performance_notes.md` 的
+  「P1 补充」小节删去即可。不影响任何既有训练/推理路径。
+- **验证**：`python -m unittest coverage_env.tests.test_batched_encoder_equivalence` 8/8 通过；
+  连同 `test_encoder`/`test_policy_forward`/`test_graph_builder` 共 16 项通过；
+  直接运行 `python coverage_env/tests/test_batched_encoder_equivalence.py` 打印完整对比表。
+
 ### 15. 跨 episode 泛化 + 总路程 reward 重设计 + 训练效率调研
 - **文件**：修改 `coverage_env/env/instance_generator.py`、`coverage_env/env/environment.py`、
   `coverage_env/rl/reward.py`、`coverage_env/config/default.yaml`、
