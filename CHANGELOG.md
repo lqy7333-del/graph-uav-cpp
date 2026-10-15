@@ -7,6 +7,48 @@
 
 ## 2026-10-15
 
+### 31. 根因定位：actor 的动作表示里**没有位置**，策略在结构上无法算「最近地块」
+- **背景**：条目 26（修 critic，EV 0→0.92）、29（actor lr 10×）、30（λ=0）三个干预
+  都没能让均值 reward 显著改善。于是先建立**参照系**，再查表示能力。
+- **参照系（决定性）**：在 RL 动作空间里实现等价的「最近未完成地块」启发式
+  （`/tmp/eval_nn.py`），用**同一个 reward 函数、同一批 20 个固定实例**：
+
+  | policy | greedy 均值 | sd |
+  | --- | --- | --- |
+  | **最近地块启发式** | **−34.50** | 4.41 |
+  | untrained 策略 | −44.50 | 7.46 |
+  | 训练后 ckpt_200 | −43.76 | 4.62 |
+
+  **任务远未饱和：一个平凡的启发式比训练后的策略好 9.26（21%）。**
+- **策略连这个最基本的决策都没学会**（`/tmp/probe_choice.py`，10 个固定实例，
+  greedy，统计「所选地块 == 质心最近的未完成地块」的比例）：
+
+  | policy | 选中最近地块 | 随机基线 | 实走距离 vs 最近距离 |
+  | --- | --- | --- | --- |
+  | untrained | 19.1% | ~11.3% | — |
+  | **trained-200** | **18.2%** | ~11.7% | **779.6 m vs 353.3 m** |
+
+  训练前后**没有区别**（都在随机基线之上一点），且每步平均走的是最近距离的 **2.2 倍**。
+- **根因（代码层确认）**：actor 的动作上下文是 `concat(action_vectors, z_G)`，其中
+  `action_vectors` 由该动作的 field/boundary 嵌入拼成。而
+  `coverage_env/rl/graph/feature_builder.py` 里：
+  - `FieldFeatureBuilder` → `[area_norm, perimeter_norm, compactness, orientation, remaining_ratio]`
+    —— **没有任何位置信息**；
+  - `BoundaryFeatureBuilder` → `[length_norm, orientation]` —— **也没有位置**；
+  - 位置只出现在 `build_uav_feature` 的 `x_u, y_u`（和 `GlobalFeatureBuilder`），
+    而它们是**全局广播**进 `z_G` 的，对每个候选动作都相同。
+  - 图上也没有 UAV 节点，所以不存在「UAV↔地块」的边来补偿。
+
+  **结论：actor 完全拿不到「UAV 到候选地块」的距离，也就无法表达「去最近的地块」。
+  这不是优化问题，是表示能力缺失。** 这也解释了为什么调 critic / lr / λ 全都无效
+  —— 缺失的信息在 actor 的输入里，不在损失里。
+- **λ=0 结论（条目 30 的实验）**：机制生效（`adv_std` 3.0→1.4、EV→0.97），
+  但策略层面 **配对 delta = −0.39 ± 1.47，t = −0.27，11/20 改善** —— 同样不显著。
+  与根因诊断一致：优势估计变干净了，可 actor 依然没有位置信息可用。
+- **建议的下一步**：给**每个候选动作**加显式空间特征（UAV 当前位置到该动作 entry
+  boundary / 地块质心的距离、到 depot 的距离、地块面积等），接进 `action_context`。
+  这样「去最近地块」就变成输入的线性函数，应当立刻可学。
+
 ### 30. `--gae-lambda` 可命令行覆盖（优势估计的偏差/方差权衡）
 - **文件**：修改 `coverage_env/rl/trainer/distributed.py`、
   `coverage_env/tests/test_training.py`。
