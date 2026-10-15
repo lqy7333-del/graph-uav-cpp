@@ -10,6 +10,7 @@ from shapely.affinity import rotate
 from shapely.geometry import LineString, Point, box
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
+from shapely.prepared import prep
 
 from coverage_env.geometry.discretization import GridPoint
 
@@ -323,7 +324,13 @@ def _shortest_path_inside_polygon(
     if start == end:
         return [start]
     direct = LineString([start, end])
-    if polygon is None or polygon.buffer(1e-7).covers(direct):
+    if polygon is None:
+        return [start, end]
+    # A prepared geometry caches an internal index, so the O(V^2) predicate
+    # sweep below is much cheaper. It evaluates the same `covers` predicate and
+    # does not change which vertex pairs are considered.
+    visible = prep(polygon.buffer(1e-7))
+    if visible.covers(direct):
         return [start, end]
 
     vertices: list[Point2D] = [start, end]
@@ -335,7 +342,6 @@ def _shortest_path_inside_polygon(
         for ring in geometry.interiors:
             vertices.extend((float(x), float(y)) for x, y in list(ring.coords)[:-1])
 
-    visible = polygon.buffer(1e-7)
     graph: list[list[tuple[float, int]]] = [[] for _ in vertices]
     for first in range(len(vertices)):
         for second in range(first + 1, len(vertices)):
