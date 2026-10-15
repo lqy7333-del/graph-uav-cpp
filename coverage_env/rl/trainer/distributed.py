@@ -58,6 +58,14 @@ class DistributedTrainer:
             self.agent.actor.eval()
             state = self.environment.reset()
             rollout_reward = 0.0
+            # Under field-count generalization a 128-step rollout spans several
+            # episodes with different field counts, so the rollout sum alone is
+            # dominated by instance variance. Accumulate per-episode returns and
+            # label each with the episode's own field count so the log can show
+            # a trend and compare magnitudes across field counts.
+            episode_reward = 0.0
+            completed_rewards: list[float] = []
+            completed_fields: list[int] = []
 
             for _ in range(rollout_steps):
                 with torch.no_grad():
@@ -74,6 +82,13 @@ class DistributedTrainer:
 
                 next_state, reward, env_done, _info = self.environment.step(action)
                 rollout_reward += float(reward)
+                episode_reward += float(reward)
+                if env_done:
+                    # The environment still describes the episode that just
+                    # finished, so its field count labels this episode.
+                    completed_rewards.append(episode_reward)
+                    completed_fields.append(len(self.environment.fields))
+                    episode_reward = 0.0
                 with torch.no_grad():
                     # DDP does not proxy custom attributes; reach the wrapped
                     # CoveragePolicy via ``.module`` for graph construction and
@@ -116,6 +131,13 @@ class DistributedTrainer:
 
             if self.rank == 0:
                 summary = self.environment.get_summary()
+                episodes = len(completed_rewards)
+                mean_episode_reward = (
+                    sum(completed_rewards) / episodes if episodes else None
+                )
+                mean_episode_fields = (
+                    sum(completed_fields) / episodes if episodes else None
+                )
                 row = {
                     "update": update_idx,
                     "reward": round(rollout_reward, 4),
@@ -123,11 +145,26 @@ class DistributedTrainer:
                     "critic_loss": round(stats["critic_loss"], 6),
                     "coverage_ratio": round(summary["coverage_ratio"], 4),
                     "total_distance": round(summary["total_distance"], 1),
+                    "episodes": episodes,
+                    "mean_ep_reward": (
+                        round(mean_episode_reward, 4)
+                        if mean_episode_reward is not None else ""
+                    ),
+                    "mean_ep_fields": (
+                        round(mean_episode_fields, 2)
+                        if mean_episode_fields is not None else ""
+                    ),
                 }
+                episode_note = (
+                    f" | eps={episodes} mean_ep_reward={mean_episode_reward:.2f} "
+                    f"mean_ep_fields={mean_episode_fields:.1f}"
+                    if episodes else " | eps=0"
+                )
                 print(
                     f"[DDP] update {update_idx}/{num_updates} | steps={rollout_steps} "
                     f"reward={rollout_reward:.3f} coverage={summary['coverage_ratio']:.1%} "
-                    f"actor_loss={stats['actor_loss']:.5f} critic_loss={stats['critic_loss']:.5f}",
+                    f"actor_loss={stats['actor_loss']:.5f} critic_loss={stats['critic_loss']:.5f}"
+                    f"{episode_note}",
                     flush=True,
                 )
                 self._append_log(row)

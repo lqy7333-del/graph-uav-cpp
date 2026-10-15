@@ -7,6 +7,23 @@
 
 ## 2026-10-15
 
+### 21. DDP 训练日志增加「按 episode」指标，使跨地块数量泛化的趋势可评估
+- **文件**：修改 `coverage_env/rl/trainer/distributed.py`。
+- **变更（旧 → 新）**：`DistributedTrainer.train()` 的 rollout 循环新增逐 episode 累计
+  `episode_reward`，在 `env_done` 时（此刻 `environment` 仍描述刚结束的那一集）记录该集
+  reward 与地块数；rank 0 的 CSV 新增 `episodes` / `mean_ep_reward` / `mean_ep_fields`
+  三列，控制台行追加 `eps=… mean_ep_reward=… mean_ep_fields=…`。
+  **只增加记录，不改动任何训练逻辑**（梯度、rollout 长度、DDP 同步均不变）。
+- **原因**：地块数量泛化后，128 步 rollout 会跨越 7~10 集、每集地块数不同，`reward` 只是
+  rollout 求和，被实例方差主导（实测 −304 ~ −486）；而 `coverage_ratio` / `total_distance`
+  是 rollout 结束瞬间的快照，经常为 0（如第 8 轮）。两者都无法支撑验收标准里的
+  「reward 上升趋势」与「不同地块数量之间量级可比」两条。
+- **效果（前 7 轮实测）**：`mean_ep_reward` 稳定在 **−41.0 ~ −44.3**，而同期
+  `mean_ep_fields` 在 9.2 ~ 14.9 之间变化、`reward` 在 −304 ~ −452 之间摆动。
+  即归一化后的「单位面积路程成本」与地块数量无关，验收标准第 1 条的量级可比性获得直接证据。
+- **回滚方法**：`git revert <本提交 SHA>`。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+
 ### 20. 可见性图连接器优化第二步：按 region 缓存多边形内部可见性子图
 - **文件**：修改 `coverage_env/planner/coverage_path.py`、
   `coverage_env/planner/boundary_aware_sweep.py`、
