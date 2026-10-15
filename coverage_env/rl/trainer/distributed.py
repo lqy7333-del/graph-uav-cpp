@@ -97,10 +97,12 @@ class DistributedTrainer:
                     if env_done:
                         next_value = 0.0
                     else:
-                        _embeddings, global_embedding = self.agent.actor.module.encode_graph(
-                            next_graph, environment=self.environment
+                        _embeddings, _global_embedding, critic_input = (
+                            self.agent.actor.module.encode_graph(
+                                next_graph, environment=self.environment
+                            )
                         )
-                        next_value = self.agent.critic(global_embedding).reshape(()).item()
+                        next_value = self.agent.critic(critic_input).reshape(()).item()
 
                 self.buffer.add(
                     {
@@ -165,6 +167,8 @@ class DistributedTrainer:
                     "advantage_std": round(stats["advantage_std"], 5),
                     "return_mean": round(stats["return_mean"], 4),
                     "return_std": round(stats["return_std"], 4),
+                    "value_mean": round(stats["value_mean"], 4),
+                    "value_std": round(stats["value_std"], 4),
                     "explained_variance": round(stats["explained_variance"], 5),
                     "ratio_std": round(stats["ratio_std"], 6),
                     "clip_fraction": round(stats["clip_fraction"], 5),
@@ -185,7 +189,8 @@ class DistributedTrainer:
                     f"explained_var={stats['explained_variance']:+.3f} "
                     f"grad_norm={stats['actor_grad_norm']:.4f} "
                     f"ratio_std={stats['ratio_std']:.4f} clip_frac={stats['clip_fraction']:.3f} "
-                    f"adv_std={stats['advantage_std']:.3f} return_std={stats['return_std']:.3f}",
+                    f"adv_std={stats['advantage_std']:.3f} return_std={stats['return_std']:.3f} "
+                    f"value={stats['value_mean']:+.2f}±{stats['value_std']:.2f}",
                     flush=True,
                 )
                 self._append_log(row)

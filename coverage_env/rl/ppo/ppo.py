@@ -13,22 +13,23 @@ from coverage_env.rl.ppo.loss import compute_advantage
 
 
 class ValueNetwork(nn.Module):
-    """Critic that maps the global context ``z_G`` to a scalar value."""
+    """Critic mapping the critic features (learned ``z_G`` + raw state) to a scalar."""
 
-    def __init__(self, hidden_dim: int = 128) -> None:
+    def __init__(self, input_dim: int = 128, hidden_dim: int = 128) -> None:
         super().__init__()
+        self.input_dim = int(input_dim)
         self.hidden_dim = int(hidden_dim)
         self.network = nn.Sequential(
-            nn.Linear(self.hidden_dim, self.hidden_dim),
+            nn.Linear(self.input_dim, self.hidden_dim),
             nn.Tanh(),
             nn.Linear(self.hidden_dim, self.hidden_dim // 2),
             nn.Tanh(),
             nn.Linear(self.hidden_dim // 2, 1),
         )
 
-    def forward(self, global_embedding):
+    def forward(self, critic_features):
         """Return scalar values with shape ``[batch, 1]``."""
-        return self.network(global_embedding.reshape(-1, self.hidden_dim))
+        return self.network(critic_features.reshape(-1, self.input_dim))
 
 
 class PPOAgent:
@@ -40,7 +41,19 @@ class PPOAgent:
         self.actor = actor
         self.device = torch.device(device or next(actor.parameters()).device)
         self.actor.to(self.device)
-        self.critic = ValueNetwork(actor.encoder.hidden_dim).to(self.device)
+        # The critic consumes ``z_G`` plus the raw UAV/depot/site features. The
+        # raw part matters: ``GlobalStateEncoder`` is trained only by the actor
+        # and detached before the critic, so the layout information the value
+        # function depends on must not be reachable *only* through it.
+        critic_input_dim = actor.encoder.hidden_dim
+        global_encoder = getattr(actor, "global_state_encoder", None)
+        if global_encoder is not None:
+            critic_input_dim += (
+                global_encoder.uav_dim
+                + global_encoder.depot_dim
+                + global_encoder.site_dim
+            )
+        self.critic = ValueNetwork(critic_input_dim, actor.encoder.hidden_dim).to(self.device)
         learning_rate = float(self.config.get("learning_rate", 3e-4))
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=learning_rate)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=learning_rate)
@@ -54,19 +67,31 @@ class PPOAgent:
         self.max_grad_norm = float(self.config.get("max_grad_norm", 0.5))
         self.update_count = 0
 
+    @staticmethod
+    def _critic_features(output) -> torch.Tensor:
+        """Return the critic's input from an actor forward result.
+
+        Prefers the policy's ``critic_input`` (``z_G`` + raw UAV/depot/site
+        features) and falls back to ``global_embedding`` for callers that only
+        produce the latter.
+        """
+        if "critic_input" in output:
+            return output["critic_input"]
+        return output["global_embedding"]
+
     def value_from_output(self, output) -> torch.Tensor:
         """Evaluate the critic from an actor forward result."""
-        return self.critic(output["global_embedding"].detach()).squeeze(-1)
+        return self.critic(self._critic_features(output).detach()).squeeze(-1)
 
     @torch.no_grad()
     def value_for_graph(self, graph, environment=None) -> float:
         """Estimate V(s) for a saved graph without generating actions or masks."""
         was_training = self.actor.training
         self.actor.eval()
-        _embeddings, global_embedding = self.actor.encode_graph(
+        _embeddings, _global_embedding, critic_input = self.actor.encode_graph(
             graph, environment=environment
         )
-        value = self.critic(global_embedding).reshape(()).item()
+        value = self.critic(critic_input).reshape(()).item()
         self.actor.train(was_training)
         return float(value)
 
@@ -175,6 +200,8 @@ class PPOAgent:
             "advantage_std": advantage_std,
             "return_mean": self._tensor_mean(returns),
             "return_std": self._tensor_std(returns),
+            "value_mean": self._tensor_mean(prediction),
+            "value_std": self._tensor_std(prediction),
             "explained_variance": self._explained_variance(prediction, target),
             "ratio_std": sum(ratio_stds) / len(ratio_stds),
             "clip_fraction": sum(clip_fractions) / len(clip_fractions),
@@ -189,7 +216,8 @@ class PPOAgent:
         return {
             "actor_loss": 0.0, "critic_loss": 0.0, "entropy": 0.0,
             "policy_loss": 0.0, "advantage_std": 0.0, "return_mean": 0.0,
-            "return_std": 0.0, "explained_variance": 0.0, "ratio_std": 0.0,
+            "return_std": 0.0, "value_mean": 0.0, "value_std": 0.0,
+            "explained_variance": 0.0, "ratio_std": 0.0,
             "clip_fraction": 0.0, "approx_kl": 0.0, "actor_grad_norm": 0.0,
             "updates": 0,
         }
@@ -280,7 +308,7 @@ class PPOAgent:
             log_probs.append(log_prob)
             entropy_rows.append(entropy)
         values = self.critic(
-            torch.stack([output["global_embedding"] for output in outputs]).detach()
+            torch.stack([self._critic_features(o) for o in outputs]).detach()
         ).squeeze(-1)
         return (
             torch.stack(log_probs),

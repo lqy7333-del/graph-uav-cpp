@@ -7,6 +7,34 @@
 
 ## 2026-10-15
 
+### 25. 修法 1b：critic 改为直接消费「z_G + 原始 UAV/depot/布局特征」
+- **文件**：修改 `coverage_env/rl/decoder/action_decoder.py`、`coverage_env/rl/ppo/ppo.py`、
+  `coverage_env/rl/trainer/distributed.py`。
+- **变更（旧 → 新）**：
+  1) `CoveragePolicy._build_global_embedding` 改为返回 `(z_G, critic_input)`，其中
+     `critic_input = concat(z_G, x_uav, x_depot, x_site)`；`forward` / `forward_batched`
+     的输出新增 `"critic_input"`；`encode_graph` 返回值由 2 元组改为 3 元组
+     `(embeddings, z_G, critic_input)`（`[1]` 语义不变）。
+  2) `PPOAgent`：`ValueNetwork` 拆出 `input_dim`（原来把 `hidden_dim` 同时当输入与隐层宽度）；
+     `PPOAgent.__init__` 按 `encoder.hidden_dim + uav_dim + depot_dim + site_dim` 推导出
+     152 维 critic 输入；新增 `_critic_features(output)`（优先 `critic_input`，回退
+     `global_embedding`）；`value_from_output` / `value_for_graph` / `_batched_minibatch_rows`
+     统一走它。
+  3) 诊断新增 `value_mean` / `value_std`（critic 预测的均值与标准差），用于区分
+     「基线没学到」与「学到了均值但无状态依赖」。
+  4) `DistributedTrainer` 的 next-value 编码同步改为 3 元组解包。
+- **原因**：**修法 1（把布局特征接进 `GlobalStateEncoder`）不够**。重跑探针后，
+  新 `z_G` 的线性可解码性只从 **0.140 升到 0.185**，而原始 13 维布局特征有 **0.458**。
+  根因是架构性的：`GlobalStateEncoder` **只被 actor 的损失训练**，且在进入 critic 前被
+  `.detach()` —— 布局信息若只经由它就等于穿过一个 critic 无法塑造的表征。
+  另一个独立问题：48 轮里 `explained_variance ≈ 0`，**连线性探针在同样输入上都能拿到
+  0.14~0.19**，说明 critic 自身也没拟合好。
+- **验证**：critic 输入 152 维（128+10+2+12）、`encode_graph` 3 元组、`value_for_graph`
+  正常；新增 24 项相关测试通过；全量 109 项仍只有 2 个改动前即存在的失败。
+  效果（`explained_variance` 是否从 0 涨起来）在紧随其后的训练里验证。
+- **回滚方法**：`git revert <本提交 SHA>`（恢复 `ValueNetwork(hidden_dim)` 与 2 元组
+  `encode_graph`，并把 `value_from_output` 改回用 `global_embedding`）。
+
 ### 24. 修法 1：给 `z_G` 加入显式地块布局特征，修复 critic 无法预测 return
 - **文件**：修改 `coverage_env/rl/decoder/global_state_encoder.py`、
   `coverage_env/rl/decoder/action_decoder.py`、

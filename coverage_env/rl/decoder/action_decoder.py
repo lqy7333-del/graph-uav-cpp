@@ -106,7 +106,9 @@ class CoveragePolicy(nn.Module):
             )
         mask = torch.tensor(mask_values, dtype=torch.bool, device=device)
 
-        global_embedding = self._build_global_embedding(embeddings, environment, state)
+        global_embedding, critic_input = self._build_global_embedding(
+            embeddings, environment, state
+        )
         action_vectors = self.action_embedding(
             actions,
             embeddings["field_embedding"],
@@ -131,6 +133,7 @@ class CoveragePolicy(nn.Module):
             "masked_scores": masked_scores,
             "action_distribution": distribution,
             "global_embedding": global_embedding,
+            "critic_input": critic_input,
             "action_input": action_context,
             "encoder_output": embeddings,
             "graph": graph,
@@ -182,13 +185,19 @@ class CoveragePolicy(nn.Module):
                 build_site_feature(site_source).to(device)
                 if site_source is not None else torch.zeros(site_dim, device=device)
             )
+        uav_stack = torch.stack(uav_features)
+        depot_stack = torch.stack(depot_features)
+        site_stack = torch.stack(site_features)
         global_embeddings = self.global_state_encoder.forward_batched(
             batched_graph_context(
                 embeddings["field_embedding"], embeddings["boundary_embedding"], batch
             ),
-            torch.stack(uav_features),
-            torch.stack(depot_features),
-            torch.stack(site_features),
+            uav_stack,
+            depot_stack,
+            site_stack,
+        )
+        critic_inputs = torch.cat(
+            [global_embeddings, uav_stack, depot_stack, site_stack], dim=-1
         )
 
         field_offsets = batch.field_offsets.tolist()
@@ -226,6 +235,7 @@ class CoveragePolicy(nn.Module):
                 "masked_scores": masked_scores,
                 "action_distribution": distribution,
                 "global_embedding": global_embedding,
+                "critic_input": critic_inputs[index],
                 "action_input": action_context,
                 "graph": graph,
             })
@@ -272,7 +282,15 @@ class CoveragePolicy(nn.Module):
         return None
 
     def _build_global_embedding(self, embeddings, environment=None, state=None):
-        """Build ``z_G`` from graph pooling, UAV, depot, and site layout."""
+        """Build ``(z_G, critic_input)`` from graph pooling, UAV, depot, and layout.
+
+        ``critic_input`` is ``z_G`` concatenated with the **raw** UAV, depot, and
+        site features. ``GlobalStateEncoder`` is optimized only by the actor loss
+        and is detached before the critic, so routing the layout information
+        solely through it leaves the value function unable to shape -- or easily
+        read -- the representation it needs. The raw features give the critic a
+        direct, linear path to them.
+        """
         device = embeddings["field_embedding"].device
         uav_source, depot_source = self._global_sources(environment, state)
         site_source = self._site_source(environment, state)
@@ -294,16 +312,22 @@ class CoveragePolicy(nn.Module):
             build_site_feature(site_source).to(device)
             if site_source is not None else torch.zeros(site_dim, device=device)
         )
-        return self.global_state_encoder(g_graph, x_uav, x_depot, x_site)
+        global_embedding = self.global_state_encoder(g_graph, x_uav, x_depot, x_site)
+        critic_input = torch.cat(
+            [global_embedding, x_uav, x_depot, x_site], dim=-1
+        )
+        return global_embedding, critic_input
 
     def encode_graph(self, graph, environment=None, state=None):
-        """Encode a saved graph without generating candidates or action masks."""
+        """Encode a saved graph; returns ``(embeddings, z_G, critic_input)``."""
         device = next(self.parameters()).device
         if hasattr(graph, "to"):
             graph = graph.to(device)
         embeddings = self.encoder(graph)
-        global_embedding = self._build_global_embedding(embeddings, environment, state)
-        return embeddings, global_embedding
+        global_embedding, critic_input = self._build_global_embedding(
+            embeddings, environment, state
+        )
+        return embeddings, global_embedding, critic_input
 
     @staticmethod
     def sample_action(output, *, generator=None) -> CoverageAction:
