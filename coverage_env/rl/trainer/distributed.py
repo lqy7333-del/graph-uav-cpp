@@ -154,6 +154,22 @@ class DistributedTrainer:
                         round(mean_episode_fields, 2)
                         if mean_episode_fields is not None else ""
                     ),
+                    # Diagnostics for "why doesn't the reward improve?":
+                    # `entropy`/`policy_loss` separate the entropy bonus from the
+                    # advantage-weighted surrogate, `actor_grad_norm` shows how
+                    # much gradient actually reaches the actor, and
+                    # `explained_variance` shows whether the critic explains
+                    # enough return variance for the advantages to be useful.
+                    "entropy": round(stats["entropy"], 5),
+                    "policy_loss": round(stats["policy_loss"], 6),
+                    "advantage_std": round(stats["advantage_std"], 5),
+                    "return_mean": round(stats["return_mean"], 4),
+                    "return_std": round(stats["return_std"], 4),
+                    "explained_variance": round(stats["explained_variance"], 5),
+                    "ratio_std": round(stats["ratio_std"], 6),
+                    "clip_fraction": round(stats["clip_fraction"], 5),
+                    "approx_kl": round(stats["approx_kl"], 7),
+                    "actor_grad_norm": round(stats["actor_grad_norm"], 5),
                 }
                 episode_note = (
                     f" | eps={episodes} mean_ep_reward={mean_episode_reward:.2f} "
@@ -164,7 +180,12 @@ class DistributedTrainer:
                     f"[DDP] update {update_idx}/{num_updates} | steps={rollout_steps} "
                     f"reward={rollout_reward:.3f} coverage={summary['coverage_ratio']:.1%} "
                     f"actor_loss={stats['actor_loss']:.5f} critic_loss={stats['critic_loss']:.5f}"
-                    f"{episode_note}",
+                    f"{episode_note}\n"
+                    f"      entropy={stats['entropy']:.3f} policy_loss={stats['policy_loss']:+.5f} "
+                    f"explained_var={stats['explained_variance']:+.3f} "
+                    f"grad_norm={stats['actor_grad_norm']:.4f} "
+                    f"ratio_std={stats['ratio_std']:.4f} clip_frac={stats['clip_fraction']:.3f} "
+                    f"adv_std={stats['advantage_std']:.3f} return_std={stats['return_std']:.3f}",
                     flush=True,
                 )
                 self._append_log(row)

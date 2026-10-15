@@ -7,6 +7,33 @@
 
 ## 2026-10-15
 
+### 23. PPO 训练诊断指标：定位「critic 收敛但 reward 不涨」
+- **文件**：修改 `coverage_env/rl/ppo/ppo.py`、`coverage_env/rl/trainer/distributed.py`。
+- **变更（旧 → 新）**：`PPOAgent.update()` 的返回字典新增
+  `policy_loss`（advantage 加权 surrogate，与 entropy bonus 分离）、
+  `advantage_std`（**归一化前**的原始 advantage 尺度）、`return_mean` / `return_std`、
+  `explained_variance`（critic 对 return 方差的解释度 `1 - Var(target-pred)/Var(target)`）、
+  `ratio_std`、`clip_fraction`、`approx_kl`、`actor_grad_norm`
+  （`clip_grad_norm_` 在裁剪**前**返回的总范数）；`DistributedTrainer` 把这些写入 CSV，
+  并在控制台第二行打印其中最关键几项。空 buffer 时返回全零，保证日志 schema 稳定。
+  **只增加统计与记录，不改变任何训练数值**（advantage 归一化、loss、梯度裁剪均原样）。
+- **原因**：88 轮正式训练显示 `mean_ep_reward` 从 −42.65 漂到 −43.90（块均值标准误 ≈0.26，
+  即约 6 个标准误的**反向**漂移），与最初「`critic_loss` 收敛但 reward 不涨」同一症状；
+  而 `entropy` 虽已算出却未记录，导致只能靠推理判断是「熵主导」还是「critic 太弱」。
+- **首测（3 轮）已给出关键证据**：
+
+  | update | entropy | policy_loss | explained_var | advantage_std | return_std | grad_norm |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 2 | 4.348 | −0.00088 | **+0.000** | 8.540 | 8.542 | 0.1343 |
+  | 3 | 4.574 | −0.01005 | **+0.002** | 8.099 | 8.106 | 0.1692 |
+
+  两点：① `explained_variance ≈ 0` 且 `advantage_std ≈ return_std` —— **critic 没有减掉任何
+  基线**，advantage 几乎等于原始 return，信号被 return 的方差（sd ≈ 8.5）淹没；
+  ② `policy_loss ≈ 0` 而 entropy bonus 约 `0.01 × 4.4 = 0.044`，且 `entropy` 在**上升**
+  （4.35 → 4.57）—— 熵正则可能正在把策略推回均匀分布。
+- **回滚方法**：`git revert <本提交 SHA>`。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+
 ### 22. 修复跨 episode 泛化的地块摆放崩溃：`sample_components` 增加有限重试
 - **文件**：修改 `coverage_env/env/instance_generator.py`、
   `coverage_env/tests/test_domain_randomization.py`。

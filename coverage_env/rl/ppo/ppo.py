@@ -82,7 +82,7 @@ class PPOAgent:
         """
         transitions = list(buffer.transitions)
         if not transitions:
-            return {"actor_loss": 0.0, "critic_loss": 0.0, "entropy": 0.0, "updates": 0}
+            return self._empty_update_stats()
         advantages, returns = compute_advantage(
             [row.reward for row in transitions],
             [row.value for row in transitions],
@@ -90,10 +90,16 @@ class PPOAgent:
             [row.done for row in transitions],
             self.gamma, self.gae_lambda, device=self.device,
         )
+        # Diagnostic only: the raw advantage scale, captured *before* the
+        # per-update normalization that makes its magnitude uninformative.
+        advantage_std = self._tensor_std(advantages)
         if len(advantages) > 1:
             advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
 
         actor_losses, critic_losses, entropies = [], [], []
+        policy_losses, ratio_stds, clip_fractions = [], [], []
+        approx_kls, grad_norms = [], []
+        predictions, targets = [], []
         for _epoch in range(max(1, self.epochs)):
             permutation = torch.randperm(len(transitions)).tolist()
             batch_size = max(1, self.batch_size)
@@ -119,12 +125,19 @@ class PPOAgent:
                 clipped = torch.clamp(
                     ratios, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio
                 ) * batch_advantages
-                actor_loss = -torch.minimum(unclipped, clipped).mean() - self.entropy_coef * entropy
+                # Keep the advantage-weighted surrogate separate from the
+                # entropy bonus so the log can show which one drives the actor.
+                surrogate = torch.minimum(unclipped, clipped).mean()
+                actor_loss = -surrogate - self.entropy_coef * entropy
                 critic_loss = F.mse_loss(current_values, returns[batch_indices])
 
                 self.actor_optimizer.zero_grad(set_to_none=True)
                 actor_loss.backward()
-                nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
+                # ``clip_grad_norm_`` returns the total norm *before* clipping,
+                # which is exactly the actor-gradient magnitude we want.
+                total_norm = nn.utils.clip_grad_norm_(
+                    self.actor.parameters(), self.max_grad_norm
+                )
                 self.actor_optimizer.step()
 
                 self.critic_optimizer.zero_grad(set_to_none=True)
@@ -134,14 +147,82 @@ class PPOAgent:
                 actor_losses.append(float(actor_loss.detach().item()))
                 critic_losses.append(float(critic_loss.detach().item()))
                 entropies.append(float(entropy.detach().item()))
+                policy_losses.append(float(-surrogate.detach().item()))
+                ratio_stds.append(self._tensor_std(ratios))
+                clip_fractions.append(
+                    self._tensor_mean(
+                        (torch.abs(ratios.detach() - 1.0) > self.clip_ratio).float()
+                    )
+                )
+                approx_kls.append(
+                    self._tensor_mean(old_log_probs - current_log_probs)
+                )
+                grad_norms.append(
+                    float(total_norm.detach().item())
+                    if torch.is_tensor(total_norm) else float(total_norm)
+                )
+                predictions.append(current_values.detach())
+                targets.append(returns[batch_indices].detach())
 
         self.update_count += 1
+        prediction = torch.cat(predictions)
+        target = torch.cat(targets)
         return {
             "actor_loss": sum(actor_losses) / len(actor_losses),
             "critic_loss": sum(critic_losses) / len(critic_losses),
             "entropy": sum(entropies) / len(entropies),
+            "policy_loss": sum(policy_losses) / len(policy_losses),
+            "advantage_std": advantage_std,
+            "return_mean": self._tensor_mean(returns),
+            "return_std": self._tensor_std(returns),
+            "explained_variance": self._explained_variance(prediction, target),
+            "ratio_std": sum(ratio_stds) / len(ratio_stds),
+            "clip_fraction": sum(clip_fractions) / len(clip_fractions),
+            "approx_kl": sum(approx_kls) / len(approx_kls),
+            "actor_grad_norm": sum(grad_norms) / len(grad_norms),
             "updates": len(actor_losses),
         }
+
+    @staticmethod
+    def _empty_update_stats() -> dict:
+        """Return zeroed statistics so the log schema is stable."""
+        return {
+            "actor_loss": 0.0, "critic_loss": 0.0, "entropy": 0.0,
+            "policy_loss": 0.0, "advantage_std": 0.0, "return_mean": 0.0,
+            "return_std": 0.0, "explained_variance": 0.0, "ratio_std": 0.0,
+            "clip_fraction": 0.0, "approx_kl": 0.0, "actor_grad_norm": 0.0,
+            "updates": 0,
+        }
+
+    @staticmethod
+    def _tensor_mean(values: torch.Tensor) -> float:
+        """Return the mean of ``values`` as a float (0.0 when empty)."""
+        if values.numel() == 0:
+            return 0.0
+        return float(values.detach().mean().item())
+
+    @staticmethod
+    def _tensor_std(values: torch.Tensor) -> float:
+        """Return the population std as a float (0.0 for fewer than 2 samples)."""
+        if values.numel() < 2:
+            return 0.0
+        return float(values.detach().std(unbiased=False).item())
+
+    @staticmethod
+    def _explained_variance(prediction: torch.Tensor, target: torch.Tensor) -> float:
+        """Return ``1 - Var(target - prediction) / Var(target)``.
+
+        Standard value-function quality measure. ``<= 0`` means the critic is no
+        better than predicting the batch mean, which leaves the advantages close
+        to noise and starves the policy gradient.
+        """
+        if target.numel() < 2:
+            return 0.0
+        target_variance = target.detach().var(unbiased=False)
+        if float(target_variance.item()) <= 0.0:
+            return 0.0
+        residual = target.detach() - prediction.detach()
+        return float((1.0 - residual.var(unbiased=False) / target_variance).item())
 
     @staticmethod
     def _action_scores(policy_state, output, action):
