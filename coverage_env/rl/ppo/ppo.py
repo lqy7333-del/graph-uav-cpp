@@ -231,27 +231,26 @@ class PPOAgent:
         }
 
     def _update_value_stats(self, returns: torch.Tensor) -> None:
-        """Track the return scale so the critic can regress O(1) targets.
+        """Fix the return scale so the critic can regress O(1) targets.
 
         Adam moves a parameter by roughly the learning rate per step, so asking
         the critic to span the raw return range (offset ~-18, spread ~11) from
         its default init needs far more steps than a 200-update run provides --
         measured behaviour was a near-constant prediction that never fitted the
         state-dependent part. Regressing ``(return - shift) / scale`` removes
-        both the offset and the scale problem, and the running estimate keeps it
-        valid as the returns drift during training.
+        both the offset and the scale problem.
+
+        The statistics are set once and then frozen: the same constants are used
+        to denormalize the values that feed GAE, so a drifting scale would close
+        a returns -> scale -> bootstrap-values -> returns feedback loop (measured:
+        the advantage scale blew up 6x within two updates).
         """
-        if returns.numel() == 0:
+        if returns.numel() == 0 or self._value_stats_initialized:
             return
-        mean = float(returns.mean().item())
+        self._value_shift = float(returns.mean().item())
         std = float(returns.std(unbiased=False).item()) if returns.numel() > 1 else 0.0
-        std = max(std, 1e-3)
-        if self._value_stats_initialized:
-            self._value_shift = 0.99 * self._value_shift + 0.01 * mean
-            self._value_scale = 0.99 * self._value_scale + 0.01 * std
-        else:
-            self._value_shift, self._value_scale = mean, std
-            self._value_stats_initialized = True
+        self._value_scale = max(std, 1e-3)
+        self._value_stats_initialized = True
 
     def _normalize(self, returns: torch.Tensor) -> torch.Tensor:
         """Map raw returns onto the critic's O(1) regression target."""

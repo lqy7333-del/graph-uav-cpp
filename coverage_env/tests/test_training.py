@@ -84,13 +84,14 @@ class ValueNormalizationTests(unittest.TestCase):
             agent._denormalize(normalized), returns, atol=1e-4
         ))
 
-    def test_scale_tracks_drift_without_jumping(self):
+    def test_scale_is_frozen_after_initialization(self):
+        """A drifting scale would close a returns->scale->GAE feedback loop."""
         agent = self._agent()
         agent._update_value_stats(torch.tensor([-18.0, -20.0, -16.0, -40.0]))
         shift, scale = agent._value_shift, agent._value_scale
         agent._update_value_stats(torch.tensor([-100.0, -100.0]))
-        self.assertLess(abs(agent._value_shift - shift), 2.0)
-        self.assertLess(abs(agent._value_scale - scale), 1.0)
+        self.assertEqual(agent._value_shift, shift)
+        self.assertEqual(agent._value_scale, scale)
 
 
 if __name__ == "__main__":
