@@ -14,6 +14,11 @@ from coverage_env.rl.decoder.global_state_encoder import (
     build_graph_context,
     build_uav_feature,
 )
+from coverage_env.rl.encoder.batched_encoder import (
+    batched_graph_context,
+    collate_graphs,
+    encode_graph_batch,
+)
 from coverage_env.rl.encoder.hetero_encoder import CoverageGraphEncoder
 from coverage_env.rl.graph.graph_builder import GraphBuilder
 
@@ -125,6 +130,95 @@ class CoveragePolicy(nn.Module):
             "encoder_output": embeddings,
             "graph": graph,
         }
+
+    def forward_batched(self, contexts, environment=None):
+        """Encode several transitions with one batched GNN pass, then decode each.
+
+        ``contexts`` is a list of mappings shaped like the arguments of
+        :meth:`forward` — ``observation``, ``graph``, ``actions``, ``mask`` — one
+        per transition. The graph encoder runs **once** over the disjoint union
+        of every graph in the list; the (much cheaper) action embedding and
+        decoder still run per transition, reading their rows out of the batched
+        embeddings via the batch's per-graph offsets.
+
+        Returns one output mapping per context, with the same keys :meth:`forward`
+        returns, so the two paths are interchangeable. This is the "batch the
+        encoder only" variant: it changes no attention indexing, only how many
+        times the GNN is launched.
+        """
+        context_list = list(contexts)
+        if not context_list:
+            return []
+        environment = environment or self.environment
+        device = next(self.parameters()).device
+        batch = collate_graphs(
+            [context["graph"] for context in context_list]
+        ).to(device)
+        embeddings = encode_graph_batch(self.encoder, batch)
+
+        # Per-transition global features; pooled graph context is per graph.
+        uav_dim = self.global_state_encoder.uav_dim
+        depot_dim = self.global_state_encoder.depot_dim
+        uav_features, depot_features = [], []
+        for context in context_list:
+            uav_source, depot_source = self._global_sources(
+                environment, context["observation"]
+            )
+            uav_features.append(
+                build_uav_feature(uav_source).to(device)
+                if uav_source is not None else torch.zeros(uav_dim, device=device)
+            )
+            depot_features.append(
+                build_depot_feature(depot_source).to(device)
+                if depot_source is not None else torch.zeros(depot_dim, device=device)
+            )
+        global_embeddings = self.global_state_encoder.forward_batched(
+            batched_graph_context(
+                embeddings["field_embedding"], embeddings["boundary_embedding"], batch
+            ),
+            torch.stack(uav_features),
+            torch.stack(depot_features),
+        )
+
+        field_offsets = batch.field_offsets.tolist()
+        boundary_offsets = batch.boundary_offsets.tolist()
+        outputs = []
+        for index, context in enumerate(context_list):
+            actions = context["actions"]
+            graph = context["graph"]
+            mask = torch.tensor(
+                context["mask"], dtype=torch.bool, device=device
+            )
+            action_vectors = self.action_embedding(
+                actions,
+                embeddings["field_embedding"],
+                embeddings["boundary_embedding"],
+                graph,
+                field_offset=field_offsets[index],
+                boundary_offset=boundary_offsets[index],
+            )
+            global_embedding = global_embeddings[index]
+            action_context = torch.cat([
+                action_vectors,
+                global_embedding.unsqueeze(0).expand(action_vectors.shape[0], -1),
+            ], dim=-1)
+            scores = self.action_decoder(action_context)
+            masked_scores = scores.squeeze(-1).masked_fill(~mask, float("-inf"))
+            if mask.numel() and bool(mask.any()):
+                distribution = torch.softmax(masked_scores, dim=0)
+            else:
+                distribution = scores.new_zeros((scores.shape[0],))
+            outputs.append({
+                "actions": actions,
+                "mask": mask,
+                "scores": scores,
+                "masked_scores": masked_scores,
+                "action_distribution": distribution,
+                "global_embedding": global_embedding,
+                "action_input": action_context,
+                "graph": graph,
+            })
+        return outputs
 
     @staticmethod
     def _global_sources(environment, state):

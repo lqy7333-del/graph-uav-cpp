@@ -70,8 +70,16 @@ class PPOAgent:
         self.actor.train(was_training)
         return float(value)
 
-    def update(self, buffer: RolloutBuffer) -> dict:
-        """Run clipped PPO policy and value updates on the collected rollout."""
+    def update(self, buffer: RolloutBuffer, *, batched: bool = False) -> dict:
+        """Run clipped PPO policy and value updates on the collected rollout.
+
+        ``batched=True`` replaces the per-transition encoder forward with a
+        single disjoint-union pass per minibatch (see
+        ``coverage_env.rl.encoder.batched_encoder``). Log-probs, entropies, and
+        values are numerically identical to the default path, so the flag only
+        changes speed. It defaults to ``False`` so training behaviour is
+        unchanged unless a caller explicitly opts in.
+        """
         transitions = list(buffer.transitions)
         if not transitions:
             return {"actor_loss": 0.0, "critic_loss": 0.0, "entropy": 0.0, "updates": 0}
@@ -91,29 +99,16 @@ class PPOAgent:
             batch_size = max(1, self.batch_size)
             for start in range(0, len(permutation), batch_size):
                 indices = permutation[start:start + batch_size]
-                log_probs, entropy_rows, values = [], [], []
-                for index in indices:
-                    transition = transitions[index]
-                    policy_state = transition.state
-                    output = self.actor(
-                        policy_state["observation"],
-                        graph=policy_state["graph"],
-                        candidate_actions=policy_state["actions"],
-                        feasible_mask=policy_state["mask"],
+                if batched:
+                    current_log_probs, entropy, current_values = (
+                        self._batched_minibatch_rows(transitions, indices)
                     )
-                    action_index = policy_state["actions"].index(transition.action)
-                    probabilities = output["action_distribution"]
-                    log_probs.append(torch.log(probabilities[action_index].clamp_min(1e-12)))
-                    valid_probabilities = probabilities[output["mask"]]
-                    entropy_rows.append(-(
-                        valid_probabilities * torch.log(valid_probabilities.clamp_min(1e-12))
-                    ).sum())
-                    values.append(self.value_from_output(output).reshape(()))
+                else:
+                    current_log_probs, entropy, current_values = (
+                        self._per_transition_minibatch_rows(transitions, indices)
+                    )
 
                 batch_indices = torch.as_tensor(indices, dtype=torch.long, device=self.device)
-                current_log_probs = torch.stack(log_probs)
-                entropy = torch.stack(entropy_rows).mean()
-                current_values = torch.stack(values)
                 old_log_probs = torch.as_tensor(
                     [transitions[index].log_prob for index in indices],
                     dtype=torch.float32, device=self.device,
@@ -146,6 +141,81 @@ class PPOAgent:
             "critic_loss": sum(critic_losses) / len(critic_losses),
             "entropy": sum(entropies) / len(entropies),
             "updates": len(actor_losses),
+        }
+
+    @staticmethod
+    def _action_scores(policy_state, output, action):
+        """Return ``(log_prob of the taken action, entropy over feasible actions)``."""
+        action_index = policy_state["actions"].index(action)
+        probabilities = output["action_distribution"]
+        log_prob = torch.log(probabilities[action_index].clamp_min(1e-12))
+        valid_probabilities = probabilities[output["mask"]]
+        entropy = -(
+            valid_probabilities * torch.log(valid_probabilities.clamp_min(1e-12))
+        ).sum()
+        return log_prob, entropy
+
+    def _per_transition_minibatch_rows(self, transitions, indices):
+        """Recompute log-probs, entropy, and values with one forward per transition."""
+        log_probs, entropy_rows, values = [], [], []
+        for index in indices:
+            transition = transitions[index]
+            policy_state = transition.state
+            output = self.actor(
+                policy_state["observation"],
+                graph=policy_state["graph"],
+                candidate_actions=policy_state["actions"],
+                feasible_mask=policy_state["mask"],
+            )
+            log_prob, entropy = self._action_scores(
+                policy_state, output, transition.action
+            )
+            log_probs.append(log_prob)
+            entropy_rows.append(entropy)
+            values.append(self.value_from_output(output).reshape(()))
+        return (
+            torch.stack(log_probs),
+            torch.stack(entropy_rows).mean(),
+            torch.stack(values),
+        )
+
+    def _batched_minibatch_rows(self, transitions, indices):
+        """Recompute the same quantities with one batched encoder pass.
+
+        The GNN runs once for the whole minibatch; decoding stays per transition
+        because each transition has its own candidate-action set. The critic is
+        also evaluated once for the minibatch.
+        """
+        # DDP does not proxy custom methods, so reach the wrapped policy.
+        actor = self.actor.module if hasattr(self.actor, "module") else self.actor
+        contexts = [self._transition_context(transitions[index]) for index in indices]
+        outputs = actor.forward_batched(contexts)
+
+        log_probs, entropy_rows = [], []
+        for index, output in zip(indices, outputs):
+            log_prob, entropy = self._action_scores(
+                transitions[index].state, output, transitions[index].action
+            )
+            log_probs.append(log_prob)
+            entropy_rows.append(entropy)
+        values = self.critic(
+            torch.stack([output["global_embedding"] for output in outputs]).detach()
+        ).squeeze(-1)
+        return (
+            torch.stack(log_probs),
+            torch.stack(entropy_rows).mean(),
+            values,
+        )
+
+    @staticmethod
+    def _transition_context(transition) -> dict:
+        """Extract the policy inputs stored on a rollout transition."""
+        state = transition.state
+        return {
+            "observation": state["observation"],
+            "graph": state["graph"],
+            "actions": state["actions"],
+            "mask": state["mask"],
         }
 
     def save_checkpoint(self, path: str | Path) -> None:

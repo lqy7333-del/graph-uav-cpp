@@ -158,3 +158,20 @@ class GlobalStateEncoder(nn.Module):
         depot_feature = depot_feature.reshape(-1)
         x = torch.cat([graph_context, uav_feature, depot_feature], dim=-1)
         return self.network(x)
+
+    def forward_batched(self, graph_context, uav_feature, depot_feature):
+        """Return ``z_G`` for a graph batch, shape ``[num_graphs, hidden_dim]``.
+
+        ``forward`` flattens its inputs because it serves exactly one graph; this
+        variant keeps the leading graph dimension so a disjoint-union batch can
+        share one projection pass. ``graph_context`` is ``[G, graph_dim]`` and
+        the UAV/depot features are ``[G, uav_dim]`` / ``[G, depot_dim]``.
+        """
+        if graph_context.ndim == 1:
+            graph_context = graph_context.unsqueeze(0)
+        if uav_feature.ndim == 1:
+            uav_feature = uav_feature.unsqueeze(0)
+        if depot_feature.ndim == 1:
+            depot_feature = depot_feature.unsqueeze(0)
+        x = torch.cat([graph_context, uav_feature, depot_feature], dim=-1)
+        return self.network(x)

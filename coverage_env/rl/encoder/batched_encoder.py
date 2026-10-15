@@ -187,11 +187,11 @@ def batched_graph_context(
     return torch.cat([field_mean, boundary_mean], dim=-1)
 
 
-class BatchedCoverageGraphEncoder(CoverageGraphEncoder):
-    """Same weights as ``CoverageGraphEncoder``, forward over a graph batch.
+def encode_graph_batch(encoder, batch: BatchedGraph) -> dict:
+    """Run ``encoder``'s submodules once over a disjoint-union ``BatchedGraph``.
 
-    ``forward`` (single graph) is inherited unchanged, so this class can be used
-    by the equivalence test with one shared ``state_dict``.
+    ``encoder`` is any ``CoverageGraphEncoder`` instance, so ``CoveragePolicy``
+    can batch *its own* encoder in place — no wrapping, copying, or subclassing.
 
     Only **one** thing actually differs from the single-graph path: global mean
     pooling of the Field/Boundary embeddings becomes a per-graph
@@ -203,62 +203,73 @@ class BatchedCoverageGraphEncoder(CoverageGraphEncoder):
     therefore never crosses a component, and the destination softmax stays
     per-node.
     """
+    x_field = batch.x_field
+    x_boundary = batch.x_boundary
+    edge_index = batch.edge_index
+    edge_type = batch.edge_type
+    edge_attr = batch.edge_attr
+    n_field_total = x_field.shape[0]
+
+    h_field_0, h_boundary_0 = encoder.feature_embedding(x_field, x_boundary)
+
+    # Boundary encoders consume the *concatenated* boundary matrix, so their
+    # indices must stay globally unique across graphs. Subtracting the total
+    # field count is therefore identical to the single-graph expression
+    # ``edge_index - n_field``; no per-graph base offset belongs here.
+    inter_mask = edge_type == EDGE_BB_INTER
+    inter_edges = edge_index[:, inter_mask] - n_field_total
+    inter_attr = edge_attr[inter_mask]
+    h_boundary_1, inter_attention = encoder.boundary_inter_encoder(
+        h_boundary_0, inter_edges, inter_attr
+    )
+
+    intra_mask = edge_type == EDGE_BB_INTRA
+    intra_edges = edge_index[:, intra_mask] - n_field_total
+    intra_attr = edge_attr[intra_mask]
+    h_boundary_intra, intra_attention = encoder.boundary_intra_encoder(
+        h_boundary_1, intra_edges, intra_attr
+    )
+
+    # FieldBoundaryEncoder already assumes "all fields, then all boundaries"
+    # and unified FB edges, so the type-separated batch layout needs no change.
+    fb_mask = edge_type == EDGE_FB
+    fb_edges = edge_index[:, fb_mask]
+    fb_attr = edge_attr[fb_mask]
+    h_field_1, h_boundary_2, fb_attention, fb_bidirectional_edges = (
+        encoder.field_boundary_encoder(
+            h_field_0, h_boundary_intra, fb_edges, fb_attr
+        )
+    )
+
+    return {
+        "field_embedding": h_field_1,
+        "boundary_embedding": h_boundary_2,
+        "global_feature": batch.global_feature,
+        "graph_context": batched_graph_context(h_field_1, h_boundary_2, batch),
+        "attention": {
+            "boundary_inter": inter_attention,
+            "boundary_intra": intra_attention,
+            "field_boundary": fb_attention,
+        },
+        "attended_edges": {
+            "boundary_inter": inter_edges,
+            "boundary_intra": intra_edges,
+            "field_boundary": fb_bidirectional_edges,
+        },
+        "batch": batch,
+    }
+
+
+class BatchedCoverageGraphEncoder(CoverageGraphEncoder):
+    """Thin subclass exposing the batch entry point as a module method.
+
+    ``forward`` (single graph) is inherited unchanged, so the same instance can
+    serve both paths; ``forward_batched`` delegates to :func:`encode_graph_batch`.
+    """
 
     def forward_batched(self, batch: BatchedGraph) -> dict:
         """Encode a disjoint-union batch and return batched embeddings + context."""
-        x_field = batch.x_field
-        x_boundary = batch.x_boundary
-        edge_index = batch.edge_index
-        edge_type = batch.edge_type
-        edge_attr = batch.edge_attr
-        n_field_total = x_field.shape[0]
-
-        h_field_0, h_boundary_0 = self.feature_embedding(x_field, x_boundary)
-
-        # Boundary encoders consume the *concatenated* boundary matrix, so their
-        # indices must stay globally unique across graphs. Subtracting the total
-        # field count is therefore identical to the single-graph expression
-        # ``edge_index - n_field``; no per-graph base offset belongs here.
-        inter_mask = edge_type == EDGE_BB_INTER
-        inter_edges = edge_index[:, inter_mask] - n_field_total
-        inter_attr = edge_attr[inter_mask]
-        h_boundary_1, inter_attention = self.boundary_inter_encoder(
-            h_boundary_0, inter_edges, inter_attr
-        )
-
-        intra_mask = edge_type == EDGE_BB_INTRA
-        intra_edges = edge_index[:, intra_mask] - n_field_total
-        intra_attr = edge_attr[intra_mask]
-        h_boundary_intra, intra_attention = self.boundary_intra_encoder(
-            h_boundary_1, intra_edges, intra_attr
-        )
-
-        # FieldBoundaryEncoder already assumes "all fields, then all boundaries"
-        # and unified FB edges, so the type-separated batch layout needs no change.
-        fb_mask = edge_type == EDGE_FB
-        fb_edges = edge_index[:, fb_mask]
-        fb_attr = edge_attr[fb_mask]
-        h_field_1, h_boundary_2, fb_attention, fb_bidirectional_edges = (
-            self.field_boundary_encoder(h_field_0, h_boundary_intra, fb_edges, fb_attr)
-        )
-
-        return {
-            "field_embedding": h_field_1,
-            "boundary_embedding": h_boundary_2,
-            "global_feature": batch.global_feature,
-            "graph_context": batched_graph_context(h_field_1, h_boundary_2, batch),
-            "attention": {
-                "boundary_inter": inter_attention,
-                "boundary_intra": intra_attention,
-                "field_boundary": fb_attention,
-            },
-            "attended_edges": {
-                "boundary_inter": inter_edges,
-                "boundary_intra": intra_edges,
-                "field_boundary": fb_bidirectional_edges,
-            },
-            "batch": batch,
-        }
+        return encode_graph_batch(self, batch)
 
 
 __all__ = [
@@ -266,5 +277,6 @@ __all__ = [
     "BatchedCoverageGraphEncoder",
     "batched_graph_context",
     "collate_graphs",
+    "encode_graph_batch",
     "segment_mean",
 ]

@@ -7,6 +7,52 @@
 
 ## 2026-10-15
 
+### 17. 图 batch 化接入 update()：action embedding 切片 + 批量策略前向（默认关闭）
+- **文件**：修改 `coverage_env/rl/encoder/batched_encoder.py`、
+  `coverage_env/rl/decoder/action_embedding.py`、
+  `coverage_env/rl/decoder/global_state_encoder.py`、
+  `coverage_env/rl/decoder/action_decoder.py`、`coverage_env/rl/ppo/ppo.py`、
+  `docs/training_performance_notes.md`；新增
+  `coverage_env/tests/test_batched_policy_update.py`。
+- **变更（旧 → 新）**：
+  1) `batched_encoder.py` 把批量前向抽成自由函数 `encode_graph_batch(encoder, batch)`，
+     任意 `CoverageGraphEncoder` 实例可直接批量化（不再依赖子类或复制权重）。
+  2) `ActionEmbedding.forward` 新增 `field_offset`/`boundary_offset`（默认 0）：把本图
+     局部索引重定位到批 embedding 的行区间。
+  3) `GlobalStateEncoder.forward_batched` 新增：原 `forward` 的 `reshape(-1)` 只服务单图，
+     批量版保持 `[G, ...]` 前导维，输出 `[G, hidden]`。
+  4) `CoveragePolicy.forward_batched(contexts)` 新增：**1 次 GNN** over 批图 + 逐
+     transition 解码，返回与 `forward` 同构的输出（含 `action_distribution`/`mask`/
+     `global_embedding`），两条路径可互换。
+  5) `PPOAgent.update(buffer, *, batched=False)` 新增开关：批量路径用
+     `_batched_minibatch_rows`（1 次编码 + critic 按 minibatch 一次求值），默认路径抽成
+     `_per_transition_minibatch_rows`；**默认 `batched=False`，训练行为完全不变**。
+  6) 新增 7 项测试：批量前向 vs 逐条前向（绑定环境 / 仅 state 两种）、分布合法性、
+     空输入、update 两条路径损失一致、批量路径确实更新参数、空 buffer。
+- **原因**：承接条目 16 的原型，用户要求「接着做 action embedding 切片，把只 batch encoder
+  这条打通到可以真正接进 update()」。
+- **实测结果**：
+  - 策略前向等价（12 transition / 93~123 候选）：mask 完全相同，
+    distribution 1.5e-08、log_prob 2.4e-07、entropy 9.5e-07、`global_embedding` 8.9e-07。
+  - `update` 端到端（64 transition / epochs=4 / batch=64）：CPU 6.45s → 1.78s（3.62×），
+    **CUDA 2.25s → 0.35s（6.39×）**；`actor_loss`/`critic_loss`/`entropy` 相对误差 < 1e-4。
+  - 全量测试 90 项，仅剩 2 个改动前即存在的失败（见条目 15 的「已知失败」）。
+- **注意事项**：
+  1) 默认关闭；`DistributedTrainer`/`Trainer` 本次未接，避免静默改变训练语义。
+  2) `dropout > 0` 时两条路径的 dropout mask 排布不同（统计等价、逐位不等价），故等价性
+     测试用 `dropout=0`；默认 `dropout=0.1` 下属两种都合法的正则化实现。
+  3) `places=5` 之类的**绝对**容差在这里不适用（`critic_loss` ~484，逐次前向差 ~1e-7 经多个
+     optimizer step 放大到 ~1e-5），测试改用相对容差 1e-4。
+- **顺带发现的既有问题（本次未修，建议单独处理）**：`update()` 调 actor 时不传
+  `environment`，`CoveragePolicy.forward` 回落到 `self.environment`，于是
+  `_global_sources` 优先取**当前**环境的 UAV/depot，而不是 transition 存下的 `state`——
+  replay 的首个 epoch 的 ratio 因此 ≠ 1。批量路径忠实复现同一行为，故两者仍一致。
+- **回滚方法**：`git revert <本提交 SHA>`；或删除 `test_batched_policy_update.py`、
+  `encode_graph_batch`、`ActionEmbedding` 的两个 offset 参数、`GlobalStateEncoder.forward_batched`、
+  `CoveragePolicy.forward_batched`、`PPOAgent.update` 的 `batched` 参数与两个 helper
+  （恢复内联的逐 transition 循环）。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+
 ### 16. 图 batch 化原型：disjoint-union 编码器 + 等价性验证（不接入训练）
 - **文件**：新增 `coverage_env/rl/encoder/batched_encoder.py`、
   `coverage_env/tests/test_batched_encoder_equivalence.py`；修改

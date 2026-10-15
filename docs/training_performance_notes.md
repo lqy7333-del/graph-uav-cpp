@@ -110,9 +110,56 @@ encoder 前向 = 8 × 64 = 512 次 / 轮 update
    误差高达 1.0 但**不报错**——正好印证了上表「索引错位是主要坑」。
    `test_boundary_indices_stay_inside_their_owning_graph` 现在守着这个不变量。
 
-5. **尚未验证的部分**（接入训练前仍需做）：action embedding 的 per-transition 切片、
-   RolloutBuffer 里的图快照如何批量 collate（rollout 时逐条存、update 时按 minibatch 拼）、
-   `attention_debug` 的多图语义、以及 critic 侧 `z_G` 的 per-graph 消费。
+5. **尚未验证的部分**：`attention_debug` 的多图语义（诊断用途，接入后可后置）。
+
+### P1 补充 2：已打通到「可接进 update()」（`batched=True` 已可用）
+
+改动（全部向后兼容，**默认行为不变**）：
+
+| 位置 | 改动 |
+| --- | --- |
+| `encoder/batched_encoder.py` | 抽出自由函数 `encode_graph_batch(encoder, batch)`：任意 `CoverageGraphEncoder` 实例都能批量化，无需子类或复制权重 |
+| `decoder/action_embedding.py` | `forward(..., field_offset=0, boundary_offset=0)`：把「本图局部索引」重定位到批 embedding 的行区间（默认 0 即原行为） |
+| `decoder/global_state_encoder.py` | 新增 `forward_batched()`：输入 `[G, graph_dim]`，输出 `[G, hidden]`（原 `forward` 的 `reshape(-1)` 只服务单图） |
+| `decoder/action_decoder.py` | 新增 `CoveragePolicy.forward_batched(contexts)`：**1 次 GNN** + 逐 transition 解码，返回与 `forward` 同构的输出 |
+| `ppo/ppo.py` | `PPOAgent.update(buffer, *, batched=False)`：一个开关切到批量路径；critic 也按 minibatch 批量求值 |
+
+等价性（12 条 transition，候选动作 93~123 个）：
+
+| 量 | max abs diff |
+| --- | --- |
+| action mask | **完全相同** |
+| action distribution | 1.5e-08 |
+| log-prob（实际动作） | 2.4e-07 |
+| entropy（可行集） | 9.5e-07 |
+| `global_embedding`（critic 输入） | 8.9e-07 |
+
+`update` 端到端（64 transition / epochs=4 / batch=64）：
+
+| device | per-transition | batched | speedup |
+| --- | --- | --- | --- |
+| cpu | 6.45 s | 1.78 s | 3.62× |
+| cuda | 2.25 s | 0.35 s | **6.39×** |
+
+损失一致性：`actor_loss` / `critic_loss` / `entropy` 相对误差 < 1e-4。逐次前向只差 ~1e-7，
+但一个 update 串联多个 optimizer step，会被 float32 舍入放大到 ~1e-5 绝对值；因此测试用
+**相对**容差（真实索引 bug 会大几个数量级，仍能抓住）。
+
+注意事项：
+
+- `batched=True` **默认关闭**，打开只需在调用处传参；`DistributedTrainer` / `Trainer`
+  本次未改，避免静默改变训练语义。
+- `dropout > 0` 时两条路径的 dropout mask 排布不同：统计等价、逐位不等价。默认
+  `rl.encoder.dropout = 0.1`，所以这是「两种都合法的正则化实现」，不是 bug；等价性测试
+  用 `dropout=0` 做逐位比对。
+- **顺带发现的既有问题（本次未修）**：`update()` 调用 actor 时不传 `environment`，
+  于是 `CoveragePolicy.forward` 回落到 `self.environment`（trainer 绑定的那个活环境），
+  `_global_sources` 便优先使用**当前**环境的 UAV/depot，而不是 transition 里存的状态。
+  这会让 replay 的首个 epoch 的 ratio ≠ 1。批量路径忠实复现了同一行为（两边都用同一个
+  environment），因此二者仍然一致；但建议后续单独修（让 replay 用 transition 的 `state`）。
+
+复现：`python coverage_env/tests/test_batched_policy_update.py`（打印逐量 diff 与双设备
+update 计时）；测试 `python -m unittest coverage_env.tests.test_batched_policy_update`（7 项）。
 
 ---
 
