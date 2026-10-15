@@ -66,6 +66,7 @@ class PPOAgent:
         self.batch_size = int(self.config.get("batch_size", 64))
         self.max_grad_norm = float(self.config.get("max_grad_norm", 0.5))
         self.update_count = 0
+        self._value_bias_initialized = False
 
     @staticmethod
     def _critic_features(output) -> torch.Tensor:
@@ -118,6 +119,7 @@ class PPOAgent:
         # Diagnostic only: the raw advantage scale, captured *before* the
         # per-update normalization that makes its magnitude uninformative.
         advantage_std = self._tensor_std(advantages)
+        self._warm_start_value_bias(returns)
         if len(advantages) > 1:
             advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
 
@@ -221,6 +223,28 @@ class PPOAgent:
             "clip_fraction": 0.0, "approx_kl": 0.0, "actor_grad_norm": 0.0,
             "updates": 0,
         }
+
+    def _critic_module(self):
+        """Return the critic module, unwrapping DDP if present."""
+        return self.critic.module if hasattr(self.critic, "module") else self.critic
+
+    def _warm_start_value_bias(self, returns: torch.Tensor) -> None:
+        """Initialise the critic's output bias to the observed mean return.
+
+        The reward is a path cost, so a return is a large negative offset plus a
+        much smaller state-dependent part. Adam moves a bias by roughly the
+        learning rate per step, so starting from zero the critic spends thousands
+        of steps just learning the offset (measured: ~0.5 per update while the
+        offset was ~18). That offset error dominates the loss, so the
+        state-dependent signal that ``explained_variance`` measures never gets
+        fitted. One warm start suffices because the offset is roughly constant.
+        """
+        if self._value_bias_initialized or returns.numel() == 0:
+            return
+        final_layer = self._critic_module().network[-1]
+        with torch.no_grad():
+            final_layer.bias.fill_(float(returns.mean().item()))
+        self._value_bias_initialized = True
 
     @staticmethod
     def _tensor_mean(values: torch.Tensor) -> float:
