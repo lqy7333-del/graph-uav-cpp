@@ -82,13 +82,40 @@ class InstanceGenerator:
         return int(num_fields)
 
     def sample_components(
-        self, rng, num_fields: int, *, randomize_uav: bool = False
+        self, rng, num_fields: int, *, randomize_uav: bool = False,
+        attempts: int = 8,
     ):
         """Sample ``(fields, depot, uavs, resolution)`` without building an env.
 
         Both initial generation and per-episode resampling run through this
         pipeline, so field geometry and vehicle randomization stay in one place.
+
+        Field placement is rejection sampling (``_sample_center`` tries a bounded
+        number of random positions), so a crowded workspace can occasionally
+        fail even for a field count that is usually placeable. Cross-episode
+        generalization resamples on *every* ``reset()``, which turns that rare
+        bad draw into an eventual crash -- so retry the whole draw a few times
+        before giving up. Retries only consume more RNG; they do not change the
+        sampling distribution.
         """
+        last_error: RuntimeError | None = None
+        for _ in range(max(1, int(attempts))):
+            try:
+                return self._sample_components_once(
+                    rng, num_fields, randomize_uav=randomize_uav
+                )
+            except RuntimeError as exc:
+                last_error = exc
+        raise RuntimeError(
+            f"Field placement failed after {attempts} attempts for "
+            f"num_fields={num_fields}; the workspace is too crowded for this "
+            f"field count."
+        ) from last_error
+
+    def _sample_components_once(
+        self, rng, num_fields: int, *, randomize_uav: bool = False
+    ):
+        """Draw one candidate instance; raises if field placement fails."""
         environment_config = self.config["environment"]
         workspace = environment_config["workspace"]
         origin_lat = (float(workspace["min_lat"]) + float(workspace["max_lat"])) / 2

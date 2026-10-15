@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import unittest
 
 from coverage_env.config import DEFAULT_CONFIG_PATH, load_config
@@ -94,6 +95,62 @@ class DomainRandomizationTests(unittest.TestCase):
         expected = -info["path_length"] / environment.total_area * scale
         if not done:
             self.assertAlmostEqual(reward, expected, places=6)
+
+    def test_sample_components_retries_transient_placement_failures(self):
+        """A rare crowded-workspace draw must not abort episode resampling.
+
+        Field placement is rejection sampling, so resampling on every ``reset()``
+        eventually hits an unlucky draw; that used to crash a long DDP run.
+        """
+        generator = InstanceGenerator(self.config)
+        original = generator._sample_center
+        calls = {"count": 0}
+
+        def flaky_center(*args, **kwargs):
+            calls["count"] += 1
+            if calls["count"] <= 2:
+                raise RuntimeError("synthetic placement failure")
+            return original(*args, **kwargs)
+
+        generator._sample_center = flaky_center
+        fields, depot, uavs, resolution = generator.sample_components(
+            random.Random(0), 5
+        )
+        self.assertEqual(len(fields), 5)
+        self.assertEqual(len(uavs), 1)
+        self.assertGreater(calls["count"], 2, "no retry happened")
+
+    def test_sample_components_gives_up_after_attempts(self):
+        generator = InstanceGenerator(self.config)
+
+        def always_fails(*_args, **_kwargs):
+            raise RuntimeError("synthetic placement failure")
+
+        generator._sample_center = always_fails
+        with self.assertRaises(RuntimeError) as context:
+            generator.sample_components(random.Random(0), 5, attempts=3)
+        self.assertIn("3 attempts", str(context.exception))
+
+    def test_reset_survives_a_transient_placement_failure(self):
+        """The whole reset() path (not just sample_components) must recover."""
+        environment = InstanceGenerator(self.config).generate(seed=3)
+        original = InstanceGenerator._sample_center
+        state = {"fail": True}
+
+        def once_flaky(*args, **kwargs):
+            if state["fail"]:
+                state["fail"] = False
+                raise RuntimeError("synthetic placement failure")
+            return original(*args, **kwargs)
+
+        InstanceGenerator._sample_center = staticmethod(once_flaky)
+        try:
+            environment.reset()  # first reset keeps the constructor instance
+            environment.reset()  # resamples: first draw fails, the retry succeeds
+        finally:
+            InstanceGenerator._sample_center = staticmethod(original)
+        self.assertFalse(state["fail"], "the synthetic failure was never triggered")
+        self.assertGreaterEqual(len(environment.fields), 5)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,29 @@
 
 ## 2026-10-15
 
+### 22. 修复跨 episode 泛化的地块摆放崩溃：`sample_components` 增加有限重试
+- **文件**：修改 `coverage_env/env/instance_generator.py`、
+  `coverage_env/tests/test_domain_randomization.py`。
+- **变更（旧 → 新）**：`sample_components` 拆为「重试壳 + `_sample_components_once`」；
+  前者最多尝试 `attempts`（默认 8）次，捕获摆放失败（`_sample_center` 抛出的
+  `RuntimeError`）后整轮重抽，全部失败才抛出带尝试次数的 `RuntimeError`。
+- **原因**：**这是条目 15 引入的回归。** 地块摆放是拒绝采样（`_sample_center` 只试 5000 个
+  随机位置），密集 workspace 下即使「通常放得下」的地块数量也可能偶尔失败。旧代码整个训练
+  只在启动时生成一次实例，所以几乎碰不到；改为**每 episode 重采样**后，一次正式训练要重采样
+  数千次，稀有失败就变成了必然。实测一次 200 轮 4 卡训练在**第 88 轮**崩溃：
+  ```
+  RuntimeError: Unable to place non-overlapping fields in configured workspace
+    environment.reset() → _resample_instance() → sample_components() → _sample_center()
+  ```
+  单独测量 5~20 地块各 120 次（共 1920 次）摆放失败率为 **0**，即 p 很小（约 1e-4 量级），
+  与「3000 次重采样中出现 1 次」一致；按 p=1e-3 估计，重试 8 次后失败概率约 1e-24。
+- **不影响采样分布**：重试只是多消耗 RNG，成功路径与原来逐位一致（未触发重试时，
+  重抽序列完全相同——所以重启训练会复现前 88 轮的数据）。
+- **验证**：新增 3 项测试 —— 前两次摆放失败仍能成功返回、尝试耗尽后抛出且信息含尝试次数、
+  以及走完整 `reset()` 路径能恢复。全量 106 项，仍只有 2 个改动前即存在的失败。
+- **回滚方法**：`git revert <本提交 SHA>`（把重试壳去掉，`_sample_components_once` 改回
+  `sample_components`）。
+
 ### 21. DDP 训练日志增加「按 episode」指标，使跨地块数量泛化的趋势可评估
 - **文件**：修改 `coverage_env/rl/trainer/distributed.py`。
 - **变更（旧 → 新）**：`DistributedTrainer.train()` 的 rollout 循环新增逐 episode 累计
