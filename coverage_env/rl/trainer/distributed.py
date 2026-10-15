@@ -175,15 +175,18 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
     torch.cuda.set_device(rank)
 
     config = load_config()
-    config["environment"]["num_fields"] = {"min": args.num_fields, "max": args.num_fields}
+    # A fixed count pins the configured range; otherwise the environment draws
+    # from [min, max] and resamples fields + UAV parameters on every reset.
+    if args.num_fields is not None:
+        config["environment"]["num_fields"] = {
+            "min": args.num_fields, "max": args.num_fields,
+        }
     config["ppo"].update({"epochs": args.ppo_epochs, "batch_size": args.batch_size})
 
     # Same model init seed on every rank so parameters start identical; the
     # environment seed differs per rank so each rank samples different fields.
     torch.manual_seed(args.seed)
-    environment = InstanceGenerator(config).generate(
-        num_fields=args.num_fields, seed=args.seed + rank
-    )
+    environment = InstanceGenerator(config).generate(seed=args.seed + rank)
 
     actor = CoveragePolicy(environment, config=config).to(rank)
     agent = PPOAgent(actor, config, device=rank)
@@ -208,7 +211,11 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
 def main() -> None:
     """Parse arguments and launch one process per GPU."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--num-fields", type=int, default=20)
+    parser.add_argument(
+        "--num-fields", type=int, default=None,
+        help="Fixed field count for every episode; default samples the "
+             "configured [min, max] range and resamples on each reset.",
+    )
     parser.add_argument("--num-updates", type=int, default=200)
     parser.add_argument("--rollout-steps", type=int, default=128)
     parser.add_argument("--seed", type=int, default=42)

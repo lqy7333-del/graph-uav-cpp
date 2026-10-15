@@ -5,6 +5,67 @@
 
 ---
 
+## 2026-10-15
+
+### 15. 跨 episode 泛化 + 总路程 reward 重设计 + 训练效率调研
+- **文件**：修改 `coverage_env/env/instance_generator.py`、`coverage_env/env/environment.py`、
+  `coverage_env/rl/reward.py`、`coverage_env/config/default.yaml`、
+  `coverage_env/rl/trainer/distributed.py`、`coverage_env/rl/trainer/trainer.py`、
+  `coverage_env/rl/evaluation/evaluator.py`、
+  `coverage_env/tests/test_boundary_guided_planner.py`、`coverage_env/tests/test_rl_interface.py`；
+  新增 `coverage_env/tests/test_domain_randomization.py`、`docs/training_performance_notes.md`。
+- **变更（旧 → 新）**：
+  1) **跨 episode 泛化（任务 1）**：`InstanceGenerator` 拆出 `sample_num_fields()` /
+     `sample_components()`（生成 `fields/depot/uavs/resolution`，不建环境、不离散化），
+     `generate()` 增加 `randomize_each_reset`（显式 `num_fields` 时默认 `False`，
+     省略时默认 `True`）。`CoverageEnvironment.__init__` 新增 `config`/`rng`/
+     `randomize_each_reset`；`reset()` 在首次之后每轮调用 `_resample_instance()`，
+     用环境持有的 `random.Random` 重新抽地块数量（`environment.num_fields` 的 `[min,max]`）、
+     地块几何、depot 和 UAV 参数；新增 `_compute_total_area()` 并在每轮 reset 缓存
+     `self.total_area`（离散化可覆盖面积之和）。`default.yaml` 新增 `uav.ranges`
+     （`max_energy/max_payload/speed/coverage_width/alpha/beta` 的 min/max），
+     `distributed.py` 不再固定 `num_fields=20`（`--num-fields` 默认改为 `None`，给了才固定），
+     `Trainer`/`Evaluator` 的 `max_steps` 每轮按当前地块数重算。
+  2) **reward 重设计（任务 2）**：`calculate_reward` 由
+     `-λ1·d/ds - λ2·e/es + λ3·a/cs - λ4·frag/fs` 改为只保留
+     `-distance / total_area * reward_scale`（step-level shaping，episode 累加即
+     `-总路程/总面积`）；`environment.step()` 删除 fragmentation 前后计算与
+     `_reward_scales()`/`_characteristic_distance()`/`_fragmentation_summary()`，
+     改用当前 episode 的 `self.total_area`；`default.yaml` 删除 `rl.reward_weights`、
+     `rl.reward_normalization`、`rl.fragmentation_small_component_max_points`，新增
+     `rl.reward_scale: 100.0`。
+  3) **训练效率调研（任务 3）**：新增 `docs/training_performance_notes.md`，只总结
+     逐 transition 前向、DDP all-reduce、rollout planner 长尾的根因、优化方向、
+     预期收益/工作量/风险，**未改任何性能代码**。
+- **原因**：① 训练期间地块数量与 UAV 参数完全固定，策略过拟合单一场景；② 旧 reward
+  由距离/能耗/覆盖/碎片化四项加权、信号混杂，且未对齐「最小化总路程」目标，跨地块数量
+  不可比；③ update 的逐 transition 前向与高频 all-reduce 缺少书面调研。
+- **取舍说明**：归一化用 `total_area`（离散化可覆盖面积）而非 `num_fields`，可同时消除
+  面积差异；实测 5/10/20 地块的单次作业 `总路程/总面积 = 0.55/0.44/0.43`，跨地块数量可比
+  （20 地块不再系统性更负）。`reward_scale` 取 **100**（而非示例的 1000）：实测比值约
+  0.43~0.55，1000 会把 episode return 抬到 −430~−550、critic MSE ~2.5e5；100 使 episode
+  return 落在 O(10~100)（−38~−55），critic MSE ~4e2，更易拟合。scale 与地块数量无关，
+  不破坏归一化。task 3 未对 planner 的 CPU 长尾做实现。
+- **回滚方法**：`git revert <本提交 SHA>`；或手动恢复 `InstanceGenerator.generate()`/
+  `CoverageEnvironment`（删除 `config`/`rng`/`randomize_each_reset`/`_resample_instance`/
+  `_replace_instance`/`_compute_total_area`/`total_area`）、`calculate_reward` 旧四项目标、
+  `default.yaml` 的 `reward_weights`/`reward_normalization`/`fragmentation_small_component_max_points`
+  与 `uav.ranges`、`distributed.py` 的 `num_fields` 固定逻辑、`Trainer`/`Evaluator` 的
+  `max_steps`；删除 `test_domain_randomization.py` 与 `docs/`。之后运行
+  `python -m unittest discover -s coverage_env/tests -p "test_*.py"` 验证。
+- **验证**：单卡 `python -m unittest coverage_env.tests.test_training` 通过；新增
+  `test_domain_randomization`（重采样/可复现/total_area/step reward）4 项通过；4 卡 DDP
+  `--num-updates 2 --rollout-steps 8 --ppo-epochs 1 --batch-size 4` 跑通，4 rank
+  actor 参数 checksum 一致（928.721299），无死锁、无 unused-parameter 报错；单卡泛化
+  训练 6 episode 跑通（reward −38~−49，critic_loss ~4e2~7e2）。
+- **已知失败（与本改动无关，改动前已存在）**：`test_uav.UAVSimulationTests.
+  test_depot_and_manual_path_execution` 仍硬编码 `energy==40.0`（alpha 0.08 下应为 16.0，
+  见条目 14）；`test_nearest_neighbor_episode` 5 地块基线因药量耗尽无法 10/10 完成
+  （见条目 13 的「已知影响」）。两者在 `git stash` 回退到改动前代码后同样失败，故未在
+  本次修复。
+
+---
+
 ## 2026-10-14
 
 ### 14. 缩小 workspace + 调低 alpha，使 payload 成为主约束、电量宽裕

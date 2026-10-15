@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import random
 from collections import deque
 from copy import deepcopy
-from typing import Dict, Iterable, Union
+from typing import Dict, Iterable, Optional, Union
 
 from coverage_env.env.depot import Depot
 from coverage_env.env.episode_logger import EpisodeLogger
@@ -86,8 +87,18 @@ class CoverageEnvironment(FieldEnvironment):
         uavs: Iterable[UAV] = (),
         *,
         rl_config: dict | None = None,
+        config: dict | None = None,
+        rng: Optional[random.Random] = None,
+        randomize_each_reset: bool = False,
     ) -> None:
-        """Create an environment with fields, a depot, and zero or more UAVs."""
+        """Create an environment with fields, a depot, and zero or more UAVs.
+
+        Supplying ``config`` and ``rng`` enables cross-episode generalization:
+        when ``randomize_each_reset`` is true, ``reset()`` resamples the fields
+        (count and geometry), the depot, and the UAV capability parameters from
+        config using the environment-owned ``random.Random`` (so a seed
+        reproduces the whole episode sequence).
+        """
         super().__init__(fields)
         if not isinstance(depot, Depot):
             raise TypeError("depot must be a Depot instance.")
@@ -100,6 +111,13 @@ class CoverageEnvironment(FieldEnvironment):
         self._mission_trajectories: dict = {uav.uav_id: [] for uav in self.uavs}
         self.episode_logger = EpisodeLogger()
         self.rl_config = dict(rl_config or {})
+        self._config = config
+        self._rng = rng
+        self._randomize_each_reset = bool(randomize_each_reset and config is not None)
+        # The first reset keeps the constructor-provided instance; later resets
+        # regenerate it when generalization is enabled.
+        self._regenerate_next_reset = False
+        self._instance_generator = None
         self._reachable_area_cache: dict = {}
         self._component_cache: dict = {}
         self._action_estimate_cache: dict = {}
@@ -108,6 +126,7 @@ class CoverageEnvironment(FieldEnvironment):
         self._consecutive_failures = 0
         self._resupply_count = 0
         self._termination_reason: str | None = None
+        self.total_area = self._compute_total_area() or 1.0
 
     def _align_field_coordinate_frames(self) -> None:
         """Put all fields in the first field's projected local XY frame.
@@ -125,7 +144,16 @@ class CoverageEnvironment(FieldEnvironment):
             field.set_coordinate_transformer(shared_transformer)
 
     def reset(self) -> dict:
-        """Reset fields, UAVs, mission history, and return the initial state."""
+        """Reset fields, UAVs, mission history, and return the initial state.
+
+        When cross-episode generalization is enabled, every reset after the
+        first resamples the fields (count + geometry), the depot, and the UAV
+        parameters before restoring the mission state. The cached
+        ``total_area`` always reflects the current episode's instance.
+        """
+        if self._regenerate_next_reset:
+            self._resample_instance()
+        self._regenerate_next_reset = self._randomize_each_reset
         position = self.depot.get_position()
         for field in self.fields:
             if not field.grid_points:
@@ -136,6 +164,7 @@ class CoverageEnvironment(FieldEnvironment):
                 )
             for point in field.grid_points:
                 point.covered = False
+        self.total_area = self._compute_total_area() or 1.0
         for uav in self.uavs:
             uav.reset(position)
         self._execution_records.clear()
@@ -154,6 +183,51 @@ class CoverageEnvironment(FieldEnvironment):
         # the richer complete environment observation required by this phase.
         state.update({uav.uav_id: uav.get_state() for uav in self.uavs})
         return state
+
+    def _compute_total_area(self) -> float:
+        """Return the total discretized (coverable) area of the current fields."""
+        return float(sum(
+            point.point_area
+            for field in self.fields
+            for point in field.grid_points
+        ))
+
+    def _resample_instance(self) -> None:
+        """Rebuild fields, depot, and UAVs from config using the held RNG."""
+        if self._config is None or self._rng is None:
+            return
+        from coverage_env.env.instance_generator import InstanceGenerator
+
+        generator = self._instance_generator
+        if generator is None:
+            generator = InstanceGenerator(self._config)
+            self._instance_generator = generator
+        count = generator.sample_num_fields(self._rng)
+        fields, depot, uavs, resolution = generator.sample_components(
+            self._rng, count, randomize_uav=True
+        )
+        self._replace_instance(fields, depot, uavs, resolution)
+
+    def _replace_instance(self, fields, depot, uavs, resolution) -> None:
+        """Swap in a freshly sampled instance and rebuild all derived state."""
+        from coverage_env.geometry.discretization import discretize_field
+
+        self._fields.clear()
+        for field in fields:
+            self.add_field(field)
+        self.depot = depot
+        self.uavs = list(uavs)
+        self._align_field_coordinate_frames()
+        self._mission_trajectories = {uav.uav_id: [] for uav in self.uavs}
+        self._execution_records.clear()
+        self._reachable_area_cache.clear()
+        self._component_cache.clear()
+        self._action_estimate_cache.clear()
+        self._growth_selection_cache.clear()
+        self._growth_area_cache.clear()
+        self._configuration_executor = None
+        for field in self.fields:
+            discretize_field(field, resolution)
 
     def get_state(self) -> dict:
         """Return UAV, field, and depot state as an ordinary dictionary."""
@@ -408,33 +482,11 @@ class CoverageEnvironment(FieldEnvironment):
 
         snapshot = self._capture_physical_state()
         try:
-            selected_field = self.get_field(configuration.field_id)
-            small_component_limit = int(
-                self.rl_config.get("fragmentation_small_component_max_points", 4)
-            )
-            fragmentation_before = self._fragmentation_summary(
-                selected_field, small_component_limit
-            )
             feedback = self.step_configuration(configuration)
         except (KeyError, ValueError, TypeError, RuntimeError, IndexError) as exc:
             self._restore_physical_state(snapshot)
             return self._failed_step(action, before_state, str(exc))
 
-        fragmentation_after = self._fragmentation_summary(
-            selected_field, small_component_limit
-        )
-        fragmentation_penalty = (
-            max(
-                0,
-                fragmentation_after["component_count"]
-                - fragmentation_before["component_count"],
-            )
-            + max(
-                0,
-                fragmentation_after["small_component_count"]
-                - fragmentation_before["small_component_count"],
-            )
-        )
         result = self._execution_records[-1]
         info = {
             "success": True,
@@ -452,18 +504,12 @@ class CoverageEnvironment(FieldEnvironment):
             "path_length": feedback["distance"],
             "energy": feedback["energy"],
             "coverage_gain": feedback["coverage"],
-            "remaining_component_count": fragmentation_after["component_count"],
-            "small_fragment_count": fragmentation_after["small_component_count"],
-            "fragmentation_penalty": fragmentation_penalty,
             "exit_point": feedback["exit_point"],
             "path": feedback["path"],
             "result": result,
         }
-        scales = self._reward_scales()
         reward = calculate_reward(
-            {**feedback, "fragmentation_penalty": fragmentation_penalty},
-            self.rl_config,
-            **scales,
+            feedback, self.rl_config, total_area=self.total_area
         )
         self._growth_area_cache.clear()
         self._consecutive_failures = 0
@@ -478,7 +524,9 @@ class CoverageEnvironment(FieldEnvironment):
             except ValueError as exc:
                 return_feedback = {"completed": False, "reason": str(exc)}
             if return_feedback is not None:
-                reward += calculate_reward(return_feedback, self.rl_config, **scales)
+                reward += calculate_reward(
+                    return_feedback, self.rl_config, total_area=self.total_area
+                )
                 info["return_to_depot"] = return_feedback
         else:
             actions = self.get_action_candidates()
@@ -489,7 +537,8 @@ class CoverageEnvironment(FieldEnvironment):
                 resupply = self._attempt_auto_resupply()
                 if resupply is not None:
                     reward += calculate_reward(
-                        resupply["return_feedback"], self.rl_config, **scales
+                        resupply["return_feedback"], self.rl_config,
+                        total_area=self.total_area,
                     )
                     info.update(resupply["info"])
                     done = False
@@ -814,75 +863,6 @@ class CoverageEnvironment(FieldEnvironment):
     def _all_fields_complete(self) -> bool:
         """Return True when every field has no uncovered grid points."""
         return all(not field.get_uncovered_points() for field in self.fields)
-
-    def _characteristic_distance(self) -> float:
-        """Return the largest site-to-site span among depot and field centroids."""
-        from math import hypot
-
-        sites = [self.depot.get_position()]
-        sites.extend(field.centroid for field in self.fields)
-        span = 0.0
-        for index, first in enumerate(sites):
-            for second in sites[index + 1:]:
-                span = max(span, hypot(first[0] - second[0], first[1] - second[1]))
-        return span or 1.0
-
-    def _reward_scales(self) -> dict:
-        """Return the reward-normalization scales for the current environment."""
-        normalization = self.rl_config.get("reward_normalization", {}) or {}
-        total_area = sum(
-            point.point_area
-            for field in self.fields
-            for point in field.grid_points
-        )
-        coverage_scale = float(
-            normalization.get("coverage_scale_m2") or total_area or 1.0
-        )
-        energy_scale = float(
-            normalization.get("energy_scale_wh")
-            or (self.uavs[0].max_energy if self.uavs else 1.0)
-        )
-        distance_scale = float(
-            normalization.get("distance_scale_m") or self._characteristic_distance()
-        )
-        fragmentation_scale = float(
-            normalization.get("fragmentation_scale") or 1.0
-        )
-        return {
-            "distance_scale": max(distance_scale, 1e-9),
-            "energy_scale": max(energy_scale, 1e-9),
-            "coverage_scale": max(coverage_scale, 1e-9),
-            "fragmentation_scale": max(fragmentation_scale, 1e-9),
-        }
-
-    @staticmethod
-    def _fragmentation_summary(field, small_component_max_points: int = 4) -> dict:
-        """Count uncovered 8-neighbor components and small isolated remnants."""
-        point_by_id = {point.id: point for point in field.get_uncovered_points()}
-        available = set(point_by_id)
-        component_sizes = []
-        while available:
-            root = min(available)
-            pending = [root]
-            available.remove(root)
-            size = 0
-            while pending:
-                point_id = pending.pop()
-                size += 1
-                point = point_by_id[point_id]
-                for neighbor_id in point.neighbors:
-                    if neighbor_id in available:
-                        available.remove(neighbor_id)
-                        pending.append(neighbor_id)
-            component_sizes.append(size)
-        return {
-            "component_count": len(component_sizes),
-            "small_component_count": sum(
-                size <= max(0, small_component_max_points)
-                for size in component_sizes
-            ),
-            "component_sizes": component_sizes,
-        }
 
     def return_to_depot(self) -> dict:
         """Fly every UAV straight back to the depot and report the cost.

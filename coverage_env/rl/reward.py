@@ -1,4 +1,4 @@
-"""Dimensionless, scale-normalized scalar reward for one Environment transition."""
+"""Total-path reward normalized by the episode's coverable area."""
 
 from __future__ import annotations
 
@@ -7,41 +7,28 @@ def calculate_reward(
     result: dict,
     config: dict | None = None,
     *,
-    distance_scale: float = 1.0,
-    energy_scale: float = 1.0,
-    coverage_scale: float = 1.0,
-    fragmentation_scale: float = 1.0,
+    total_area: float | None = None,
+    scale: float | None = None,
 ) -> float:
-    """Return a reward with each physical term normalized to a common scale.
+    """Return ``-distance / total_area * scale`` for one transition.
 
-    The reward is ``-lambda1 * distance / distance_scale
-    - lambda2 * energy / energy_scale + lambda3 * coverage / coverage_scale
-    - lambda4 * fragmentation_penalty / fragmentation_scale``.
+    Minimizing total flight distance is the task objective, so the reward is
+    negative and larger (closer to zero) for shorter paths. Dividing by the
+    episode's total coverable area makes rewards comparable across episodes
+    with different field counts and field sizes: the quantity is the traveled
+    distance per unit area (the inverse of coverage efficiency).
 
-    Dividing each quantity by a problem-specific scale keeps the three terms
-    comparable so no single term dominates the learning signal. Callers should
-    pass a characteristic distance (meters), the UAV battery capacity (Wh), and
-    the total coverable area (m²). Fragmentation is the positive increase in
-    uncovered 8-neighbor components and small components caused by this step.
-    Weights can be tuned in ``rl.reward_weights``.
+    ``scale`` is a constant multiplier that only lifts the magnitude into a
+    range PPO can learn from; it never depends on the instance, so it does not
+    break the cross-instance normalization. Energy, coverage, and fragmentation
+    no longer contribute to the reward.
     """
     config = config or {}
-    weights = config.get("reward_weights", config.get("reward", {}))
-    lambda1 = float(weights.get("lambda1", 1.0))
-    lambda2 = float(weights.get("lambda2", 1.0))
-    lambda3 = float(weights.get("lambda3", 1.0))
-    lambda4 = float(weights.get("lambda4", 0.1))
-    distance = result.get("distance", result.get("path_length", 0.0))
-    energy = result.get("energy", result.get("energy_consumption", 0.0))
-    coverage = result.get("coverage", result.get("coverage_gain", 0.0))
-    fragmentation = result.get("fragmentation_penalty", 0.0)
-    distance_term = float(distance) / max(float(distance_scale), 1e-9)
-    energy_term = float(energy) / max(float(energy_scale), 1e-9)
-    coverage_term = float(coverage) / max(float(coverage_scale), 1e-9)
-    fragmentation_term = float(fragmentation) / max(float(fragmentation_scale), 1e-9)
-    return (
-        -lambda1 * distance_term
-        -lambda2 * energy_term
-        +lambda3 * coverage_term
-        -lambda4 * fragmentation_term
-    )
+    distance = float(result.get("distance", result.get("path_length", 0.0)))
+    if total_area is None:
+        total_area = float(config.get("total_area", 1.0))
+    if not total_area or total_area <= 0.0:
+        total_area = 1.0
+    if scale is None:
+        scale = float(config.get("reward_scale", 1.0))
+    return -distance / float(total_area) * float(scale)

@@ -27,7 +27,6 @@ def build_environment():
         [field], Depot("depot-1", (-10.0, -10.0)), [uav],
         rl_config={
             "workload_options": [0.1, 0.2, 0.3, 0.5],
-            "reward_weights": {"lambda1": 0.001, "lambda2": 0.01, "lambda3": 0.1},
         },
     )
     return env

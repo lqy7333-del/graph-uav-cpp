@@ -28,25 +28,68 @@ class InstanceGenerator:
         *,
         num_fields: int | None = None,
         seed: int | None = None,
+        randomize_each_reset: bool | None = None,
     ) -> CoverageEnvironment:
         """Generate a fully initialized ``CoverageEnvironment``.
 
         ``num_fields`` and ``seed`` override the default config for experiment
         cases while all geometry and vehicle parameters still come from config.
+
+        ``randomize_each_reset`` controls cross-episode generalization: when it
+        is enabled the returned environment resamples fields (count and
+        geometry), the depot, and UAV capability parameters on every
+        ``reset()`` using its own ``random.Random``. It defaults to ``True``
+        when ``num_fields`` is omitted (training over the configured range) and
+        to ``False`` for an explicit fixed count (single-instance experiments).
         """
         environment_config = self.config["environment"]
-        count_config = environment_config["num_fields"]
         rng = random.Random(
             environment_config.get("random_seed", 0) if seed is None else seed
         )
+        if randomize_each_reset is None:
+            randomize_each_reset = num_fields is None
+        count = self.sample_num_fields(rng, num_fields)
+        fields, depot, uavs, resolution = self.sample_components(
+            rng, count, randomize_uav=bool(randomize_each_reset)
+        )
+
+        environment = CoverageEnvironment(
+            fields,
+            depot,
+            uavs,
+            rl_config=self.config.get("rl", {}),
+            config=self.config,
+            rng=rng,
+            randomize_each_reset=bool(randomize_each_reset),
+        )
+        for field in environment.fields:
+            discretize_field(field, resolution)
+        environment.reset()
+        return environment
+
+    def sample_num_fields(self, rng, num_fields: int | None = None) -> int:
+        """Return a validated field count, drawing one when ``num_fields`` is None."""
+        count_config = self.config["environment"]["num_fields"]
+        minimum = int(count_config["min"])
+        maximum = int(count_config["max"])
         if num_fields is None:
-            num_fields = rng.randint(int(count_config["min"]), int(count_config["max"]))
-        if not int(count_config["min"]) <= num_fields <= int(count_config["max"]):
+            num_fields = rng.randint(minimum, maximum)
+        if not minimum <= int(num_fields) <= maximum:
             raise ValueError(
                 f"num_fields={num_fields} is outside configured range "
-                f"[{count_config['min']}, {count_config['max']}]."
+                f"[{minimum}, {maximum}]."
             )
+        return int(num_fields)
 
+    def sample_components(
+        self, rng, num_fields: int, *, randomize_uav: bool = False
+    ):
+        """Sample ``(fields, depot, uavs, resolution)`` without building an env.
+
+        Both initial generation and per-episode resampling run through this
+        pipeline, so field geometry and vehicle randomization stay in one place.
+        """
+        environment_config = self.config["environment"]
         workspace = environment_config["workspace"]
         origin_lat = (float(workspace["min_lat"]) + float(workspace["max_lat"])) / 2
         origin_lon = (float(workspace["min_lon"]) + float(workspace["max_lon"])) / 2
@@ -90,35 +133,63 @@ class InstanceGenerator:
             rng, fields, workspace
         )
         depot = Depot("depot-1", depot_position)
+        uavs = self._build_uavs(rng, randomize_uav=randomize_uav)
+
+        resolution = float(field_configs["resolution"]["grid_resolution"])
+        return fields, depot, uavs, resolution
+
+    def _build_uavs(self, rng, *, randomize_uav: bool = False) -> list[UAV]:
+        """Build ``num_uav`` UAVs, sampling capability ranges when requested."""
         uav_config = self.config["uav"]
         energy_config = uav_config["energy"]
-        uavs = [
-            UAV(
-                f"UAV-{index + 1}",
-                max_energy=float(uav_config["max_energy"]),
-                speed=float(uav_config["speed"]),
-                coverage_width=float(uav_config["coverage_width"]),
-                sensor_width=float(uav_config["sensor_width"]),
-                energy_consumption_parameters={
-                    "alpha": float(energy_config["alpha"]),
-                    "beta": float(energy_config["beta"]),
-                },
-                max_payload=uav_config.get("max_payload"),
-                payload_per_area=float(uav_config.get("payload_per_area", 0.0)),
+        ranges = dict(uav_config.get("ranges") or {}) if randomize_uav else {}
+        uavs = []
+        for index in range(int(uav_config["num_uav"])):
+            max_payload = self._sample_range(
+                rng, ranges.get("max_payload"), uav_config.get("max_payload")
             )
-            for index in range(int(uav_config["num_uav"]))
-        ]
+            uavs.append(
+                UAV(
+                    f"UAV-{index + 1}",
+                    max_energy=float(self._sample_range(
+                        rng, ranges.get("max_energy"), uav_config["max_energy"]
+                    )),
+                    speed=float(self._sample_range(
+                        rng, ranges.get("speed"), uav_config["speed"]
+                    )),
+                    coverage_width=float(self._sample_range(
+                        rng, ranges.get("coverage_width"),
+                        uav_config["coverage_width"],
+                    )),
+                    sensor_width=float(uav_config["sensor_width"]),
+                    energy_consumption_parameters={
+                        "alpha": float(self._sample_range(
+                            rng, ranges.get("alpha"), energy_config["alpha"]
+                        )),
+                        "beta": float(self._sample_range(
+                            rng, ranges.get("beta"), energy_config["beta"]
+                        )),
+                    },
+                    max_payload=None if max_payload is None else float(max_payload),
+                    payload_per_area=float(uav_config.get("payload_per_area", 0.0)),
+                )
+            )
+        return uavs
 
-        environment = CoverageEnvironment(
-            fields, depot, uavs, rl_config=self.config.get("rl", {})
-        )
-        resolution = float(
-            field_configs["resolution"]["grid_resolution"]
-        )
-        for field in environment.fields:
-            discretize_field(field, resolution)
-        environment.reset()
-        return environment
+    @staticmethod
+    def _sample_range(rng, limits, fallback):
+        """Return a uniform draw from ``{"min", "max"}`` or the ``fallback`` value.
+
+        Ranges are only consulted when they are configured, so fixed-instance
+        generation consumes no RNG state for vehicle parameters.
+        """
+        if not limits:
+            return fallback
+        low = float(limits["min"])
+        high = float(limits["max"])
+        if high < low:
+            raise ValueError(f"UAV range min {low} exceeds max {high}.")
+        return rng.uniform(low, high)
 
     @staticmethod
     def _workspace_xy_bounds(workspace: dict, transformer: CoordinateTransformer):
@@ -224,6 +295,7 @@ class InstanceGenerator:
         latitude = rng.uniform(float(workspace["min_lat"]), float(workspace["max_lat"]))
         longitude = rng.uniform(float(workspace["min_lon"]), float(workspace["max_lon"]))
         return fields[0].coordinate_transformer.to_xy(latitude, longitude)
+
 
 def generate_instance(
     config: dict, *, num_fields: int | None = None, seed: int | None = None

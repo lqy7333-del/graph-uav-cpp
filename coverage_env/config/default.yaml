@@ -40,6 +40,28 @@ uav:
     alpha: 0.08
     beta: 0.02
     energy_margin: 0.20
+  # Domain randomization: each reset draws a new capability set from these
+  # ranges when cross-episode generalization is enabled. Fixed-instance
+  # generation (an explicit num_fields) keeps the scalar values above.
+  ranges:
+    max_energy:
+      min: 1200.0
+      max: 1800.0
+    max_payload:
+      min: 40.0
+      max: 60.0
+    speed:
+      min: 6.0
+      max: 10.0
+    coverage_width:
+      min: 8.0
+      max: 12.0
+    alpha:
+      min: 0.06
+      max: 0.10
+    beta:
+      min: 0.016
+      max: 0.024
 
 coverage:
   default_workload: 0.45
@@ -67,17 +89,13 @@ rl:
   # several consecutive failures so training can proceed to the next episode.
   failure_penalty: -1.0
   failure_termination_threshold: 5
-  reward_weights:
-    lambda1: 1.0
-    lambda2: 1.0
-    lambda3: 1.0
-    lambda4: 0.1
-  reward_normalization:
-    distance_scale_m: null
-    energy_scale_wh: null
-    coverage_scale_m2: null
-    fragmentation_scale: 1.0
-  fragmentation_small_component_max_points: 4
+  # Reward is -delta_distance / total_area times this constant scale, where
+  # total_area is the current episode's discretized coverable area. The scale
+  # only lifts the magnitude and never depends on the field count, preserving
+  # cross-instance comparability. Measured field-count sweep (5/10/20 fields)
+  # gives total_distance/total_area ~= 0.43-0.55, so 100 keeps the episode
+  # return at O(10-100) and the critic target easy to fit.
+  reward_scale: 100.0
   graph:
     max_area: 8000.0
     max_perimeter: 500.0

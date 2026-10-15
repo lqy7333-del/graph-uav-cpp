@@ -220,25 +220,30 @@ class BoundaryGuidedPlannerTests(unittest.TestCase):
         self.assertFalse(done)
         self.assertTrue(info["failed"])
 
-    def test_reward_penalizes_new_fragmentation_without_changing_action_shape(self):
-        field = make_field()
-        points = field.grid_points
-        for point in points:
-            point.covered = True
-        points[0].covered = False
-        points[-1].covered = False
-        summary = CoverageEnvironment._fragmentation_summary(field, 1)
-        self.assertEqual(summary["component_count"], 2)
-        self.assertEqual(summary["small_component_count"], 2)
+    def test_reward_is_distance_over_total_area_with_constant_scale(self):
+        config = {"reward_scale": 1000.0}
+        # The same path is penalized more when the covered area is smaller, so
+        # rewards stay comparable across field counts and sizes.
+        small = calculate_reward({"distance": 100.0}, config, total_area=1000.0)
+        large = calculate_reward({"distance": 100.0}, config, total_area=10_000.0)
+        self.assertAlmostEqual(small, -100.0)
+        self.assertAlmostEqual(large, -10.0)
+        self.assertLess(small, large)
 
-        weights = {"reward_weights": {
-            "lambda1": 0.0, "lambda2": 0.0, "lambda3": 1.0, "lambda4": 0.5
-        }}
-        base = calculate_reward({"coverage": 10.0}, weights)
-        penalized = calculate_reward({
-            "coverage": 10.0, "fragmentation_penalty": 2.0
-        }, weights)
-        self.assertAlmostEqual(base - penalized, 1.0)
+        # Energy, coverage, and fragmentation no longer affect the reward.
+        base = calculate_reward({"distance": 50.0}, config, total_area=5_000.0)
+        extras = calculate_reward(
+            {
+                "distance": 50.0,
+                "energy": 999.0,
+                "coverage": 999.0,
+                "fragmentation_penalty": 9.0,
+            },
+            config,
+            total_area=5_000.0,
+        )
+        self.assertAlmostEqual(base, extras)
+        self.assertLess(base, 0.0)
         self.assertFalse(hasattr(CoverageAction("f", "B0", "B1"), "workload_ratio"))
 
 

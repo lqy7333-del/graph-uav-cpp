@@ -13,6 +13,7 @@ class Evaluator:
     def __init__(self, environment, actor: CoveragePolicy, *, max_steps=None) -> None:
         self.environment = environment
         self.actor = actor
+        self._fixed_max_steps = None if max_steps is None else int(max_steps)
         self.max_steps = max_steps or max(1, len(environment.fields) * 12)
 
     @torch.no_grad()
@@ -25,6 +26,9 @@ class Evaluator:
         episode_rows = []
         for _ in range(num_episode):
             state = self.environment.reset()
+            # Field counts vary under domain randomization; rebuild the cap.
+            if self._fixed_max_steps is None:
+                self.max_steps = max(1, len(self.environment.fields) * 12)
             reward_sum = 0.0
             for _step in range(self.max_steps):
                 output = self.actor(state, environment=self.environment)

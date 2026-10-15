@@ -20,8 +20,9 @@ class Trainer:
         self.rl_config = self.config.get("rl", self.config)
         env_config = self.config.get("environment", {})
         fields_count = max(1, len(environment.fields))
-        steps_per_field = int(env_config.get("max_episode_steps_per_field", 12))
-        self.max_steps = int(max_steps or fields_count * steps_per_field)
+        self._steps_per_field = int(env_config.get("max_episode_steps_per_field", 12))
+        self._fixed_max_steps = None if max_steps is None else int(max_steps)
+        self.max_steps = int(max_steps or fields_count * self._steps_per_field)
         self.checkpoint_dir = checkpoint_dir
         self.buffer = RolloutBuffer()
         self.history: list[dict] = []
@@ -34,6 +35,12 @@ class Trainer:
         self.agent.actor.eval()  # Stable old/new log probabilities; gradients still work.
         for episode in range(1, num_episode + 1):
             state = self.environment.reset()
+            # Episode field counts vary under domain randomization, so the
+            # truncation cap follows the instance actually drawn by reset().
+            if self._fixed_max_steps is None:
+                self.max_steps = (
+                    max(1, len(self.environment.fields)) * self._steps_per_field
+                )
             episode_reward = 0.0
             steps = 0
             last_info = {}
