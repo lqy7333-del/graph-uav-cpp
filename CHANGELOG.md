@@ -7,6 +7,46 @@
 
 ## 2026-10-15
 
+### 26. 定位并修复「critic 解释不了 return 方差」：critic 独立学习率（已验证 EV 0→0.88）
+- **文件**：修改 `coverage_env/rl/ppo/ppo.py`、`coverage_env/config/default.yaml`、
+  `coverage_env/tests/test_training.py`。
+- **完整排查过程（含一次失败尝试，按时间顺序）**：
+  1) `a684dde` **偏置热启动**：把 critic 输出偏置设为首个 return 批次的均值。
+     `critic_loss` 立刻 342 → 68，`explained_variance` 一度升到 0.015，但随后衰减回 0；
+     `value_std` 始终 ≤0.26 而 `return_std` 8~11 —— 说明只解决了「偏移」，没解决「尺度」。
+  2) `a4b02fa` + `19bd340` **value 归一化（先运行尺度、后冻结尺度）**：**两版都不稳定**，
+     都在 update 2 崩。`adv_std`/`return_std` 从 8.3 暴涨到 51.3，`critic_loss` 在
+     0.4~138 之间振荡。根因：归一化把 critic 的输出乘上 `scale` 之后才喂回 GAE 的
+     bootstrap，等于给 `returns → critic → bootstrap → returns` 这个环加了增益；
+     原尺寸下该环是稳定的。
+  3) `6975f12` **回退归一化**，恢复到「原始特征直给 critic + 偏置热启动」的稳定配置。
+  4) `5d6f325` **critic 独立学习率（默认 10× = 3e-3）** —— 这一版成功。
+- **根因（算术）**：return 偏移 ≈ −18、展布 ≈ 11，而 critic 最后一层权重初始化只有约
+  ±0.06，要覆盖该范围需涨约 10 倍。Adam 对每个参数的步长 ≈ `lr`，8 minibatch/update
+  → 约 2.4e-3/update → 需要 **200~400 轮**，而整个训练就是 200 轮。
+  **所以 critic 是「步数预算不足」，不是「输入缺信息」。**
+  这也解释了 `value_coef`（0.5）与 `max_grad_norm`（0.5）为何调不动它：Adam 按参数
+  归一化，它们只改梯度**幅度**、不改**步长**；唯一能改步长的是 lr 或总步数。
+- **改动**：`PPOAgent` 新增 `ppo.critic_learning_rate`（缺省回落到 `learning_rate`，
+  向后兼容），actor / critic 分别建 Adam；`default.yaml` 设 `0.003`（10×）。
+- **验证（15 轮，`--seed 42`，run 目录 `coverage_env/results/probe_critic_lr10x/`）**：
+
+  | update | 1 | 2 | 3 | 4 | 5 | 6 | 8 | 10 | 12 | 15 |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | `explained_variance` | 0.036 | 0.082 | 0.253 | 0.565 | 0.734 | 0.862 | 0.694 | 0.856 | **0.908** | 0.891 |
+  | `advantage_std` | 8.28 | 9.28 | 10.7 | 7.21 | 5.81 | 3.96 | 4.96 | 2.84 | 2.96 | 3.27 |
+  | `return_std` | 8.27 | 9.82 | 11.2 | 10.4 | 10.6 | 10.5 | 11.3 | 10.6 | 10.6 | 11.2 |
+  | `value_std` | 0.36 | 1.87 | 2.58 | 4.27 | 6.35 | 7.89 | 10.7 | 9.64 | 9.38 | 10.5 |
+
+  前 3 轮 EV 均值 **0.124**，后 5 轮均值 **0.876**（max 0.908），且**全程稳定无爆炸**。
+  关键旁证：`advantage_std` 从 ≈ `return_std` 降到约 **0.29 × return_std**
+  —— 基线真正被减掉了；`value_std` 从 0.36 涨到 10.5，与 `return_std`（11.2）同量级。
+  这已经接近探针测得的可预测性上限（0.88），即 critic 基本吃满了其输入中的信息。
+- **尚未验证**：15 轮内 `mean_ep_reward` 仍在 −43 附近摆动（尚看不出趋势），
+  `policy_loss` 仍 ≈ 0；需要完整 200 轮才能判断策略是否因此开始改进。
+- **回滚方法**：`git revert 5d6f325`（或把 `default.yaml` 的 `critic_learning_rate`
+  删掉即回落到共享 lr）。
+
 ### 25. 修法 1b：critic 改为直接消费「z_G + 原始 UAV/depot/布局特征」
 - **文件**：修改 `coverage_env/rl/decoder/action_decoder.py`、`coverage_env/rl/ppo/ppo.py`、
   `coverage_env/rl/trainer/distributed.py`。
