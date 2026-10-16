@@ -13,16 +13,20 @@ def _angle_to_unit(angle_degrees: float) -> float:
 
 
 class FieldFeatureBuilder:
-    """Build fixed five-dimensional, relation-free Field node features."""
+    """Build seven-dimensional Field features, including its static center."""
 
-    def __init__(self, max_area: float, max_perimeter: float) -> None:
+    def __init__(self, max_area: float, max_perimeter: float,
+                 position_scale_m: float = 10_000.0) -> None:
         if max_area <= 0.0 or max_perimeter <= 0.0:
             raise ValueError("max_area and max_perimeter must be positive.")
+        if position_scale_m <= 0.0:
+            raise ValueError("position_scale_m must be positive.")
         self.max_area = float(max_area)
         self.max_perimeter = float(max_perimeter)
+        self.position_scale_m = float(position_scale_m)
 
     def build(self, environment) -> torch.Tensor:
-        """Return rows ``[area_norm, perimeter_norm, compactness, orientation, remaining_ratio]``."""
+        """Return [area, perimeter, compactness, orientation, remaining, center_x, center_y]."""
         rows = []
         for field in environment.fields:
             total_grid_area = sum(point.point_area for point in field.grid_points)
@@ -40,20 +44,26 @@ class FieldFeatureBuilder:
                 max(0.0, min(1.0, compactness)),
                 _angle_to_unit(field.orientation),
                 max(0.0, min(1.0, remaining_ratio)),
+                max(-1.0, min(1.0, float(field.centroid[0]) / self.position_scale_m)),
+                max(-1.0, min(1.0, float(field.centroid[1]) / self.position_scale_m)),
             ])
-        return torch.tensor(rows, dtype=torch.float32).reshape(-1, 5)
+        return torch.tensor(rows, dtype=torch.float32).reshape(-1, 7)
 
 
 class BoundaryFeatureBuilder:
-    """Build fixed two-dimensional, relation-free Boundary node features."""
+    """Build four-dimensional Boundary features, including its static center."""
 
-    def __init__(self, max_boundary_length: float) -> None:
+    def __init__(self, max_boundary_length: float,
+                 position_scale_m: float = 10_000.0) -> None:
         if max_boundary_length <= 0.0:
             raise ValueError("max_boundary_length must be positive.")
+        if position_scale_m <= 0.0:
+            raise ValueError("position_scale_m must be positive.")
         self.max_boundary_length = float(max_boundary_length)
+        self.position_scale_m = float(position_scale_m)
 
     def build(self, environment, boundaries=None) -> torch.Tensor:
-        """Return rows ``[length_norm, orientation]`` for boundary nodes."""
+        """Return rows [length_norm, orientation, center_x, center_y]."""
         boundaries = boundaries or [
             (field, boundary)
             for field in environment.fields
@@ -69,8 +79,10 @@ class BoundaryFeatureBuilder:
             rows.append([
                 min(1.0, boundary.length / self.max_boundary_length),
                 _angle_to_unit(angle),
+                max(-1.0, min(1.0, float(boundary.center[0]) / self.position_scale_m)),
+                max(-1.0, min(1.0, float(boundary.center[1]) / self.position_scale_m)),
             ])
-        return torch.tensor(rows, dtype=torch.float32).reshape(-1, 2)
+        return torch.tensor(rows, dtype=torch.float32).reshape(-1, 4)
 
 
 class GlobalFeatureBuilder:

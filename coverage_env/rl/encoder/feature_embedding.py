@@ -10,8 +10,8 @@ class FeatureEmbedding(nn.Module):
 
     def __init__(
         self,
-        field_input_dim: int = 5,
-        boundary_input_dim: int = 2,
+        field_input_dim: int = 7,
+        boundary_input_dim: int = 4,
         hidden_dim: int = 128,
         dropout: float = 0.0,
     ) -> None:

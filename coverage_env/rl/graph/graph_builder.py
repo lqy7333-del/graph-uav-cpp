@@ -41,9 +41,11 @@ class GraphBuilder:
         self.field_features = FieldFeatureBuilder(
             max_area=float(self.config.get("max_area", 8_000.0)),
             max_perimeter=float(self.config.get("max_perimeter", 500.0)),
+            position_scale_m=float(self.config.get("position_scale_m", 10_000.0)),
         )
         self.boundary_features = BoundaryFeatureBuilder(
-            max_boundary_length=float(self.config.get("max_boundary_length", 200.0))
+            max_boundary_length=float(self.config.get("max_boundary_length", 200.0)),
+            position_scale_m=float(self.config.get("position_scale_m", 10_000.0)),
         )
         self.global_features = GlobalFeatureBuilder(
             position_scale_m=float(self.config.get("position_scale_m", 10_000.0))
@@ -113,7 +115,7 @@ class GraphBuilder:
                     2: "boundary_boundary_inter",
                 },
                 "feature_dims": {
-                    "field": 5, "boundary": 2, "global": 5,
+                    "field": 7, "boundary": 4, "global": 5,
                     "relation": relations["relation_feature_dims"],
                     "edge_attr_padded": 4,
                 },

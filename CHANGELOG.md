@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-10-16
+
+### 33. 用地块/边界静态坐标替代 Action 显式距离特征（消融实验）
+- **文件**：修改 `coverage_env/rl/graph/feature_builder.py`、
+  `coverage_env/rl/graph/graph_builder.py`、`coverage_env/rl/encoder/feature_embedding.py`、
+  `coverage_env/rl/encoder/hetero_encoder.py`、`coverage_env/rl/decoder/action_decoder.py`、
+  `coverage_env/tests/test_graph_builder.py`、`coverage_env/tests/test_policy_forward.py`；
+  删除 `coverage_env/rl/decoder/action_spatial.py` 和
+  `coverage_env/tests/test_action_spatial_features.py`。
+- **变更（旧 → 新）**：Field 原始特征从 5 维扩为 7 维，追加归一化地块中心 `(x,y)`；
+  Boundary 原始特征从 2 维扩为 4 维，追加归一化边界中心 `(x,y)`。坐标使用
+  `rl.graph.position_scale_m`（默认 10,000 m）缩放并截断到 `[-1,1]`。Action Decoder 输入
+  从 `384 + 5 + 128 = 517` 改为 `384 + 128 = 512`，不再拼接每动作 5 维显式距离。
+- **原因**：验证策略能否从节点坐标和图消息传递中学习空间关系，减少人工构造的
+  Action 距离特征；这是可回滚的输入表示消融，不代表已证明与显式距离性能等价。
+- **兼容性**：旧 Field/Boundary 输入维度和带显式距离的 Decoder 权重均不兼容，需从头训练，
+  不可直接加载此前 checkpoint。
+- **验证**：更新图特征维度及 Policy 输入维度断言；运行结果记录在本次修改报告中。
+- **回滚方法**：`git revert` 本条对应提交即可恢复 5/2 维节点特征及显式 Action 距离模块。
+
+---
+
 ## 2026-10-15
 
 ### 32. 给每个候选动作加显式空间特征，让 actor 能表达「去最近的地块」

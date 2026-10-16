@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 import matplotlib
+import torch
 from torch_geometric.data import Data
 
 matplotlib.use("Agg")
@@ -34,8 +35,20 @@ class GraphBuilderTests(unittest.TestCase):
         self.assertIsInstance(graph, Data)
         field_count = len(self.environment.fields)
         boundary_count = sum(len(field.boundaries) for field in self.environment.fields)
-        self.assertEqual(graph.x_field.shape, (field_count, 5))
-        self.assertEqual(graph.x_boundary.shape, (boundary_count, 2))
+        self.assertEqual(graph.x_field.shape, (field_count, 7))
+        self.assertEqual(graph.x_boundary.shape, (boundary_count, 4))
+        self.assertTrue(torch.all(graph.x_field[:, 5:7].abs() <= 1.0))
+        self.assertTrue(torch.all(graph.x_boundary[:, 2:4].abs() <= 1.0))
+        position_scale = self.config["rl"]["graph"]["position_scale_m"]
+        for index, field in enumerate(self.environment.fields):
+            expected_center = torch.tensor(field.centroid) / position_scale
+            self.assertTrue(torch.allclose(graph.x_field[index, 5:7], expected_center))
+        boundary_records = [
+            boundary for field in self.environment.fields for boundary in field.boundaries
+        ]
+        for index, boundary in enumerate(boundary_records):
+            expected_center = torch.tensor(boundary.center) / position_scale
+            self.assertTrue(torch.allclose(graph.x_boundary[index, 2:4], expected_center))
         self.assertEqual(graph.global_feature.shape, (5,))
         self.assertEqual(graph.num_nodes, field_count + boundary_count)
         self.assertEqual(graph.relation_counts[EDGE_FB], boundary_count)

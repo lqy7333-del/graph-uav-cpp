@@ -8,10 +8,6 @@ import torch.nn as nn
 from coverage_env.rl.action_mask import get_action_mask
 from coverage_env.rl.action_space import ActionGenerator, CoverageAction
 from coverage_env.rl.decoder.action_embedding import ActionEmbedding
-from coverage_env.rl.decoder.action_spatial import (
-    ACTION_SPATIAL_DIM,
-    build_action_spatial_feature,
-)
 from coverage_env.rl.decoder.global_state_encoder import (
     GlobalStateEncoder,
     build_depot_feature,
@@ -80,12 +76,9 @@ class CoveragePolicy(nn.Module):
             graph_dim=2 * hidden_dim, uav_dim=10, depot_dim=2, site_dim=12,
             hidden_dim=hidden_dim,
         )
-        # Per-action distances. The graph is translation invariant and the global
-        # context is shared by every candidate, so without these the actor cannot
-        # express "go to the nearest field" at all.
-        decoder_input_dim = (
-            self.action_embedding.output_dim + ACTION_SPATIAL_DIM + hidden_dim
-        )
+        # Candidate Field/Boundary embeddings now carry static metric coordinates;
+        # explicit per-action distance features are disabled for this ablation.
+        decoder_input_dim = self.action_embedding.output_dim + hidden_dim
         self.action_decoder = ActionDecoder(decoder_input_dim, hidden_dim)
 
     def forward(
@@ -124,12 +117,8 @@ class CoveragePolicy(nn.Module):
             embeddings["boundary_embedding"],
             graph,
         )
-        x_spatial = build_action_spatial_feature(
-            actions, self._spatial_source(environment, state)
-        ).to(device)
         action_context = torch.cat([
             action_vectors,
-            x_spatial,
             global_embedding.unsqueeze(0).expand(action_vectors.shape[0], -1),
         ], dim=-1)
         scores = self.action_decoder(action_context)
@@ -231,12 +220,8 @@ class CoveragePolicy(nn.Module):
                 boundary_offset=boundary_offsets[index],
             )
             global_embedding = global_embeddings[index]
-            x_spatial = build_action_spatial_feature(
-                actions, self._spatial_source(environment, context["observation"])
-            ).to(device)
             action_context = torch.cat([
                 action_vectors,
-                x_spatial,
                 global_embedding.unsqueeze(0).expand(action_vectors.shape[0], -1),
             ], dim=-1)
             scores = self.action_decoder(action_context)
@@ -291,21 +276,6 @@ class CoveragePolicy(nn.Module):
         Same reasoning as ``_global_sources``: PPO replay must see the layout of
         the transition's own instance, and by then the live environment has moved
         on (or resampled a different instance entirely).
-        """
-        if isinstance(state, dict) and state.get("fields"):
-            return state
-        if environment is not None and getattr(environment, "fields", None):
-            return environment
-        return None
-
-    @staticmethod
-    def _spatial_source(environment, state):
-        """Resolve the geometry source for per-action distances.
-
-        Prefers the stored state for the same reason as ``_site_source``: replay
-        must use the transition's own geometry, and the live environment has
-        moved on by then. The state carries UAV position, depot position, field
-        centres, and boundary centres, so no environment access is needed.
         """
         if isinstance(state, dict) and state.get("fields"):
             return state
