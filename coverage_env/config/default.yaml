@@ -124,6 +124,17 @@ rl:
     # corner-to-corner case inside [0, 1] without clipping.
     uav_distance_scale_m: 3000.0
     d_near_m: 1500.0
+    # Normalizers for the UAV capability channels. Each equals the *upper* bound
+    # of the matching uav.ranges entry, which is the smallest scale that clips
+    # nothing while giving the widest possible normalized span. The previous
+    # values (30000/100/20/50) were 1.7-20x too large: max_energy was squashed
+    # into a 0.02-wide band, so "how big is this episode's battery" was almost
+    # invisible next to payload_ratio (sd 0.006 vs 0.315). Must match
+    # DEFAULT_SCALES in rl/decoder/global_state_encoder.py (guarded by a test).
+    max_energy_scale: 1800.0
+    max_payload_scale: 60.0
+    speed_scale: 10.0
+    coverage_width_scale: 12.0
   encoder:
     hidden_dim: 128
     num_heads: 4

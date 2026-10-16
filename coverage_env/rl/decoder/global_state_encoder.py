@@ -34,10 +34,15 @@ DEFAULT_SCALES = {
     # smallest scale that clamps nothing in the ~2400 m workspace, and it lifts the
     # coordinates from the ~0.045 that 10000 m produced to ~0.29.
     "position_scale_m": 1_500.0,
-    "max_energy_scale": 30_000.0,
-    "max_payload_scale": 100.0,
-    "speed_scale": 20.0,
-    "coverage_width_scale": 50.0,
+    # UAV capability normalizers. Each equals the upper bound of the matching
+    # uav.ranges entry: the smallest scale that clips nothing, which maximizes the
+    # normalized span. The old 30000/100/20/50 were 1.7-20x too large and squashed
+    # max_energy into a 0.02-wide band. Must match rl.graph.*_scale in
+    # default.yaml (guarded by a test).
+    "max_energy_scale": 1_800.0,
+    "max_payload_scale": 60.0,
+    "speed_scale": 10.0,
+    "coverage_width_scale": 12.0,
     # Site-layout scales. The episode reward is path length per unit covered
     # area, so it depends on *where the fields are* relative to the depot and to
     # each other; these bound the matching normalized layout features.

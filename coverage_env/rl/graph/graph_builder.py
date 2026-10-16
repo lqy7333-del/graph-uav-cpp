@@ -61,10 +61,10 @@ class GraphBuilder:
             position_scale_m=float(self.config.get("position_scale_m", 10_000.0))
         )
         self.uav_features = UavNodeFeatureBuilder(
-            max_energy_scale=float(self.config.get("max_energy_scale", 30_000.0)),
-            max_payload_scale=float(self.config.get("max_payload_scale", 100.0)),
-            speed_scale=float(self.config.get("speed_scale", 20.0)),
-            coverage_width_scale=float(self.config.get("coverage_width_scale", 50.0)),
+            max_energy_scale=float(self.config.get("max_energy_scale", 1_800.0)),
+            max_payload_scale=float(self.config.get("max_payload_scale", 60.0)),
+            speed_scale=float(self.config.get("speed_scale", 10.0)),
+            coverage_width_scale=float(self.config.get("coverage_width_scale", 12.0)),
         )
         self.relation_features = RelationFeatureBuilder(
             d_near=float(self.config.get("d_near_m", 1_500.0)),

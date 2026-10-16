@@ -130,5 +130,62 @@ class UavGraphNodeTests(unittest.TestCase):
         self.assertTrue(torch.equal(near, far))
 
 
+    def test_capability_scales_are_matched_to_uav_ranges(self):
+        """Each capability normalizer must equal its ``uav.ranges`` upper bound.
+
+        A scale far above the sampled range squashes the channel: at
+        ``max_energy_scale=30000`` the 1200-1800 range landed in a 0.02-wide band,
+        so "how big is this episode's battery" was nearly invisible next to
+        ``payload_ratio`` (sd 0.006 vs 0.315). Taking the upper bound is the
+        smallest scale that clips nothing, which maximizes the normalized span.
+        """
+        graph_config = self.config["rl"]["graph"]
+        ranges = self.config["uav"]["ranges"]
+        pairs = {
+            "max_energy_scale": "max_energy",
+            "max_payload_scale": "max_payload",
+            "speed_scale": "speed",
+            "coverage_width_scale": "coverage_width",
+        }
+        for scale_key, range_key in pairs.items():
+            upper = float(ranges[range_key]["max"])
+            scale = float(graph_config[scale_key])
+            self.assertGreaterEqual(
+                scale, upper, f"{scale_key} would clip the sampled range"
+            )
+            self.assertLessEqual(
+                scale, 1.5 * upper, f"{scale_key} under-conditions its channel"
+            )
+
+    def test_uav_scales_agree_between_graph_and_global_features(self):
+        """The graph's UAV node and the z_G uav vector must share one scale."""
+        from coverage_env.rl.decoder.global_state_encoder import DEFAULT_SCALES
+
+        graph_config = self.config["rl"]["graph"]
+        for key in (
+            "max_energy_scale", "max_payload_scale", "speed_scale",
+            "coverage_width_scale",
+        ):
+            self.assertAlmostEqual(
+                float(graph_config[key]), float(DEFAULT_SCALES[key]), places=6
+            )
+
+    def test_capability_channels_are_not_squashed(self):
+        """Across randomised episodes the capability channels must span a real band."""
+        environment = InstanceGenerator(self.config).generate(seed=42)
+        rows = []
+        for _ in range(12):
+            environment.reset()
+            rows.append(self.builder.build_graph(environment).x_uav_node[0])
+        stacked = torch.stack(rows)
+        # Dims 0/1 are the *state* ratios, which are 1.0 at reset by construction;
+        # dims 2-5 are the per-episode capability channels this scale fix targets.
+        capability = stacked[:, 2:]
+        spread = capability.max(dim=0).values - capability.min(dim=0).values
+        self.assertGreater(
+            float(spread.min()), 0.1, f"a capability channel is squashed: {spread.tolist()}"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

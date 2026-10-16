@@ -97,10 +97,10 @@ class UavNodeFeatureBuilder:
 
     def __init__(
         self,
-        max_energy_scale: float = 30_000.0,
-        max_payload_scale: float = 100.0,
-        speed_scale: float = 20.0,
-        coverage_width_scale: float = 50.0,
+        max_energy_scale: float = 1_800.0,
+        max_payload_scale: float = 60.0,
+        speed_scale: float = 10.0,
+        coverage_width_scale: float = 12.0,
     ) -> None:
         if min(
             max_energy_scale, max_payload_scale, speed_scale, coverage_width_scale

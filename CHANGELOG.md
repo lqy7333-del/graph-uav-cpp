@@ -7,7 +7,41 @@
 
 ## 2026-10-16
 
-### 38. UAV 图节点设计的 200 轮终局：**峰值追平手工特征，但长训练更差且不稳定**
+### 39. 校正 UAV 能力维度的归一化尺度（与 `uav.ranges` 对齐）
+- **文件**：修改 `coverage_env/config/default.yaml`（`rl.graph` 新增 4 个尺度键）、
+  `coverage_env/rl/decoder/global_state_encoder.py`（`DEFAULT_SCALES`）、
+  `coverage_env/rl/graph/feature_builder.py`（`UavNodeFeatureBuilder` 默认值）、
+  `coverage_env/rl/graph/graph_builder.py`（配置读取默认值）、
+  `coverage_env/tests/test_uav_graph_node.py`（新增 3 项测试）。
+- **变更（旧 → 新）**：`max_energy_scale` **30000 → 1800**、`max_payload_scale` **100 → 60**、
+  `speed_scale` **20 → 10**、`coverage_width_scale` **50 → 12**。
+- **原因**：这四个尺度与 `uav.ranges`（域随机化范围：max_energy 1200–1800、
+  max_payload 40–60、speed 6–10、coverage_width 8–12）严重不匹配。实测（训练设置
+  `randomize_each_reset=True`）归一化后的跨度：
+
+  | 维度 | 旧尺度 | 旧跨度 / sd | 新跨度 / sd | 改善 |
+  | --- | --- | --- | --- | --- |
+  | `max_energy` | 30000 | **0.020 / 0.006** | **0.323 / 0.099** | **16×** |
+  | `coverage_width` | 50 | 0.072 / 0.020 | 0.302 / 0.083 | 4.2× |
+  | `speed` | 20 | 0.200 / 0.056 | 0.393 / 0.112 | 2.0× |
+  | `max_payload` | 100 | 0.183 / 0.056 | 0.305 / 0.093 | 1.7× |
+
+  最严重的是 `max_energy`：30000 约为实际范围的 **20 倍**，把「本局电池多大」这一维压成
+  0.02 宽的窄带（sd 0.006），而同一向量里 `payload_ratio` 的 sd 是 0.315 —— 相差 50 倍。
+  这与已修的 `position_scale_m`（10000 → 1500）和 `global_distance_scale_m`（10000 → 3000）
+  是**同一类欠尺度问题**。
+- **取值原则**：每个尺度 = 对应 `uav.ranges` 的**上界** —— 这是**不截断任何采样值的前提下最小
+  的尺度**，因此归一化跨度最大、条件数最好。四个尺度同时影响 **UAV 图节点特征**
+  和 `build_uav_feature` 的 10 维 `x_UAV`（后者进 `z_G` 与 critic 输入），三处必须一致。
+- **测试**：新增 3 项 —— (a) 每个尺度必须 ≥ 对应 `uav.ranges` 上界且 ≤ 1.5×（既不截断也不过压），
+  直接与 `uav.ranges` 绑定，改范围就会报警；(b) `default.yaml` 与 `DEFAULT_SCALES` 四处尺度
+  必须一致；(c) 域随机化下能力维的实测跨度必须 > 0.1（防再次被压平）。
+  全量 **128 项**，仍只有 2 个改动前即存在的失败。
+- **影响**：`x_UAV` 与 UAV 节点特征都变了，**旧 checkpoint 不再兼容，需从头训练**。
+  条目 38 里 arm 1 的 +9.63/+7.04 是在**旧尺度**下得到的，如需评估本次校正的收益需重跑。
+- **回滚方法**：`git revert <本提交 SHA>`（四处尺度一并回到 30000/100/20/50）。
+
+### 38. UAV 图节点设计的 200 轮终局：**峰值追平手工特征，但长训练更差且不稳定** UAV 图节点设计的 200 轮终局：**峰值追平手工特征，但长训练更差且不稳定**
 - **运行**：`run_uav_node/` 从 ckpt_100 续训到 200 轮（exit 0，4 rank checksum 一致 = 1005.017321）。
   续训的理由是「100 轮时仍在上升、尚未饱和」—— **这个判断被结果否定了**（见下）。
 - **配对结果（20 实例逐实例，相对本架构未训练基线 −41.19 / 27.9%）**：
