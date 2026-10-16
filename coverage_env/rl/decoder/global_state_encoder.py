@@ -27,7 +27,13 @@ import torch.nn as nn
 
 
 DEFAULT_SCALES = {
-    "position_scale_m": 10_000.0,
+    # Must match rl.graph.position_scale_m in default.yaml (guarded by a test):
+    # this normalizes the uav/depot position inside ``z_G`` while that one
+    # normalizes the Field/Boundary node centres, and the actor needs both in the
+    # same frame to compare "where am I" with "where is this field". 1500 m is the
+    # smallest scale that clamps nothing in the ~2400 m workspace, and it lifts the
+    # coordinates from the ~0.045 that 10000 m produced to ~0.29.
+    "position_scale_m": 1_500.0,
     "max_energy_scale": 30_000.0,
     "max_payload_scale": 100.0,
     "speed_scale": 20.0,

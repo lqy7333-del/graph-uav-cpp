@@ -100,7 +100,19 @@ rl:
     max_area: 8000.0
     max_perimeter: 500.0
     max_boundary_length: 200.0
-    position_scale_m: 10000.0
+    # Metric scale for every *position* feature: Field/Boundary node centres and
+    # the graph's global uav/depot coordinates. Measured over 60 instances (790
+    # fields) the workspace spans only ~2400 m and |centre| peaks at 1253 m, so
+    # 10000 compressed the coordinate channels to |mean| 0.045 while their sibling
+    # node features sit at 0.38-1.0 -- about 10x under-scaled, leaving the
+    # field-to-field coordinate differences (median 0.0675, the actual signal for
+    # "which field is nearest") tiny. 1500 m is the smallest scale that clamps
+    # nothing (1000 m would clip 6.1% of centres, exactly the far fields) while
+    # lifting coordinates to |mean| 0.29 and the pairwise differences to ~0.45.
+    # MUST match DEFAULT_SCALES["position_scale_m"] in
+    # rl/decoder/global_state_encoder.py (guarded by a test); a mismatch would put
+    # node centres and the UAV position in different frames.
+    position_scale_m: 1500.0
     global_distance_scale_m: 10000.0
     d_near_m: 1500.0
   encoder:

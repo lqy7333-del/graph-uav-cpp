@@ -76,6 +76,35 @@ class GraphBuilderTests(unittest.TestCase):
                 self.assertGreaterEqual(target, field_count)
         self.assertNotIn("field_field", graph.graph_metadata["edge_type_names"].values())
 
+    def test_position_channels_are_well_scaled(self):
+        """Node coordinates must not be drowned out by their sibling features.
+
+        Measured failure mode: with a 10000 m scale the coordinate channels sat at
+        |mean| 0.045 while area/perimeter/compactness/remaining were 0.38-1.0, and
+        the policy never learned the nearest-field decision. Guard against that
+        regression rather than the exact constant.
+        """
+        coordinates = self.graph.x_field[:, 5:7]
+        siblings = self.graph.x_field[:, :5]
+        self.assertGreater(float(coordinates.abs().mean()), 0.1)
+        self.assertGreater(
+            float(coordinates.abs().mean()), 0.2 * float(siblings.abs().mean())
+        )
+        # Coordinate channels must actually vary, otherwise "which field is
+        # nearest" is unrepresentable.
+        self.assertGreater(float(coordinates.std(dim=0).min()), 0.01)
+        self.assertTrue(torch.all(self.graph.x_boundary[:, 2:4].abs() <= 1.0))
+
+    def test_graph_and_global_position_scales_agree(self):
+        """Node centres and the z_G uav/depot position must share one frame."""
+        from coverage_env.rl.decoder.global_state_encoder import DEFAULT_SCALES
+
+        self.assertAlmostEqual(
+            float(self.config["rl"]["graph"]["position_scale_m"]),
+            float(DEFAULT_SCALES["position_scale_m"]),
+            places=6,
+        )
+
     def test_inter_edges_obey_near_threshold_and_visualization(self):
         graph = self.graph
         near_limit = self.builder.relation_features.d_near
