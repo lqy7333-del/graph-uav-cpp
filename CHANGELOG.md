@@ -7,7 +7,49 @@
 
 ## 2026-10-16
 
-### 40. 尺度校正后的 arm 1 重跑：训练轨迹明显变好，但**最终性能无法与其它方案区分**
+### 41. 新增训练后「贪心完整路径规划」可视化工具（固定场景、不同地块数）
+- **文件**：新增 `coverage_env/visualization/policy_paths.py`。
+- **用法**：
+  ```
+  PYTHONPATH=. .venv/bin/python -m coverage_env.visualization.policy_paths \
+      --checkpoint coverage_env/results/<run>/ckpt_update_100.pt \
+      --field-counts 5 10 20 --out coverage_env/results/<run>/paths.png
+  ```
+  同时在 stdout 打印一张表（reward / coverage / steps / resupplies / termination reason），
+  所以不开图也能读结论。
+- **功能**：在**固定的**测试场景（`num_fields ∈ {5,10,20}`，`randomize_each_reset=False`，
+  seed 固定）上，用 **greedy 策略**跑完整 episode，并与**最近地块启发式在同一个实例上**并排绘制。
+  每个面板画出：地块轮廓与编号、depot、UAV 起点、**按访问顺序着色的飞行路径**、
+  entry 点的**访问序号**、**自动补给的回程**（红色点线）、**终局返回**（灰色虚线）。
+- **目的**：把「策略是否合理」从数字变成一眼可见的判断。数值指标（配对 greedy）只能说明
+  「好多少」，看不出**顺序是否绕路**；而 5 地块这种小场景的总路程对顺序极其敏感，
+  画出来就能直接看出交叉和折返。
+- **首次运行的读数（`run_uav_node_scale_fix/ckpt_update_100.pt`，见
+  `coverage_env/results/run_uav_node_scale_fix/paths_newscale.png`）**：
+
+  | 地块数 | 策略 | reward | coverage | steps | 补给 | 终止 |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 5 | greedy | −38.92 | 100% | 5 | 0 | mission_complete |
+  | 5 | 最近地块 | −39.00 | 100% | 5 | 0 | mission_complete |
+  | 10 | greedy | **−29.79** | 100% | 11 | 1 | mission_complete |
+  | 10 | 最近地块 | −33.84 | 100% | 11 | 1 | mission_complete |
+  | 20 | greedy | −32.26 | 100% | 24 | 4 | mission_complete |
+  | 20 | 最近地块 | **−31.32** | 100% | 24 | 4 | mission_complete |
+
+  **读出来的三件事**：
+  1) 三个场景全部 **100% 覆盖、`mission_complete`** —— 策略确实完成了任务，不是靠"少干活"拿分。
+  2) **5 地块场景暴露了顺序问题**：greedy 的访问顺序是 3→1→4→2→5，轨迹**先下、再上、再上、
+     再大幅折回到最下方、最后向左**，肉眼可见地大量交叉。10 地块上策略明显优于启发式
+     （−29.79 vs −33.84），20 地块上反而略差（−32.26 vs −31.32）—— 说明**两者都只是
+     "近似贪心排序"，谁更好取决于实例**，而不是策略学会了更好的全局顺序。
+  3) **补给回程（红色点线）在地图上很长且位置尴尬**：它由环境强制触发（`step()` 在
+     所有动作都不可行时自动返回 depot），但**触发位置取决于策略的覆盖顺序**，
+     而回程距离是计入 reward 的。所以顺序选择会间接决定这部分成本。
+- **结论**：可视化把「数字上看不出差别」的问题变成了可见问题 —— **剩余的低效主要在
+  "跨地块的全局顺序"，而不是"空间感知"**。这与条目 38/40 观察到的
+  「最近地块率与收益不单调」以及「三种位置表示最终性能打平」是一致的。
+
+### 40. 尺度校正后的 arm 1 重跑：训练轨迹明显变好，但**最终性能无法与其它方案区分** 尺度校正后的 arm 1 重跑：训练轨迹明显变好，但**最终性能无法与其它方案区分**
 - **运行**：`run_uav_node_scale_fix/`，从零训练 100 轮（全新架构，旧 checkpoint 不兼容），
   `seed 42`、地块 5~20、4 卡 DDP。
 - **训练日志（sampled reward，25 轮 block 均值，前 100 轮）—— 这是方差最低的比较**：
