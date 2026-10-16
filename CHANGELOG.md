@@ -7,7 +7,47 @@
 
 ## 2026-10-16
 
-### 36. 坐标路线终局判定（300 轮）：**决定性劣于显式距离**，尺度不是主因
+### 37. 把 UAV 接入为图节点 + 关系边（方案 A：独立 Stage 3「agent-relative 读出」）
+- **文件**：新增 `docs/uav_graph_node_design.md`、`coverage_env/tests/test_uav_graph_node.py`；
+  修改 `coverage_env/rl/graph/feature_builder.py`、`relation_builder.py`、`graph_builder.py`、
+  `coverage_env/rl/encoder/feature_embedding.py`、`hetero_encoder.py`、`batched_encoder.py`、
+  `coverage_env/visualization/plot.py`、`coverage_env/config/default.yaml`、
+  `coverage_env/tests/test_graph_builder.py`、`test_encoder.py`、
+  `test_batched_encoder_equivalence.py`。
+- **变更（旧 → 新）**：
+  1) 统一节点空间由 `[Field, Boundary]` 扩为 **`[Field, Boundary, UAV]`**，UAV 排在最后，
+     使 `edge_index - n_field` 这类既有表达式全部不变。UAV 节点 **1 个**（动作空间只能寻址一个 UAV）。
+  2) 新增 `UavNodeFeatureBuilder`：6 维**只含状态**（`[energy_ratio, payload_ratio, speed,
+     width, E_max, Q_max]`），**不含位置**；过独立的 `uav_mlp`。
+  3) 新增关系 `EDGE_UF = 3`（`UAV→Field`）与 `EDGE_UB = 4`（`UAV→Boundary`），边特征均为
+     `[dx, dy, dist]`（按 `uav_distance_scale_m` 归一化）。
+  4) 新增 **Stage 3 `UavRelativeEncoder`**，在 Stage 2b 之后运行、**只吃 UAV 关系**，
+     输出即 `ActionEmbedding` 读取的 agent-relative 嵌入；decoder 输入维度不变（仍 512）。
+  5) 尺度：`global_distance_scale_m` **10000 → 3000**；新增 `uav_distance_scale_m: 3000`。
+  6) 批处理：`BatchedGraph` 增加 `x_uav_node`/`uav_batch`/`uav_offsets`；`collate_graphs` 的端点
+     重映射由二分类改为**三分类**（UAV 在最后，原 `< n_field` 判定会把它误判成 boundary）。
+  7) `plot_graph` 补 UAV 边样式与 UAV 节点标记（原先遇到未知 `edge_type` 直接 `KeyError`）。
+- **原因**：条目 31 定位的根因是「actor 拿不到 UAV→候选的距离」。两条既有修法里，显式距离
+  有效（+10.32）但属人工特征；静态坐标无效（300 轮仅 +1.9~+3.1）。本条目把有效机制**泛化成
+  图原生形式**：让**图自己把距离算出来并投递**，而不是在 decoder 上拼一个预计算特征。
+- **关键机制（不变量）**：`RelationGATLayer` 的消息是 `source_h + relation_embedding(edge_attr)`，
+  且注意力分数也含关系嵌入 —— 所以把 `dist` 放进边特征，距离会作为**显式加项**进入目标节点嵌入。
+  而 `_destination_softmax` 是**对目标节点全部入边**做归一化，若把 UAV 边混进 Stage 1，
+  一个 Boundary 的 UAV 消息权重会降到约 `1/(K+1)`（K 为跨地块邻居数，通常 5~15）→ 被稀释 6~16 倍。
+  **独立 Stage 3 里每个目标恰好只有 1 条入边 → softmax 恒为 1 → 零稀释**，且残差保证
+  Stage 1–2 信息不丢。这是选择「独立 Stage 3」而非并入 Stage 1 的决定性理由。
+- **测试**：新增 `test_uav_graph_node.py` 6 项 —— UAV 边覆盖 `|F|+|B|` 且都从 UAV 出发；
+  **UAV 边注意力恒为 1.0**（零稀释，实测通过）；只移动 UAV 时 **Stage 1–2 注意力逐位不变**
+  而最终嵌入必须改变（map-relative / agent-relative 分离）；只把 UAV 边属性乘 0.5（拓扑与所有
+  节点特征不变）必须改变 Field 嵌入（距离通道确实到达目的地）；距离通道尺度良好（防欠尺度回归）；
+  UAV 节点特征不含位置。另更新 `test_graph_builder`（含 UAV 节点与边方向断言）、`test_encoder`
+  （attention_debug 新增键）、`test_batched_encoder_equivalence`（含 UAV 的端点归属与注意力比对；
+  单图批仍要求**逐位相等**，多图批因 GEMM 归约顺序放宽到 1e-5 并注明理由）。全量 **125 项**，
+  仍只有 2 个改动前即存在的失败；4 卡 DDP 冒烟通过（checksum 一致）。
+- **验证结果**：见下一条（100 轮 A/B）。
+- **回滚方法**：`git revert <本提交 SHA>`（会同时恢复 `global_distance_scale_m` 为 10000）。
+
+### 36. 坐标路线终局判定（300 轮）：**决定性劣于显式距离**，尺度不是主因 坐标路线终局判定（300 轮）：**决定性劣于显式距离**，尺度不是主因
 - **目的**：条目 35 只跑到 100 轮且趋势仍在上升，不足以判「坐标路线行不行」。本次从
   `ckpt_update_100.pt` 续训到 **300 轮**（`run_coords_scale1500/`，exit 0，4 rank checksum
   一致 = 702.032333），每个检查点用同一套双重指标测量。

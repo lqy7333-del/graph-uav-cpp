@@ -85,6 +85,60 @@ class BoundaryFeatureBuilder:
         return torch.tensor(rows, dtype=torch.float32).reshape(-1, 4)
 
 
+class UavNodeFeatureBuilder:
+    """Build the six-dimensional UAV node feature vector.
+
+    The vector carries the UAV's *state* only. Its position is deliberately left
+    out: every other relation in the graph is relative, so keeping absolute
+    coordinates out preserves translation invariance, and the geometry the policy
+    actually needs travels on the ``UAV -> Field`` / ``UAV -> Boundary`` edge
+    features instead (relative offset plus normalized distance).
+    """
+
+    def __init__(
+        self,
+        max_energy_scale: float = 30_000.0,
+        max_payload_scale: float = 100.0,
+        speed_scale: float = 20.0,
+        coverage_width_scale: float = 50.0,
+    ) -> None:
+        if min(
+            max_energy_scale, max_payload_scale, speed_scale, coverage_width_scale
+        ) <= 0.0:
+            raise ValueError("UAV feature scales must be positive.")
+        self.max_energy_scale = float(max_energy_scale)
+        self.max_payload_scale = float(max_payload_scale)
+        self.speed_scale = float(speed_scale)
+        self.coverage_width_scale = float(coverage_width_scale)
+
+    def build(self, environment) -> torch.Tensor:
+        """Return ``[1, 6]``: ``[energy_ratio, payload_ratio, speed, width, E_max, Q_max]``."""
+        if not environment.uavs:
+            raise ValueError("Cannot build a UAV node without a UAV in the environment.")
+        uav = environment.uavs[0]
+        max_energy = float(getattr(uav, "max_energy", 0.0))
+        max_payload = float(getattr(uav, "max_payload", 0.0))
+        remaining_energy = float(getattr(uav, "remaining_energy", 0.0))
+        remaining_payload = float(
+            getattr(uav, "remaining_payload", max_payload)
+        )
+
+        def ratio(remaining, maximum):
+            return max(0.0, min(1.0, remaining / maximum)) if maximum > 0.0 else 0.0
+
+        def norm(value, scale):
+            return max(0.0, min(1.0, float(value) / scale))
+
+        return torch.tensor([[
+            ratio(remaining_energy, max_energy),
+            ratio(remaining_payload, max_payload),
+            norm(getattr(uav, "speed", 0.0), self.speed_scale),
+            norm(getattr(uav, "coverage_width", 0.0), self.coverage_width_scale),
+            norm(max_energy, self.max_energy_scale),
+            norm(max_payload, self.max_payload_scale),
+        ]], dtype=torch.float32)
+
+
 class GlobalFeatureBuilder:
     """Build the five-value UAV/depot global feature vector."""
 

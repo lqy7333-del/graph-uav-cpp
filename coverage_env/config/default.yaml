@@ -113,7 +113,16 @@ rl:
     # rl/decoder/global_state_encoder.py (guarded by a test); a mismatch would put
     # node centres and the UAV position in different frames.
     position_scale_m: 1500.0
-    global_distance_scale_m: 10000.0
+    # Scale for the E_BB_inter distance feature (``distance / global_scale``).
+    # E_BB_inter only links boundaries closer than ``d_near_m`` (1500 m), so at
+    # 10000 the feature could only ever span 0-0.15 -- the same under-scaling
+    # that made the coordinate channels useless. 3000 m covers the whole
+    # workspace with the ~1500 m neighbourhood inside it.
+    global_distance_scale_m: 3000.0
+    # Scale for the UAV->Field / UAV->Boundary relative offset and distance.
+    # A UAV can be anywhere in the ~2.4 km workspace, so 3000 m keeps the
+    # corner-to-corner case inside [0, 1] without clipping.
+    uav_distance_scale_m: 3000.0
     d_near_m: 1500.0
   encoder:
     hidden_dim: 128

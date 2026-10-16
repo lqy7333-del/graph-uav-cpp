@@ -1,4 +1,4 @@
-"""Initial MLP projections for Field and Boundary node features."""
+"""Initial MLP projections for Field, Boundary, and UAV node features."""
 
 from __future__ import annotations
 
@@ -12,14 +12,18 @@ class FeatureEmbedding(nn.Module):
         self,
         field_input_dim: int = 7,
         boundary_input_dim: int = 4,
+        uav_input_dim: int = 6,
         hidden_dim: int = 128,
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
-        if min(field_input_dim, boundary_input_dim, hidden_dim) <= 0:
+        if min(field_input_dim, boundary_input_dim, uav_input_dim, hidden_dim) <= 0:
             raise ValueError("Feature dimensions and hidden_dim must be positive.")
         self.field_mlp = self._make_mlp(field_input_dim, hidden_dim, dropout)
         self.boundary_mlp = self._make_mlp(boundary_input_dim, hidden_dim, dropout)
+        # The UAV node carries agent state only; its geometry travels on the
+        # UAV->Field / UAV->Boundary edges, not in this vector.
+        self.uav_mlp = self._make_mlp(uav_input_dim, hidden_dim, dropout)
 
     @staticmethod
     def _make_mlp(input_dim: int, hidden_dim: int, dropout: float) -> nn.Sequential:
@@ -33,6 +37,10 @@ class FeatureEmbedding(nn.Module):
             nn.GELU(),
         )
 
-    def forward(self, x_field, x_boundary):
-        """Return initial Field and Boundary embeddings ``h_F0, h_B0``."""
-        return self.field_mlp(x_field), self.boundary_mlp(x_boundary)
+    def forward(self, x_field, x_boundary, x_uav_node):
+        """Return initial embeddings ``h_F0, h_B0, h_U0``."""
+        return (
+            self.field_mlp(x_field),
+            self.boundary_mlp(x_boundary),
+            self.uav_mlp(x_uav_node),
+        )

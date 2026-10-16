@@ -15,7 +15,13 @@ matplotlib.use("Agg")
 from coverage_env.config import DEFAULT_CONFIG_PATH, load_config
 from coverage_env.env.instance_generator import InstanceGenerator
 from coverage_env.rl.graph.graph_builder import GraphBuilder
-from coverage_env.rl.graph.relation_builder import EDGE_BB_INTER, EDGE_BB_INTRA, EDGE_FB
+from coverage_env.rl.graph.relation_builder import (
+    EDGE_BB_INTER,
+    EDGE_BB_INTRA,
+    EDGE_FB,
+    EDGE_UB,
+    EDGE_UF,
+)
 from coverage_env.visualization.plot import plot_graph
 
 
@@ -30,7 +36,7 @@ class GraphBuilderTests(unittest.TestCase):
         self.builder = GraphBuilder(self.config["rl"])
         self.graph = self.builder.build_graph(self.environment)
 
-    def test_graph_has_only_field_and_boundary_nodes(self):
+    def test_graph_has_field_boundary_and_uav_nodes(self):
         graph = self.graph
         self.assertIsInstance(graph, Data)
         field_count = len(self.environment.fields)
@@ -50,7 +56,21 @@ class GraphBuilderTests(unittest.TestCase):
             expected_center = torch.tensor(boundary.center) / position_scale
             self.assertTrue(torch.allclose(graph.x_boundary[index, 2:4], expected_center))
         self.assertEqual(graph.global_feature.shape, (5,))
-        self.assertEqual(graph.num_nodes, field_count + boundary_count)
+        # One UAV node is appended after every Field and Boundary node.
+        self.assertEqual(graph.x_uav_node.shape, (1, 6))
+        self.assertEqual(graph.uav_node_index, field_count + boundary_count)
+        self.assertEqual(graph.num_nodes, field_count + boundary_count + 1)
+        self.assertTrue(torch.all(graph.x_uav_node >= 0.0))
+        self.assertTrue(torch.all(graph.x_uav_node <= 1.0))
+        self.assertEqual(graph.relation_counts[EDGE_UF], field_count)
+        self.assertEqual(graph.relation_counts[EDGE_UB], boundary_count)
+        # Every UAV edge starts at the UAV node.
+        uav_mask = (graph.edge_type == EDGE_UF) | (graph.edge_type == EDGE_UB)
+        self.assertTrue(torch.all(
+            graph.edge_index[0, uav_mask] == graph.uav_node_index
+        ))
+        for relation in (EDGE_UF, EDGE_UB):
+            self.assertEqual(graph.relation_features[relation].shape[1], 3)
         self.assertEqual(graph.relation_counts[EDGE_FB], boundary_count)
         self.assertEqual(
             graph.relation_counts[EDGE_BB_INTRA],
@@ -64,13 +84,20 @@ class GraphBuilderTests(unittest.TestCase):
         self.assertEqual(len(graph.field_id_to_index), field_count)
         self.assertEqual(len(graph.boundary_key_to_index), boundary_count)
 
-        # FB edges must go Field -> Boundary; BB edges must have Boundary endpoints.
+        # FB edges must go Field -> Boundary; BB edges must have Boundary
+        # endpoints; UAV edges must start at the UAV node and target a Field or a
+        # Boundary (the UAV -> Field family is the one that legitimately targets a
+        # Field node, so it is checked separately from the map relations).
+        uav_index = field_count + boundary_count
         for (source, target), edge_type in zip(
             graph.edge_index.t().tolist(), graph.edge_type.tolist()
         ):
             if edge_type == EDGE_FB:
                 self.assertLess(source, field_count)
                 self.assertGreaterEqual(target, field_count)
+            elif edge_type in (EDGE_UF, EDGE_UB):
+                self.assertEqual(source, uav_index)
+                self.assertNotEqual(target, uav_index)
             else:
                 self.assertGreaterEqual(source, field_count)
                 self.assertGreaterEqual(target, field_count)

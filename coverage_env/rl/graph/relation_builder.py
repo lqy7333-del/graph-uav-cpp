@@ -10,6 +10,20 @@ import torch
 EDGE_FB = 0
 EDGE_BB_INTRA = 1
 EDGE_BB_INTER = 2
+# The UAV as a graph node. Direction is UAV -> Field / UAV -> Boundary, so each
+# candidate destination receives "where is the agent relative to me" as a
+# message whose *content and attention* are both functions of the relative
+# offset and the normalized distance.
+EDGE_UF = 3
+EDGE_UB = 4
+
+RELATION_FEATURE_DIMS = {
+    EDGE_FB: 4,
+    EDGE_BB_INTRA: 3,
+    EDGE_BB_INTER: 3,
+    EDGE_UF: 3,
+    EDGE_UB: 3,
+}
 
 
 def _axis_angle(tangent) -> float:
@@ -31,13 +45,21 @@ class RelationFeatureBuilder:
     available because their requested dimensions differ.
     """
 
-    def __init__(self, d_near: float = 1_500.0, global_distance_scale: float | None = None):
+    def __init__(
+        self,
+        d_near: float = 1_500.0,
+        global_distance_scale: float | None = None,
+        uav_distance_scale: float = 3_000.0,
+    ):
         if d_near <= 0.0:
             raise ValueError("d_near must be positive.")
         if global_distance_scale is not None and global_distance_scale <= 0.0:
             raise ValueError("global_distance_scale must be positive when supplied.")
+        if uav_distance_scale <= 0.0:
+            raise ValueError("uav_distance_scale must be positive.")
         self.d_near = float(d_near)
         self.global_distance_scale = global_distance_scale
+        self.uav_distance_scale = float(uav_distance_scale)
 
     def build(self, environment, field_id_to_index, boundary_id_to_index):
         """Return edge arrays, typed relation features, and relation counts."""
@@ -52,8 +74,10 @@ class RelationFeatureBuilder:
         edges: list[tuple[int, int]] = []
         edge_types: list[int] = []
         padded_attrs: list[list[float]] = []
-        features = {EDGE_FB: [], EDGE_BB_INTRA: [], EDGE_BB_INTER: []}
-        counts = {EDGE_FB: 0, EDGE_BB_INTRA: 0, EDGE_BB_INTER: 0}
+        features = {
+            EDGE_FB: [], EDGE_BB_INTRA: [], EDGE_BB_INTER: [], EDGE_UF: [], EDGE_UB: [],
+        }
+        counts = {key: 0 for key in features}
 
         def add_edge(source, target, relation_type, values):
             edges.append((source, target))
@@ -133,6 +157,28 @@ class RelationFeatureBuilder:
                     distance / global_scale, angle_difference, normal_similarity,
                 ])
 
+        # E_UF / E_UB: the UAV node points at every Field and every Boundary.
+        # This is what lets "which candidate is closest" be computed *by the
+        # graph* -- the distance is an edge feature, so it enters both the
+        # attention score and the message content of the destination node.
+        uav_position = self._uav_position(environment, fields)
+        if uav_position is not None:
+            uav_index = nf + len(boundary_records)
+            scale = self.uav_distance_scale
+            for field in fields:
+                offset_x = field.centroid[0] - uav_position[0]
+                offset_y = field.centroid[1] - uav_position[1]
+                add_edge(uav_index, field_id_to_index[field.field_id], EDGE_UF, [
+                    offset_x / scale, offset_y / scale, hypot(offset_x, offset_y) / scale,
+                ])
+            for field, boundary in boundary_records:
+                offset_x = boundary.center[0] - uav_position[0]
+                offset_y = boundary.center[1] - uav_position[1]
+                boundary_idx = nf + boundary_id_to_index[field.field_id][boundary.id]
+                add_edge(uav_index, boundary_idx, EDGE_UB, [
+                    offset_x / scale, offset_y / scale, hypot(offset_x, offset_y) / scale,
+                ])
+
         edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
         if not edges:
             edge_index = torch.empty((2, 0), dtype=torch.long)
@@ -141,12 +187,32 @@ class RelationFeatureBuilder:
             "edge_type": torch.tensor(edge_types, dtype=torch.long),
             "edge_attr": torch.tensor(padded_attrs, dtype=torch.float32).reshape(-1, 4),
             "relation_features": {
-                key: torch.tensor(value, dtype=torch.float32).reshape(-1, 4 if key == EDGE_FB else 3)
+                key: torch.tensor(value, dtype=torch.float32).reshape(
+                    -1, RELATION_FEATURE_DIMS[key]
+                )
                 for key, value in features.items()
             },
             "relation_counts": counts,
-            "relation_feature_dims": {EDGE_FB: 4, EDGE_BB_INTRA: 3, EDGE_BB_INTER: 3},
+            "relation_feature_dims": dict(RELATION_FEATURE_DIMS),
         }
+
+    @staticmethod
+    def _uav_position(environment, fields):
+        """Return the UAV's current position, falling back to the depot."""
+        uavs = getattr(environment, "uavs", None) or []
+        if uavs:
+            position = getattr(uavs[0], "current_position", None)
+            if position is not None:
+                return (float(position[0]), float(position[1]))
+        depot = getattr(environment, "depot", None)
+        if depot is not None:
+            getter = getattr(depot, "get_position", None)
+            raw = getter() if callable(getter) else None
+            if raw is not None:
+                return (float(raw[0]), float(raw[1]))
+        if fields:
+            return (float(fields[0].centroid[0]), float(fields[0].centroid[1]))
+        return None
 
     @staticmethod
     def _environment_scale(fields) -> float:

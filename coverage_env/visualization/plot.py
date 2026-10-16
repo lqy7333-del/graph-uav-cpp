@@ -563,7 +563,7 @@ def plot_mission(
 
 
 def plot_graph(environment, graph, *, show: bool = True, save_path: str | None = None):
-    """Visualize Field/Boundary nodes and the three permitted edge families."""
+    """Visualize Field/Boundary/UAV nodes and the permitted edge families."""
     figure, ax = plt.subplots(figsize=(12, 9))
     node_positions = {}
     field_count = len(environment.fields)
@@ -589,10 +589,29 @@ def plot_graph(environment, graph, *, show: bool = True, save_path: str | None =
                     xytext=(3, 3), textcoords="offset points", fontsize=6,
                     color="#23457d")
 
+    uav_index = field_count + sum(len(field.boundaries) for field in environment.fields)
+    uav_position = None
+    uavs = getattr(environment, "uavs", None) or []
+    if uavs:
+        uav_position = getattr(uavs[0], "current_position", None)
+    if uav_position is None:
+        depot = getattr(environment, "depot", None)
+        getter = getattr(depot, "get_position", None) if depot is not None else None
+        uav_position = getter() if callable(getter) else None
+    if uav_position is not None:
+        node_positions[uav_index] = uav_position
+        ax.scatter(*uav_position, marker="*", s=190, color="#c0392b", zorder=5)
+        ax.annotate("UAV", uav_position, xytext=(6, -10),
+                    textcoords="offset points", fontsize=9, color="#7b241c")
+
+    # Every relation family needs a style: the graph now carries UAV edges too,
+    # and an unknown edge type used to raise KeyError here.
     styles = {
         0: ("#617849", "--", "Field–Boundary"),
         1: ("#dc8a22", ":", "Boundary intra"),
         2: ("#8e44ad", "-", "Boundary inter"),
+        3: ("#c0392b", "-", "UAV–Field"),
+        4: ("#e67e22", "-", "UAV–Boundary"),
     }
     edge_index = graph.edge_index.detach().cpu().tolist()
     edge_types = graph.edge_type.detach().cpu().tolist()
@@ -610,6 +629,7 @@ def plot_graph(environment, graph, *, show: bool = True, save_path: str | None =
 
     ax.scatter([], [], marker="o", color="#236b3b", label="Field node")
     ax.scatter([], [], marker="^", color="#315caa", label="Boundary node")
+    ax.scatter([], [], marker="*", color="#c0392b", label="UAV node")
     ax.set_aspect("equal", adjustable="datalim")
     ax.set_xlabel("Local X (m)")
     ax.set_ylabel("Local Y (m)")

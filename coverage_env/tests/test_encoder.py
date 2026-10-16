@@ -35,7 +35,7 @@ class CoverageGraphEncoderTests(unittest.TestCase):
         self.assertTrue(torch.equal(output["global_feature"], self.graph.global_feature))
         self.assertEqual(
             set(self.encoder.attention_debug),
-            {"boundary_inter", "boundary_intra", "field_boundary"},
+            {"boundary_inter", "boundary_intra", "field_boundary", "uav_relative"},
         )
         self.assertEqual(
             self.encoder.attention_debug["boundary_inter"]["edge_type"],

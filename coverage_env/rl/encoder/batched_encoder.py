@@ -29,6 +29,8 @@ from coverage_env.rl.graph.relation_builder import (
     EDGE_BB_INTER,
     EDGE_BB_INTRA,
     EDGE_FB,
+    EDGE_UB,
+    EDGE_UF,
 )
 
 
@@ -37,47 +39,56 @@ class BatchedGraph:
     """A disjoint union of single-graph objects in one unified index space.
 
     Node space is *type separated*: every Field node first, then every Boundary
-    node. A graph ``k`` owns field rows ``[field_offsets[k], field_offsets[k+1])``
-    and boundary rows ``[boundary_offsets[k], boundary_offsets[k+1])``. Unified
-    node ids follow the single-graph convention: field ``i`` of graph ``k`` is
-    ``field_offsets[k] + i`` and boundary ``j`` of graph ``k`` is
-    ``num_fields + boundary_offsets[k] + j``.
+    node, then every UAV node. A graph ``k`` owns field rows
+    ``[field_offsets[k], field_offsets[k+1])``, boundary rows
+    ``[boundary_offsets[k], boundary_offsets[k+1])`` and uav rows
+    ``[uav_offsets[k], uav_offsets[k+1])``. Unified node ids follow the
+    single-graph convention: field ``i`` of graph ``k`` is
+    ``field_offsets[k] + i``, boundary ``j`` is
+    ``num_fields + boundary_offsets[k] + j``, and uav ``m`` is
+    ``num_fields + num_boundaries + uav_offsets[k] + m``.
     """
 
     x_field: torch.Tensor
     x_boundary: torch.Tensor
+    x_uav_node: torch.Tensor
     edge_index: torch.Tensor
     edge_type: torch.Tensor
     edge_attr: torch.Tensor
     global_feature: torch.Tensor
     field_batch: torch.Tensor
     boundary_batch: torch.Tensor
+    uav_batch: torch.Tensor
     edge_batch: torch.Tensor
     field_offsets: torch.Tensor
     boundary_offsets: torch.Tensor
+    uav_offsets: torch.Tensor
     num_fields: int
     num_boundaries: int
+    num_uavs: int
     num_graphs: int
 
     @property
     def num_nodes(self) -> int:
-        """Return the total number of Field + Boundary nodes."""
-        return int(self.num_fields + self.num_boundaries)
+        """Return the total number of Field + Boundary + UAV nodes."""
+        return int(self.num_fields + self.num_boundaries + self.num_uavs)
 
     def to(self, device) -> "BatchedGraph":
         """Return a copy of this batch with every tensor moved to ``device``."""
         moved = {
             name: getattr(self, name).to(device)
             for name in (
-                "x_field", "x_boundary", "edge_index", "edge_type", "edge_attr",
-                "global_feature", "field_batch", "boundary_batch", "edge_batch",
-                "field_offsets", "boundary_offsets",
+                "x_field", "x_boundary", "x_uav_node", "edge_index", "edge_type",
+                "edge_attr", "global_feature", "field_batch", "boundary_batch",
+                "uav_batch", "edge_batch", "field_offsets", "boundary_offsets",
+                "uav_offsets",
             )
         }
         return BatchedGraph(
             **moved,
             num_fields=self.num_fields,
             num_boundaries=self.num_boundaries,
+            num_uavs=self.num_uavs,
             num_graphs=self.num_graphs,
         )
 
@@ -113,24 +124,34 @@ def collate_graphs(graphs) -> BatchedGraph:
 
     field_counts = [int(graph.x_field.shape[0]) for graph in graph_list]
     boundary_counts = [int(graph.x_boundary.shape[0]) for graph in graph_list]
+    uav_counts = [int(graph.x_uav_node.shape[0]) for graph in graph_list]
     edge_dtype = graph_list[0].edge_index.dtype
     field_offsets = _cumulative_offsets(field_counts, edge_dtype)
     boundary_offsets = _cumulative_offsets(boundary_counts, edge_dtype)
+    uav_offsets = _cumulative_offsets(uav_counts, edge_dtype)
     total_fields = int(field_offsets[-1].item())
+    total_boundaries = int(boundary_offsets[-1].item())
 
     edges, edge_types, edge_attrs, edge_batches = [], [], [], []
     for graph_index, graph in enumerate(graph_list):
         graph_edges = graph.edge_index
         graph_field_count = field_counts[graph_index]
-        # A single graph numbers fields first, then boundaries. Field endpoints
-        # keep their local index (shifted by the graph's field base); boundary
-        # endpoints move into the batch's shared boundary block.
+        graph_boundary_count = boundary_counts[graph_index]
+        # A single graph numbers fields first, then boundaries, then the UAV.
+        # Each type moves into its own block of the batch's shared space, so the
+        # three endpoint kinds need three distinct remappings.
         is_field = graph_edges < graph_field_count
+        is_boundary = graph_edges < graph_field_count + graph_boundary_count
         remapped = torch.where(
             is_field,
             graph_edges + field_offsets[graph_index],
-            graph_edges - graph_field_count + total_fields
-            + boundary_offsets[graph_index],
+            torch.where(
+                is_boundary,
+                graph_edges - graph_field_count + total_fields
+                + boundary_offsets[graph_index],
+                graph_edges - graph_field_count - graph_boundary_count
+                + total_fields + total_boundaries + uav_offsets[graph_index],
+            ),
         )
         edges.append(remapped)
         edge_types.append(graph.edge_type)
@@ -142,6 +163,7 @@ def collate_graphs(graphs) -> BatchedGraph:
     return BatchedGraph(
         x_field=torch.cat([graph.x_field for graph in graph_list], dim=0),
         x_boundary=torch.cat([graph.x_boundary for graph in graph_list], dim=0),
+        x_uav_node=torch.cat([graph.x_uav_node for graph in graph_list], dim=0),
         edge_index=torch.cat(edges, dim=1),
         edge_type=torch.cat(edge_types, dim=0),
         edge_attr=torch.cat(edge_attrs, dim=0),
@@ -150,11 +172,14 @@ def collate_graphs(graphs) -> BatchedGraph:
         ),
         field_batch=_repeat_index(field_counts, torch.long),
         boundary_batch=_repeat_index(boundary_counts, torch.long),
+        uav_batch=_repeat_index(uav_counts, torch.long),
         edge_batch=torch.cat(edge_batches, dim=0),
         field_offsets=field_offsets,
         boundary_offsets=boundary_offsets,
+        uav_offsets=uav_offsets,
         num_fields=total_fields,
-        num_boundaries=int(boundary_offsets[-1].item()),
+        num_boundaries=total_boundaries,
+        num_uavs=int(uav_offsets[-1].item()),
         num_graphs=len(graph_list),
     )
 
@@ -205,12 +230,15 @@ def encode_graph_batch(encoder, batch: BatchedGraph) -> dict:
     """
     x_field = batch.x_field
     x_boundary = batch.x_boundary
+    x_uav_node = batch.x_uav_node
     edge_index = batch.edge_index
     edge_type = batch.edge_type
     edge_attr = batch.edge_attr
     n_field_total = x_field.shape[0]
 
-    h_field_0, h_boundary_0 = encoder.feature_embedding(x_field, x_boundary)
+    h_field_0, h_boundary_0, h_uav_0 = encoder.feature_embedding(
+        x_field, x_boundary, x_uav_node
+    )
 
     # Boundary encoders consume the *concatenated* boundary matrix, so their
     # indices must stay globally unique across graphs. Subtracting the total
@@ -241,20 +269,32 @@ def encode_graph_batch(encoder, batch: BatchedGraph) -> dict:
         )
     )
 
+    # Stage 3: the UAV relation families only, in the same shared index space.
+    # Every destination again has exactly one incoming edge, so no per-graph
+    # bookkeeping is needed beyond the endpoints collate_graphs already remapped.
+    uav_mask = (edge_type == EDGE_UF) | (edge_type == EDGE_UB)
+    uav_edges = edge_index[:, uav_mask]
+    uav_attr = edge_attr[uav_mask]
+    h_field_2, h_boundary_3, _h_uav_2, uav_attention = encoder.uav_relative_encoder(
+        h_field_1, h_boundary_2, h_uav_0, uav_edges, uav_attr
+    )
+
     return {
-        "field_embedding": h_field_1,
-        "boundary_embedding": h_boundary_2,
+        "field_embedding": h_field_2,
+        "boundary_embedding": h_boundary_3,
         "global_feature": batch.global_feature,
-        "graph_context": batched_graph_context(h_field_1, h_boundary_2, batch),
+        "graph_context": batched_graph_context(h_field_2, h_boundary_3, batch),
         "attention": {
             "boundary_inter": inter_attention,
             "boundary_intra": intra_attention,
             "field_boundary": fb_attention,
+            "uav_relative": uav_attention,
         },
         "attended_edges": {
             "boundary_inter": inter_edges,
             "boundary_intra": intra_edges,
             "field_boundary": fb_bidirectional_edges,
+            "uav_relative": uav_edges,
         },
         "batch": batch,
     }
