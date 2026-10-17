@@ -256,3 +256,14 @@ class HierarchicalActionDecoder(nn.Module):
             "field_representatives": field_representatives,
             "entry_representatives": entry_representatives,
         }
+
+
+def checkpoint_uses_hierarchical(state_dict) -> bool:
+    """Detect which decoder a saved actor state dict belongs to.
+
+    Checkpoints record only their parameter names, so loading a flat-decoder
+    checkpoint into the factored decoder fails with a wall of missing keys. Tools
+    that load a checkpoint for evaluation use this to pick the right decoder
+    instead of relying on a flag somebody has to remember.
+    """
+    return any(str(key).startswith("hierarchical_decoder.") for key in state_dict)

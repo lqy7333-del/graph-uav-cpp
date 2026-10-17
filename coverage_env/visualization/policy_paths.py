@@ -134,6 +134,15 @@ def run_episode(environment, choose, *, label, num_fields, seed, max_steps=600):
 def build_traces(checkpoint, field_counts, *, actor_seed=0):
     """Return ``{(num_fields, policy_label): {label: trace}}`` for one checkpoint."""
     config = load_config(DEFAULT_CONFIG_PATH)
+    if checkpoint is not None:
+        from coverage_env.rl.decoder.hierarchical_decoder import (
+            checkpoint_uses_hierarchical,
+        )
+
+        saved = torch.load(checkpoint, map_location="cpu")
+        config["rl"]["decoder"]["hierarchical_decoding"] = checkpoint_uses_hierarchical(
+            saved["actor"]
+        )
     scenarios = {}
     for num_fields in field_counts:
         seed = BASE_SEED + num_fields
