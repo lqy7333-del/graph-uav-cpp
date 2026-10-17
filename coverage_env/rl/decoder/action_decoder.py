@@ -80,7 +80,6 @@ class CoveragePolicy(nn.Module):
         # Candidate Field/Boundary embeddings now carry static metric coordinates;
         # explicit per-action distance features are disabled for this ablation.
         decoder_input_dim = self.action_embedding.output_dim + hidden_dim
-        self.action_decoder = ActionDecoder(decoder_input_dim, hidden_dim)
         # Factored decode p(field) * p(entry|field) * p(exit|field,entry). A flat
         # softmax over the product space gave the parcel decision only a ~1/14
         # share of the output (measured: ~41 candidates for ~3 parcels), while the
@@ -88,6 +87,13 @@ class CoveragePolicy(nn.Module):
         decoder_config = self.rl_config.get("decoder", {})
         self.hierarchical_decoding = bool(
             decoder_config.get("hierarchical_decoding", True)
+        )
+        # Only the active decoder is built. Keeping both would leave the inactive
+        # one as parameters that never appear in the loss, and DDP refuses that
+        # ("Expected to have finished reduction in the prior iteration").
+        self.action_decoder = (
+            None if self.hierarchical_decoding
+            else ActionDecoder(decoder_input_dim, hidden_dim)
         )
         self.hierarchical_decoder = (
             HierarchicalActionDecoder(hidden_dim=hidden_dim)
@@ -150,16 +156,24 @@ class CoveragePolicy(nn.Module):
         ], dim=-1)
         extras: dict = {}
         reachable = bool(mask.numel()) and bool(mask.any())
-        if self.hierarchical_decoding and actions and reachable:
-            joint, extras = self.hierarchical_decoder(
-                actions, action_vectors, global_embedding, mask, graph
-            )
-            # The product is already normalised (each level is a proper conditional);
-            # renormalise only to absorb float32 drift so the clipped log matches.
-            joint = joint / joint.sum().clamp_min(1e-12)
-            scores = torch.log(joint.clamp_min(1e-12)).unsqueeze(-1)
-            masked_scores = scores.squeeze(-1).masked_fill(~mask, float("-inf"))
-            distribution = joint.masked_fill(~mask, 0.0)
+        # "No feasible action" is handled per decoder, NOT by falling back to the
+        # flat one: only the active decoder exists, so a fallback would call None.
+        if self.hierarchical_decoding:
+            if actions and reachable:
+                joint, extras = self.hierarchical_decoder(
+                    actions, action_vectors, global_embedding, mask, graph
+                )
+                # The product is already normalised (each level is a proper
+                # conditional); renormalise only to absorb float32 drift so the
+                # clipped log matches.
+                joint = joint / joint.sum().clamp_min(1e-12)
+                scores = torch.log(joint.clamp_min(1e-12)).unsqueeze(-1)
+                masked_scores = scores.squeeze(-1).masked_fill(~mask, float("-inf"))
+                distribution = joint.masked_fill(~mask, 0.0)
+            else:
+                scores = action_vectors.new_zeros((action_vectors.shape[0], 1))
+                masked_scores = scores.squeeze(-1).masked_fill(~mask, float("-inf"))
+                distribution = scores.new_zeros((action_vectors.shape[0],))
         else:
             scores = self.action_decoder(action_context)
             masked_scores = scores.squeeze(-1).masked_fill(~mask, float("-inf"))

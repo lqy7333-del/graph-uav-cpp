@@ -105,6 +105,31 @@ class HierarchicalDecodeTests(unittest.TestCase):
             atol=1e-6,
         ))
 
+    def test_every_actor_parameter_receives_gradient(self):
+        """Both modes must use every parameter they own.
+
+        DistributedDataParallel aborts when a parameter produces no gradient
+        ("Expected to have finished reduction in the prior iteration"), which is
+        exactly what happened when the flat decoder was still constructed while
+        the factored decoder did the scoring.
+        """
+        for hierarchical in (True, False):
+            config = load_config(DEFAULT_CONFIG_PATH)
+            config["rl"]["decoder"]["hierarchical_decoding"] = hierarchical
+            policy = CoveragePolicy(self.environment, config=config)
+            policy.train()
+            output = policy(self.state, environment=self.environment)
+            distribution = output["action_distribution"]
+            log_prob = torch.log(
+                distribution.clamp_min(1e-12)[output["mask"]]
+            ).sum()
+            log_prob.backward()
+            unused = [
+                name for name, parameter in policy.named_parameters()
+                if parameter.grad is None
+            ]
+            self.assertEqual(unused, [], f"hierarchical={hierarchical}: {unused}")
+
     def test_flat_decoder_still_available(self):
         config = load_config(DEFAULT_CONFIG_PATH)
         config["rl"]["decoder"]["hierarchical_decoding"] = False
