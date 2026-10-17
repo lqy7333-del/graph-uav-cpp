@@ -123,6 +123,63 @@ def _nearest_unfinished_field(environment):
     return best
 
 
+def policy_order(actor, environment):
+    """Return the field order the greedy policy actually visits (first visits)."""
+    state = environment.reset()
+    order = []
+    with torch.no_grad():
+        for _ in range(MAX_STEPS):
+            output = actor(state, environment=environment)
+            distribution = output["action_distribution"]
+            if distribution.numel() == 0 or float(distribution.detach().sum()) <= 0:
+                break
+            action = output["actions"][int(distribution.argmax().item())]
+            if action.field_id not in order:
+                order.append(action.field_id)
+            state, reward, done, _info = environment.step(action)
+            if done:
+                break
+    for field in environment.fields:
+        if field.field_id not in order:
+            order.append(field.field_id)
+    return order
+
+
+def local_search(environment, order, *, rounds=4):
+    """Improve a field order with 2-opt reversal + or-opt move on real replays.
+
+    The objective is a full environment episode under the fixed entry/exit rule, so
+    this measures exactly what is reachable *by reordering alone*. Reversal alone
+    is weak for this cost because the episode is not symmetric (entry/exit choice,
+    forced resupply), so single-field moves are searched too.
+    """
+    best = list(order)
+    best_score = score_order(environment, best)
+    if best_score is None:
+        return best, None
+    for _ in range(rounds):
+        improved = False
+        size = len(best)
+        for i in range(size - 1):
+            for j in range(i + 1, size):
+                candidate = best[:i] + list(reversed(best[i:j + 1])) + best[j + 1:]
+                score = score_order(environment, candidate)
+                if score is not None and score > best_score + 1e-9:
+                    best, best_score, improved = candidate, score, True
+        for i in range(size):
+            for j in range(size):
+                if i == j:
+                    continue
+                candidate = best[:i] + best[i + 1:]
+                candidate.insert(j, best[i])
+                score = score_order(environment, candidate)
+                if score is not None and score > best_score + 1e-9:
+                    best, best_score, improved = candidate, score, True
+        if not improved:
+            break
+    return best, best_score
+
+
 def exhaustive_reference(environment, field_ids):
     """Return the best/median/worst reward over every permutation of ``field_ids``."""
     scores = []
@@ -185,11 +242,16 @@ def main() -> None:
     parser.add_argument("--num-fields", type=int, default=5,
                         help="Permutation count grows as num_fields!; keep this small.")
     parser.add_argument("--seeds", type=int, nargs="+", default=[1005])
+    parser.add_argument("--two-opt", action="store_true",
+                        help="Also improve the policy's order with 2-opt/or-opt.")
     args = parser.parse_args()
 
     config = load_config(DEFAULT_CONFIG_PATH)
-    print(f"{'seed':>6}{'orders':>8}{'worst':>9}{'median':>9}{'best':>9}"
-          f"{'policy':>9}{'nearest':>9}{'gap':>8}{'pctile':>9}")
+    header = (f"{'seed':>6}{'orders':>8}{'worst':>9}{'median':>9}{'best':>9}"
+              f"{'policy':>9}{'nearest':>9}{'gap':>8}{'beats%':>9}")
+    if args.two_opt:
+        header += f"{'2opt':>10}{'closed':>9}"
+    print(header)
     for seed in args.seeds:
         environment = InstanceGenerator(config).generate(
             num_fields=args.num_fields, seed=seed, randomize_each_reset=False
@@ -212,10 +274,17 @@ def main() -> None:
         # better; ~50% would mean "no ordering strategy at all".
         beaten = sum(1 for value in scores if value < policy)
         percentile = 100.0 * beaten / len(scores)
-        print(f"{seed:>6}{len(scores):>8}{scores[0]:>9.2f}"
-              f"{scores[len(scores) // 2]:>9.2f}{scores[-1]:>9.2f}"
-              f"{policy:>9.2f}{nearest:>9.2f}{scores[-1] - policy:>8.2f}"
-              f"{percentile:>8.0f}%")
+        line = (f"{seed:>6}{len(scores):>8}{scores[0]:>9.2f}"
+                f"{scores[len(scores) // 2]:>9.2f}{scores[-1]:>9.2f}"
+                f"{policy:>9.2f}{nearest:>9.2f}{scores[-1] - policy:>8.2f}"
+                f"{percentile:>8.0f}%")
+        if args.two_opt:
+            order = policy_order(actor, environment)
+            improved, improved_score = local_search(environment, order)
+            gap = scores[-1] - policy
+            closed = 0.0 if gap <= 1e-9 else 100.0 * (improved_score - policy) / gap
+            line += (f"{improved_score:>10.2f}{closed:>8.0f}%")
+        print(line)
 
 
 if __name__ == "__main__":
