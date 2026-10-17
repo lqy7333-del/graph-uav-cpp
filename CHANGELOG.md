@@ -7,7 +7,46 @@
 
 ## 2026-10-17
 
-### 48. 2-opt 后处理验证：排序空间的那 1.5~3.8 分**完全可以拿到（100% 闭合）**
+### 49. 层次化解码：`p(field) · p(entry|field) · p(exit|field,entry)`（+ 剩余集合特征）
+- **文件**：新增 `coverage_env/rl/decoder/hierarchical_decoder.py`、
+  `coverage_env/tests/test_hierarchical_decoder.py`；修改
+  `coverage_env/rl/decoder/action_decoder.py`、`coverage_env/config/default.yaml`、
+  `coverage_env/tests/test_training.py`。
+- **动机（条目 47/48 的实测证据）**：动作空间是 `(field, entry, exit)` 的**乘积空间**。实测一步有
+  **84 个候选 / 5 个地块 / 20 个 `(field, entry)` 组**，即每个地块约 **14 个** entry/exit 变体。
+  而 entry/exit 直接决定**当步**的飞行距离（即期奖励），地块顺序的收益是**延迟**的
+  —— 于是「选哪个地块」只占输出分布的约 1/14，梯度大部分被「把进/出口选对」吃掉。
+  而 2-opt 实验已证明**进/出口已经够好、剩下 1.5~3.8 分全在顺序上**。
+- **变更**：
+  1) 新增三级解码 `p(field) · p(entry|field) · p(exit|field,entry)`，三个独立 head 分别读
+     action embedding 的不同槽位（`z_F` / `z_F+z_entry` / `z_F+z_entry+z_exit`），
+     因此 entry head 看不到 exit 选择、field head 两者都看不到。
+  2) 三级各自归一：level 1 是**跨地块的单次 softmax**（5 路）；level 2 在
+     **每个地块内部**对 `(field, entry)` 组归一；level 3 在**每个 `(field, entry)` 内部**归一。
+  3) **新增剩余集合特征**（每候选 4 维，`remaining_set_features`）：到剩余地块质心的距离、
+     到最远剩余地块的距离、剩余比例、剩余集合直径。这些**只从图里算**（`x_field[:,4]` 是
+     `remaining_ratio`、`x_field[:,5:7]` 是归一化质心），所以 **replay 安全**。
+     动机：池化的全局上下文只有两两距离的聚合统计，field head 无法知道「这个候选是挨着
+     剩下的活、还是孤零零在一边」。
+  4) 配置开关 `rl.decoder.hierarchical_decoding`（默认 `true`），flat 路径完整保留以便 A/B。
+  5) `forward` 与 `forward_batched` 改为**共用一个 `_assemble_output`**（此前是两段复制的
+     打分代码，有悄悄分叉的风险）。
+- **为什么这是精确重参数化而不是近似**（已在测试里验证）：把三级条件概率相乘成联合向量
+  `action_distribution` 后，① 联合仍**严格归一**（每级都是合法的条件分布），所以
+  `sample_action`/`greedy_action`/`top_k_actions` 与 PPO 的 log-prob 查表**全都不用改**；
+  ② 联合熵**精确等于** `H(F)+H(E|F)+H(X|F,E)`，所以 `entropy_coef` **不需要重新标定**。
+- **测试**：新增 6 项 —— 联合归一且掩码外为 0、`p_field` 归一且不被单个地块吞掉（守着一个
+  真实 bug：把 level 1 写成 per-parcel segment softmax 会让每个地块概率恒为 1）、
+  联合等于三级乘积、**熵与链式法则一致**、`forward` 与 `forward_batched` 一致、flat 路径仍可用。
+  全量 **141 项**，仍只有 2 个改动前即存在的失败。
+- **顺带发现（正确的数学行为，已写入注释）**：某一级只有一个可行子节点时该级退化
+  （概率恒 1、梯度为 0）。例如只有 1 块未完成地块时 `p_field ≡ 1`、field head 拿不到梯度。
+  `test_ten_episode_training_smoke` 用的正是 1 地块配置，因此它改断言**整个 actor 的参数**是否
+  更新，而不是盯某个 head。
+- **回滚方法**：`git revert <本提交 SHA>`，或把 `rl.decoder.hierarchical_decoding` 设为 `false`
+  （后者只回滚解码方式，不回滚剩余集合特征与重构）。
+
+### 48. 2-opt 后处理验证：排序空间的那 1.5~3.8 分**完全可以拿到（100% 闭合）** 2-opt 后处理验证：排序空间的那 1.5~3.8 分**完全可以拿到（100% 闭合）**
 - **文件**：修改 `coverage_env/rl/evaluation/order_reference.py`（新增 `policy_order`、
   `local_search`、`--two-opt`）。
 - **做法**：取策略**实际访问的地块顺序**作起点，在「**固定 entry/exit 规则 + 真实环境重放一整局**」

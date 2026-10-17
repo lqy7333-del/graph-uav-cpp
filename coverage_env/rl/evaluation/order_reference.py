@@ -200,14 +200,19 @@ def first_divergence(first, second) -> int:
 
 
 def exhaustive_reference(environment, field_ids):
-    """Return the best/median/worst reward over every permutation of ``field_ids``."""
-    scores = []
+    """Return ``(sorted scores, best order)`` over every permutation.
+
+    The best order is returned alongside so callers that need it (the 2-opt
+    comparison, the rank diagnostic) do not have to enumerate a second time --
+    each enumeration is 120 full environment replays.
+    """
+    pairs = []
     for order in permutations(field_ids):
         value = score_order(environment, order)
         if value is not None:
-            scores.append(value)
-    scores.sort()
-    return scores
+            pairs.append((value, list(order)))
+    pairs.sort(key=lambda pair: pair[0])
+    return [value for value, _order in pairs], (pairs[-1][1] if pairs else None)
 
 
 def _policy_reward(actor, environment) -> float:
@@ -276,7 +281,7 @@ def main() -> None:
             num_fields=args.num_fields, seed=seed, randomize_each_reset=False
         )
         field_ids = [field.field_id for field in environment.fields]
-        scores = exhaustive_reference(environment, field_ids)
+        scores, best_order = exhaustive_reference(environment, field_ids)
         if not scores:
             print(f"{seed:>6}  no feasible order")
             continue
@@ -302,14 +307,6 @@ def main() -> None:
             improved, improved_score = local_search(environment, order)
             gap = scores[-1] - policy
             closed = 0.0 if gap <= 1e-9 else 100.0 * (improved_score - policy) / gap
-            best_order = None
-            best_value = None
-            for candidate_order in permutations(field_ids):
-                value = score_order(environment, candidate_order)
-                if value is None:
-                    continue
-                if best_value is None or value > best_value:
-                    best_value, best_order = value, list(candidate_order)
             tau = kendall_tau(order, best_order) if best_order else 0.0
             divergence = first_divergence(order, best_order) if best_order else 0
             line += (f"{improved_score:>10.2f}{closed:>8.0f}%"

@@ -28,7 +28,11 @@ class PPOTrainingTests(unittest.TestCase):
         actor = CoveragePolicy(environment, config=config)
         agent = PPOAgent(actor, config)
         trainer = Trainer(environment, agent, config=config, max_steps=1)
-        actor_before = copy.deepcopy(actor.action_decoder.network[-1].weight.detach())
+        # Checksum the whole actor rather than one head: this test runs a
+        # single-parcel instance, where the parcel level of the factored decode is
+        # degenerate (one feasible parcel => p=1 => exactly zero gradient), so a
+        # head-specific probe would be testing the wrong thing.
+        actor_before = torch.cat([p.detach().flatten() for p in actor.parameters()]).clone()
         critic_before = copy.deepcopy(agent.critic.network[-1].weight.detach())
 
         history = trainer.train(num_episode=10)
@@ -39,7 +43,8 @@ class PPOTrainingTests(unittest.TestCase):
         self.assertIn("critic_loss", history[-1])
         self.assertTrue(torch.isfinite(torch.tensor(history[-1]["actor_loss"])))
         self.assertTrue(torch.isfinite(torch.tensor(history[-1]["critic_loss"])))
-        self.assertFalse(torch.equal(actor_before, actor.action_decoder.network[-1].weight))
+        actor_after = torch.cat([p.detach().flatten() for p in actor.parameters()])
+        self.assertFalse(torch.allclose(actor_before, actor_after))
         self.assertFalse(torch.equal(critic_before, agent.critic.network[-1].weight))
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
