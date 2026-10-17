@@ -57,6 +57,40 @@ class HierarchicalDecodeTests(unittest.TestCase):
         actual = self.output["action_distribution"]
         self.assertTrue(torch.allclose(actual, expected, atol=1e-6))
 
+    def test_parcel_scores_depend_on_the_edges(self):
+        """A parcel's score must know how good its entry/exit points are.
+
+        The first factored version scored parcels from ``z_F`` alone, so "which
+        parcel next" was decided blind to what it costs to enter it -- the reverse
+        half of the parcel/edge dependency, and the reason that version did not beat
+        the flat decoder. Perturbing the entry slots of ONE parcel must move
+        ``p(field)``; a uniform perturbation could not, because the pooled summary
+        would shift every parcel by the same constant and softmax is shift
+        invariant.
+        """
+        decoder = self.policy.hierarchical_decoder
+        hidden = decoder.hidden_dim
+        actions = self.output["actions"]
+        vectors = self.output["action_input"][:, : 3 * hidden].clone()
+        global_embedding = self.output["global_embedding"]
+        mask = self.output["mask"]
+        graph = self.output["graph"]
+        target = actions[0].field_id
+        indices = torch.tensor(
+            [index for index, action in enumerate(actions)
+             if action.field_id == target], dtype=torch.long,
+        )
+        with torch.no_grad():
+            _, base = decoder(actions, vectors, global_embedding, mask, graph)
+            perturbed = vectors.clone()
+            perturbed[indices, hidden:2 * hidden] *= 3.0
+            _, moved = decoder(
+                actions, perturbed, global_embedding, mask, graph
+            )
+        self.assertFalse(torch.allclose(
+            base["field_probabilities"], moved["field_probabilities"], atol=1e-6
+        ))
+
     def test_entropy_matches_the_chain_rule(self):
         """H(joint) must equal H(F) + H(E|F) + H(X|F,E)."""
         hierarchical = self.output["hierarchical"]

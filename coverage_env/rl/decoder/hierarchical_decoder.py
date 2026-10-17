@@ -62,6 +62,23 @@ def segment_softmax(
     return weights / totals[segments].clamp_min(1e-12)
 
 
+def segment_max(values, segments, mask, num_segments):
+    """Max-pool ``values`` within each segment, ignoring masked entries.
+
+    Used to summarise a parent's children: a parcel is as attractive as its *best*
+    entry/exit pair, not its average one.
+    """
+    filled = values.masked_fill(~mask.unsqueeze(-1), float("-inf"))
+    width = values.shape[1]
+    pooled = torch.full(
+        (num_segments, width), float("-inf"), device=values.device, dtype=values.dtype
+    )
+    pooled = pooled.scatter_reduce(
+        0, segments.unsqueeze(-1).expand(-1, width), filled, reduce="amax"
+    )
+    return torch.where(torch.isinf(pooled), torch.zeros_like(pooled), pooled)
+
+
 def remaining_set_features(
     field_indices: torch.Tensor,
     graph,
@@ -112,10 +129,15 @@ class HierarchicalActionDecoder(nn.Module):
         super().__init__()
         self.hidden_dim = int(hidden_dim)
         head_hidden = int(head_hidden or hidden_dim)
-        # z_F + z_G + remaining-set geometry
-        self.field_head = self._mlp(self.hidden_dim * 2 + remaining_dim, head_hidden)
-        # z_F + z_entry + z_G
-        self.entry_head = self._mlp(self.hidden_dim * 3, head_hidden)
+        # Parcel head sees a pooled summary of that parcel's entry/exit options, so
+        # "which parcel next" knows how good its gate is. Scoring parcels from z_F
+        # alone made the order decision blind to the entry/exit cost -- exactly the
+        # dependency that makes "parcel first, then edge" work.
+        self.child_projection = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
+        # z_F + z_G + remaining-set geometry + pooled child summary
+        self.field_head = self._mlp(self.hidden_dim * 3 + remaining_dim, head_hidden)
+        # z_F + z_entry + z_G + pooled exits available behind this entry
+        self.entry_head = self._mlp(self.hidden_dim * 4, head_hidden)
         # z_F + z_entry + z_exit + z_G
         self.exit_head = self._mlp(self.hidden_dim * 4, head_hidden)
 
@@ -192,11 +214,18 @@ class HierarchicalActionDecoder(nn.Module):
         )
         remaining = remaining_set_features(field_indices, graph)
         field_vectors = z_field[torch.tensor(field_representatives, dtype=torch.long, device=device)]
+        # Parent sees its best child: max-pool the entry/exit slots over this
+        # parcel's feasible candidates. This is the reverse half of the dependency.
+        pooled_children = self.child_projection(torch.cat([
+            segment_max(z_entry, field_segment_tensor, mask, num_fields),
+            segment_max(z_exit, field_segment_tensor, mask, num_fields),
+        ], dim=-1))
         field_logits = self.field_head(
             torch.cat([
                 field_vectors,
                 global_embedding.unsqueeze(0).expand(field_vectors.shape[0], -1),
                 remaining,
+                pooled_children,
             ], dim=-1)
         ).squeeze(-1)
         field_feasible = torch.zeros(num_fields, device=device)
@@ -217,10 +246,14 @@ class HierarchicalActionDecoder(nn.Module):
         entry_representative_tensor = torch.tensor(
             entry_representatives, dtype=torch.long, device=device
         )
+        # An entry is as good as the exits it leads to, so it also sees its own
+        # pooled exit summary.
+        pooled_exits = segment_max(z_exit, entry_segment_tensor, mask, num_entries)
         entry_logits = self.entry_head(torch.cat([
             z_field[entry_representative_tensor],
             z_entry[entry_representative_tensor],
             global_embedding.unsqueeze(0).expand(num_entries, -1),
+            pooled_exits,
         ], dim=-1)).squeeze(-1)
         entry_group_feasible = torch.zeros(num_entries, device=device)
         entry_group_feasible = entry_group_feasible.index_add(
