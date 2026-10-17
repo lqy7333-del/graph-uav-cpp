@@ -180,6 +180,25 @@ def local_search(environment, order, *, rounds=4):
     return best, best_score
 
 
+def kendall_tau(first, second) -> float:
+    """Rank agreement between two orders, in [-1, 1] (1 = identical order)."""
+    position = {value: index for index, value in enumerate(second)}
+    pairs = [(position[a], position[b])
+             for i, a in enumerate(first) for b in first[i + 1:]]
+    concordant = sum(1 for a, b in pairs if a < b)
+    discordant = sum(1 for a, b in pairs if a > b)
+    total = concordant + discordant
+    return (concordant - discordant) / total if total else 0.0
+
+
+def first_divergence(first, second) -> int:
+    """Index of the first position where two orders differ (len when identical)."""
+    for index, (a, b) in enumerate(zip(first, second)):
+        if a != b:
+            return index
+    return min(len(first), len(second))
+
+
 def exhaustive_reference(environment, field_ids):
     """Return the best/median/worst reward over every permutation of ``field_ids``."""
     scores = []
@@ -250,7 +269,7 @@ def main() -> None:
     header = (f"{'seed':>6}{'orders':>8}{'worst':>9}{'median':>9}{'best':>9}"
               f"{'policy':>9}{'nearest':>9}{'gap':>8}{'beats%':>9}")
     if args.two_opt:
-        header += f"{'2opt':>10}{'closed':>9}"
+        header += f"{'2opt':>10}{'closed':>9}{'tau':>8}{'diverge':>8}"
     print(header)
     for seed in args.seeds:
         environment = InstanceGenerator(config).generate(
@@ -283,7 +302,18 @@ def main() -> None:
             improved, improved_score = local_search(environment, order)
             gap = scores[-1] - policy
             closed = 0.0 if gap <= 1e-9 else 100.0 * (improved_score - policy) / gap
-            line += (f"{improved_score:>10.2f}{closed:>8.0f}%")
+            best_order = None
+            best_value = None
+            for candidate_order in permutations(field_ids):
+                value = score_order(environment, candidate_order)
+                if value is None:
+                    continue
+                if best_value is None or value > best_value:
+                    best_value, best_order = value, list(candidate_order)
+            tau = kendall_tau(order, best_order) if best_order else 0.0
+            divergence = first_divergence(order, best_order) if best_order else 0
+            line += (f"{improved_score:>10.2f}{closed:>8.0f}%"
+                     f"{tau:>8.2f}{divergence:>7}")
         print(line)
 
 
