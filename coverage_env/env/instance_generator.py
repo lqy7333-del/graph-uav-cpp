@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from math import cos, pi, sin, sqrt
+from math import ceil, cos, hypot, pi, sin, sqrt
 
 from coverage_env.env.depot import Depot
 from coverage_env.env.environment import CoverageEnvironment
@@ -132,38 +132,166 @@ class InstanceGenerator:
         if min_area <= 0.0 or max_area < min_area:
             raise ValueError("field_generator.field_size area limits are invalid.")
 
-        centers_and_radii: list[tuple[float, float, float]] = []
-        fields = []
-        spacing = float(field_configs.get("min_field_spacing", 0.0))
-        for field_index in range(num_fields):
-            target_area = rng.uniform(min_area, max_area)
-            shape = field_configs["shape"]
-            irregularity = float(shape.get("irregularity", 0.2))
-            radial_max = float(shape.get("radial_max", 1.0 + irregularity))
-            radius_bound = sqrt(max_area) * radial_max * 1.25
-            center = self._sample_center(
-                rng, min_x, min_y, max_x, max_y,
-                radius_bound, spacing, centers_and_radii,
+        layout = dict(field_configs.get("layout") or {})
+        mode = str(layout.get("mode", "scattered"))
+        block_bounds = None
+        if mode == "scattered":
+            fields = self._sample_scattered_fields(
+                rng, num_fields, (min_x, min_y, max_x, max_y),
+                workspace_transformer, min_area, max_area,
             )
-            polygon_xy = self._irregular_polygon_xy(
-                rng, center, target_area, shape
+        elif mode == "contiguous":
+            fields, block_bounds = self._sample_contiguous_fields(
+                rng, num_fields, layout, (min_x, min_y, max_x, max_y),
+                workspace_transformer, min_area, max_area,
             )
-            field = self._field_with_area(
-                f"field-{field_index + 1}", polygon_xy,
-                workspace_transformer, target_area,
-                min_area, max_area,
-            )
-            fields.append(field)
-            centers_and_radii.append((center[0], center[1], radius_bound))
+        else:
+            raise ValueError(f"Unsupported field_generator.layout.mode: {mode!r}.")
 
         depot_position = self._depot_position(
-            rng, fields, workspace
+            rng, fields, workspace, layout=layout, block_bounds=block_bounds
         )
         depot = Depot("depot-1", depot_position)
         uavs = self._build_uavs(rng, randomize_uav=randomize_uav)
 
         resolution = float(field_configs["resolution"]["grid_resolution"])
         return fields, depot, uavs, resolution
+
+    def _sample_scattered_fields(
+        self, rng, num_fields, bounds, transformer, min_area, max_area,
+    ) -> list[Field]:
+        """Place fields uniformly at random over the whole workspace.
+
+        Kept so pre-existing baselines stay reproducible; real farmland looks like
+        :meth:`_sample_contiguous_fields` instead. Draw order (area, then centre)
+        matches the historical implementation so the same seed yields the same
+        instance.
+        """
+        min_x, min_y, max_x, max_y = bounds
+        field_configs = self.config["field_generator"]
+        shape = field_configs["shape"]
+        irregularity = float(shape.get("irregularity", 0.2))
+        radial_max = float(shape.get("radial_max", 1.0 + irregularity))
+        radius_bound = sqrt(max_area) * radial_max * 1.25
+        spacing = float(field_configs.get("min_field_spacing", 0.0))
+        centers_and_radii: list[tuple[float, float, float]] = []
+        fields = []
+        for field_index in range(num_fields):
+            target_area = rng.uniform(min_area, max_area)
+            center = self._sample_center(
+                rng, min_x, min_y, max_x, max_y,
+                radius_bound, spacing, centers_and_radii,
+            )
+            polygon_xy = self._irregular_polygon_xy(rng, center, target_area, shape)
+            field = self._field_with_area(
+                f"field-{field_index + 1}", polygon_xy,
+                transformer, target_area, min_area, max_area,
+            )
+            fields.append(field)
+            centers_and_radii.append((center[0], center[1], radius_bound))
+        return fields
+
+    def _sample_contiguous_fields(
+        self, rng, num_fields, layout, bounds, transformer, min_area, max_area,
+    ) -> list[Field]:
+        """Grow a contiguous parcel pool, then randomly select ``num_fields``.
+
+        Real farmland is a block of neighbouring parcels separated by farm tracks,
+        not fields scattered across kilometres. A larger pool is grown by placing
+        each new parcel tangent to an already-placed one (``gap_m`` apart), and the
+        episode then uses a random subset. That keeps the adjacency while still
+        giving every episode a different instance, and the subset leaves genuine
+        gaps between the chosen parcels -- a farm does not treat every parcel on
+        the same day.
+        """
+        min_x, min_y, max_x, max_y = bounds
+        shape = self.config["field_generator"]["shape"]
+        gap = max(0.0, float(layout.get("gap_m", 15.0)))
+        oversample = max(1.0, float(layout.get("pool_oversample", 1.5)))
+        attempts = max(1, int(layout.get("growth_attempts", 60)))
+        pool_size = max(num_fields, int(ceil(num_fields * oversample)))
+
+        # Each pool entry is (target_area, local_polygon, position, radius).
+        pool: list[tuple[float, list[tuple[float, float]],
+                         tuple[float, float], float]] = []
+        for _ in range(pool_size):
+            target_area = rng.uniform(min_area, max_area)
+            polygon = self._irregular_polygon_xy(rng, (0.0, 0.0), target_area, shape)
+            center, radius = self._polygon_center_and_radius(polygon)
+            local = [(x - center[0], y - center[1]) for x, y in polygon]
+
+            if not pool:
+                position = (0.0, 0.0)
+            else:
+                position = None
+                for _attempt in range(attempts):
+                    _anchor, _polygon, anchor_center, anchor_radius = pool[
+                        rng.randrange(len(pool))
+                    ]
+                    angle = rng.uniform(0.0, 2.0 * pi)
+                    distance = anchor_radius + radius + gap
+                    candidate = (
+                        anchor_center[0] + distance * cos(angle),
+                        anchor_center[1] + distance * sin(angle),
+                    )
+                    if all(
+                        hypot(candidate[0] - other_center[0],
+                              candidate[1] - other_center[1])
+                        >= radius + other_radius + gap
+                        for _area, _poly, other_center, other_radius in pool
+                    ):
+                        position = candidate
+                        break
+                if position is None:
+                    raise RuntimeError(
+                        "Unable to grow a contiguous field block; reduce "
+                        "field_generator.field_size or raise growth_attempts."
+                    )
+            pool.append((target_area, local, position, radius))
+
+        chosen = sorted(rng.sample(range(len(pool)), num_fields))
+        selected = [pool[index] for index in chosen]
+        # Centre the selected block inside the workspace so the depot offset and
+        # the position normalisers behave the same way across instances.
+        mean_x = sum(entry[2][0] for entry in selected) / len(selected)
+        mean_y = sum(entry[2][1] for entry in selected) / len(selected)
+        shift_x = (min_x + max_x) / 2.0 - mean_x
+        shift_y = (min_y + max_y) / 2.0 - mean_y
+
+        fields = []
+        for order, (target_area, local, position, _radius) in enumerate(selected, start=1):
+            moved = [
+                (position[0] + shift_x + x, position[1] + shift_y + y)
+                for x, y in local
+            ]
+            fields.append(self._field_with_area(
+                f"field-{order}", moved, transformer, target_area,
+                min_area, max_area,
+            ))
+        # Bounds in the *shared* local frame. They cannot be read back off the
+        # fields here: each Field still carries its own per-parcel transformer
+        # until the environment installs the shared one, so ``xy_polygon`` would
+        # be centred on each parcel instead of on the block.
+        all_points = [
+            (position[0] + shift_x + x, position[1] + shift_y + y)
+            for _area, local, position, _radius in selected
+            for x, y in local
+        ]
+        block_bounds = (
+            min(point[0] for point in all_points),
+            min(point[1] for point in all_points),
+            max(point[0] for point in all_points),
+            max(point[1] for point in all_points),
+        )
+        return fields, block_bounds
+
+    @staticmethod
+    def _polygon_center_and_radius(points) -> tuple[tuple[float, float], float]:
+        """Return a polygon's vertex-mean centre and farthest-vertex distance."""
+        center_x = sum(point[0] for point in points) / len(points)
+        center_y = sum(point[1] for point in points) / len(points)
+        radius = max(hypot(x - center_x, y - center_y) for x, y in points)
+        return (center_x, center_y), radius
 
     def _build_uavs(self, rng, *, randomize_uav: bool = False) -> list[UAV]:
         """Build ``num_uav`` UAVs, sampling capability ranges when requested."""
@@ -310,7 +438,9 @@ class InstanceGenerator:
             f"[{min_area:.2f}, {max_area:.2f}] m^2."
         )
 
-    def _depot_position(self, rng, fields, workspace):
+    def _depot_position(
+        self, rng, fields, workspace, *, layout=None, block_bounds=None
+    ):
         """Create a configured or random depot in the shared local frame."""
         depot_config = self.config["depot"]
         position = depot_config.get("position")
@@ -319,6 +449,19 @@ class InstanceGenerator:
         depot_type = depot_config.get("type", "random")
         if depot_type != "random":
             raise ValueError(f"Unsupported depot.type: {depot_type!r}.")
+        layout = layout or {}
+        mode = str(layout.get("mode", "scattered"))
+        if mode == "contiguous" and block_bounds is not None:
+            # Farm headquarters: just outside the parcel block, so the commute is a
+            # real but bounded part of the episode instead of dominating it (a
+            # random workspace position reintroduced a multi-kilometre commute).
+            offset = max(0.0, float(layout.get("depot_offset_m", 150.0)))
+            min_bx, min_by, max_bx, max_by = block_bounds
+            sign_x = rng.choice((-1.0, 1.0))
+            sign_y = rng.choice((-1.0, 1.0))
+            edge_x = max_bx if sign_x > 0.0 else min_bx
+            edge_y = max_by if sign_y > 0.0 else min_by
+            return (edge_x + sign_x * offset, edge_y + sign_y * offset)
         latitude = rng.uniform(float(workspace["min_lat"]), float(workspace["max_lat"]))
         longitude = rng.uniform(float(workspace["min_lon"]), float(workspace["max_lon"]))
         return fields[0].coordinate_transformer.to_xy(latitude, longitude)

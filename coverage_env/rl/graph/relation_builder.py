@@ -49,7 +49,7 @@ class RelationFeatureBuilder:
         self,
         d_near: float = 1_500.0,
         global_distance_scale: float | None = None,
-        uav_distance_scale: float = 3_000.0,
+        uav_distance_scale: float = 1_200.0,
     ):
         if d_near <= 0.0:
             raise ValueError("d_near must be positive.")

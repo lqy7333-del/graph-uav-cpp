@@ -21,6 +21,18 @@ field_generator:
     max_vertices: 5
     irregularity: 0.22
   min_field_spacing: 15.0
+  # Field layout. ``contiguous`` grows a pool of neighbouring parcels separated by
+  # ``gap_m`` farm tracks and then randomly selects ``num_fields`` of them, which
+  # is how farmland actually looks: a block of adjacent parcels. The previous
+  # ``scattered`` behaviour spread fields uniformly over the whole workspace, so
+  # 60% of the travelled distance was flying between fields rather than covering
+  # them. ``scattered`` is kept so older baselines stay reproducible.
+  layout:
+    mode: contiguous
+    gap_m: 15.0
+    pool_oversample: 1.5
+    growth_attempts: 60
+    depot_offset_m: 150.0
   resolution:
     grid_resolution: 10.0
 
@@ -112,17 +124,23 @@ rl:
     # MUST match DEFAULT_SCALES["position_scale_m"] in
     # rl/decoder/global_state_encoder.py (guarded by a test); a mismatch would put
     # node centres and the UAV position in different frames.
-    position_scale_m: 1500.0
+    # Re-derived for the contiguous layout: measured over 40 instances the largest
+    # |field centroid| is 641 m (the block now sits compactly around the
+    # workspace centre), so 800 m is the smallest scale with headroom that does
+    # not squash the coordinate channels.
+    position_scale_m: 800.0
     # Scale for the E_BB_inter distance feature (``distance / global_scale``).
     # E_BB_inter only links boundaries closer than ``d_near_m`` (1500 m), so at
     # 10000 the feature could only ever span 0-0.15 -- the same under-scaling
     # that made the coordinate channels useless. 3000 m covers the whole
     # workspace with the ~1500 m neighbourhood inside it.
-    global_distance_scale_m: 3000.0
+    # E_BB_inter only links boundaries closer than d_near_m, so setting this equal
+    # to d_near_m makes the feature span exactly [0, 1] by construction.
+    global_distance_scale_m: 1500.0
     # Scale for the UAV->Field / UAV->Boundary relative offset and distance.
-    # A UAV can be anywhere in the ~2.4 km workspace, so 3000 m keeps the
-    # corner-to-corner case inside [0, 1] without clipping.
-    uav_distance_scale_m: 3000.0
+    # Re-derived for the contiguous layout: measured max UAV->candidate distance is
+    # 902 m, so 1200 m covers it with headroom.
+    uav_distance_scale_m: 1200.0
     d_near_m: 1500.0
     # Normalizers for the UAV capability channels. Each equals the *upper* bound
     # of the matching uav.ranges entry, which is the smallest scale that clips

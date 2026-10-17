@@ -51,14 +51,14 @@ class GraphBuilder:
         self.field_features = FieldFeatureBuilder(
             max_area=float(self.config.get("max_area", 8_000.0)),
             max_perimeter=float(self.config.get("max_perimeter", 500.0)),
-            position_scale_m=float(self.config.get("position_scale_m", 10_000.0)),
+            position_scale_m=float(self.config.get("position_scale_m", 800.0)),
         )
         self.boundary_features = BoundaryFeatureBuilder(
             max_boundary_length=float(self.config.get("max_boundary_length", 200.0)),
-            position_scale_m=float(self.config.get("position_scale_m", 10_000.0)),
+            position_scale_m=float(self.config.get("position_scale_m", 800.0)),
         )
         self.global_features = GlobalFeatureBuilder(
-            position_scale_m=float(self.config.get("position_scale_m", 10_000.0))
+            position_scale_m=float(self.config.get("position_scale_m", 800.0))
         )
         self.uav_features = UavNodeFeatureBuilder(
             max_energy_scale=float(self.config.get("max_energy_scale", 1_800.0)),
@@ -70,7 +70,7 @@ class GraphBuilder:
             d_near=float(self.config.get("d_near_m", 1_500.0)),
             global_distance_scale=self.config.get("global_distance_scale_m"),
             uav_distance_scale=float(
-                self.config.get("uav_distance_scale_m", 3_000.0)
+                self.config.get("uav_distance_scale_m", 1_200.0)
             ),
         )
 

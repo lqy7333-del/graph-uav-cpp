@@ -5,9 +5,62 @@
 
 ---
 
-## 2026-10-16
+## 2026-10-17
 
-### 41. 新增训练后「贪心完整路径规划」可视化工具（固定场景、不同地块数）
+### 42. 场景分布改为「连片农田」：连片生长地块池 + 随机抽取（并重算全部位置尺度）
+- **文件**：修改 `coverage_env/env/instance_generator.py`、
+  `coverage_env/config/default.yaml`、`coverage_env/rl/decoder/global_state_encoder.py`、
+  `coverage_env/rl/graph/graph_builder.py`、`coverage_env/rl/graph/relation_builder.py`、
+  `coverage_env/tests/test_domain_randomization.py`、`test_graph_builder.py`；
+  新增 `coverage_env/tests/test_contiguous_layout.py`。
+- **原因（条目 41 的可视化暴露的问题）**：原生成器在整个工作区**均匀随机撒点**，导致地块
+  又小又散。实测 20 地块：**边界到边界间隙中位 196.7 m**、块区 1328×1359 m、
+  **路程 58.6% 是「飞过去」、只有 41.4% 是覆盖**。这更像 TSP 而不是农业覆盖作业 ——
+  真实农田里相邻地块共用田埂，飞行只占零头。
+- **变更（旧 → 新）**：`field_generator.layout` 新增配置；默认 `mode: contiguous`：
+  1) **连片生长**：第一块放在原点，之后每块都**贴着已放置的某一块**、沿随机方向以
+     `anchor_radius + self_radius + gap_m` 的距离放置；重叠用**外接半径**做廉价判定，
+     失败就换邻居/方向重试（`growth_attempts`）。
+  2) **随机抽取**：池子大小 = `num_fields × pool_oversample`（默认 1.5），再用
+     `rng.sample` 抽出 `num_fields` 块当作本局实例。这样既保留相邻结构，又让每局实例不同，
+     而且抽掉的那部分会留出真实的空档（农场不会每天把每块地都作业一遍）。
+  3) 抽中的地块整体**平移到工作区中心**，并重新顺序编号为 `field-1..N`。
+  4) **depot 放到块区外侧**（`depot_offset_m`，默认 150 m），像农场总部；原来在工作区里
+     随机取点会重新引入多公里通勤。
+  5) `mode: scattered` **完整保留**且能复现旧行为（同样的 RNG 抽取顺序），
+     旧基线仍可复跑。
+- **效果（20 地块，15 实例实测）**：
+
+  | 指标 | scattered（旧） | **contiguous（新）** |
+  | --- | --- | --- |
+  | 边界到边界间隙（中位） | 196.7 m | **33.0 m** |
+  | 块区尺寸 | 1328 × 1359 m | **832 × 723 m** |
+  | depot → 最近地块边缘 | 70 m | **377 m**（块外） |
+  | 路程：飞行 / 覆盖 | 58.6% / 41.4% | **43.5% / 56.5%** |
+
+- **连带必须重算的位置尺度**（测试 `test_position_channels_are_well_scaled` 当场抓到了）：
+  地块挤到 ~800 m 的块里以后，原来的 `position_scale_m=1500` 会把坐标压得过小。
+  按新分布实测重定：`position_scale_m` **1500 → 800**（37 实例最大 |质心| 641 m）、
+  `uav_distance_scale_m` **3000 → 1200**（最大 UAV→候选距离 902 m）、
+  `global_distance_scale_m` **3000 → 1500**（= `d_near_m`，使该特征按构造恰好落在 [0,1]）。
+  `DEFAULT_SCALES.position_scale_m` 同步改 800（有测试守着两者一致）。
+- **测试**：
+  - 新增 `test_contiguous_layout.py` 6 项：地块**相邻**（最近间隙中位 < 80 m 且 > 0）、
+    块区紧凑（20 块 < 1400 m）、`scattered` 仍可复现旧布局、**depot 在块外**、
+    不同种子给出不同实例、地块数与编号正确。
+  - `test_domain_randomization` 里 3 个 patch `_sample_center` 的放置重试测试改为**显式指定
+    scattered 模式**（连片模式不用 `_sample_center`，否则 patch 不生效）。
+  - `test_position_channels_are_well_scaled` 的判据从「坐标均值绝对值」改为
+    「**跨地块的坐标标准差**」—— 块区居中于原点后均值不再有代表性，而真正要看的是
+    坐标通道有没有足够的变化幅度。
+  - 全量 **134 项**，仍只有 2 个改动前即存在的失败。
+- **重要影响**：这是**任务分布的改变**，此前所有 reward 数字（−32.99 / −33.35 / −33.86 /
+  −40.00 / 启发式 −34.50）**全部作废、不可比**，需要重新建立基线与训练。
+  reward 量级也会变化（路程/总面积下降）。
+- **回滚方法**：`git revert <本提交 SHA>`，或把 `field_generator.layout.mode` 设为 `scattered`
+  （后者只回滚分布，不回滚尺度）。
+
+### 41. 新增训练后「贪心完整路径规划」可视化工具（固定场景、不同地块数） 新增训练后「贪心完整路径规划」可视化工具（固定场景、不同地块数）
 - **文件**：新增 `coverage_env/visualization/policy_paths.py`。
 - **用法**：
   ```

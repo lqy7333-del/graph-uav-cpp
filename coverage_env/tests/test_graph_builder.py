@@ -113,13 +113,14 @@ class GraphBuilderTests(unittest.TestCase):
         """
         coordinates = self.graph.x_field[:, 5:7]
         siblings = self.graph.x_field[:, :5]
-        self.assertGreater(float(coordinates.abs().mean()), 0.1)
-        self.assertGreater(
-            float(coordinates.abs().mean()), 0.2 * float(siblings.abs().mean())
-        )
-        # Coordinate channels must actually vary, otherwise "which field is
-        # nearest" is unrepresentable.
-        self.assertGreater(float(coordinates.std(dim=0).min()), 0.01)
+        # Spread, not magnitude: under the contiguous layout the parcel block is
+        # centred on the workspace origin, so a healthy coordinate channel is one
+        # that VARIES across parcels by an amount comparable to the other
+        # geometric features -- not one whose absolute values are large.
+        coordinate_spread = float(coordinates.std(dim=0).min())
+        sibling_spread = float(siblings.std(dim=0).median())
+        self.assertGreater(coordinate_spread, 0.05)
+        self.assertGreater(coordinate_spread, 0.3 * sibling_spread)
         self.assertTrue(torch.all(self.graph.x_boundary[:, 2:4].abs() <= 1.0))
 
     def test_graph_and_global_position_scales_agree(self):

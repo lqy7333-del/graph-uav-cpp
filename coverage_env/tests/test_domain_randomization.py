@@ -33,6 +33,16 @@ class DomainRandomizationTests(unittest.TestCase):
     def setUp(self):
         self.config = load_config(DEFAULT_CONFIG_PATH)
 
+    def _scattered_config(self):
+        """Config pinned to the rejection-sampling layout.
+
+        The placement-retry tests below patch ``_sample_center``, which only the
+        scattered layout uses; the contiguous layout grows parcels instead.
+        """
+        config = load_config(DEFAULT_CONFIG_PATH)
+        config["field_generator"]["layout"] = {"mode": "scattered"}
+        return config
+
     def test_reset_resamples_field_count_geometry_and_uavs(self):
         environment = InstanceGenerator(self.config).generate(seed=1234)
         limits = self.config["environment"]["num_fields"]
@@ -97,6 +107,7 @@ class DomainRandomizationTests(unittest.TestCase):
             self.assertAlmostEqual(reward, expected, places=6)
 
     def test_sample_components_retries_transient_placement_failures(self):
+        self.config = self._scattered_config()
         """A rare crowded-workspace draw must not abort episode resampling.
 
         Field placement is rejection sampling, so resampling on every ``reset()``
@@ -121,6 +132,7 @@ class DomainRandomizationTests(unittest.TestCase):
         self.assertGreater(calls["count"], 2, "no retry happened")
 
     def test_sample_components_gives_up_after_attempts(self):
+        self.config = self._scattered_config()
         generator = InstanceGenerator(self.config)
 
         def always_fails(*_args, **_kwargs):
@@ -133,6 +145,7 @@ class DomainRandomizationTests(unittest.TestCase):
 
     def test_reset_survives_a_transient_placement_failure(self):
         """The whole reset() path (not just sample_components) must recover."""
+        self.config = self._scattered_config()
         environment = InstanceGenerator(self.config).generate(seed=3)
         original = InstanceGenerator._sample_center
         state = {"fail": True}

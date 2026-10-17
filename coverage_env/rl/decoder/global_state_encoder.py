@@ -33,7 +33,7 @@ DEFAULT_SCALES = {
     # same frame to compare "where am I" with "where is this field". 1500 m is the
     # smallest scale that clamps nothing in the ~2400 m workspace, and it lifts the
     # coordinates from the ~0.045 that 10000 m produced to ~0.29.
-    "position_scale_m": 1_500.0,
+    "position_scale_m": 800.0,
     # UAV capability normalizers. Each equals the upper bound of the matching
     # uav.ranges entry: the smallest scale that clips nothing, which maximizes the
     # normalized span. The old 30000/100/20/50 were 1.7-20x too large and squashed
