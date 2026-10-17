@@ -32,7 +32,14 @@ field_generator:
     gap_m: 15.0
     pool_oversample: 1.5
     growth_attempts: 60
-    depot_offset_m: 150.0
+    # Farm headquarters placement. Both the *direction* around the block and the
+    # standoff distance are random, so the commute itself is part of what
+    # generalises across episodes. A fixed bbox corner put the depot 0-435 m from
+    # the nearest parcel (the parcel cluster is irregular, so its bounding box is
+    # much larger than the cluster) and only ever on one of four diagonals.
+    depot_offset_m:
+      min: 50.0
+      max: 400.0
   resolution:
     grid_resolution: 10.0
 

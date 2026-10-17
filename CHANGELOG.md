@@ -7,7 +7,43 @@
 
 ## 2026-10-17
 
-### 42. 场景分布改为「连片农田」：连片生长地块池 + 随机抽取（并重算全部位置尺度）
+### 43. depot 位置按规则泛化（方向 + 距离），并修掉一个坐标系不匹配 bug
+- **文件**：修改 `coverage_env/env/instance_generator.py`、
+  `coverage_env/config/default.yaml`、`coverage_env/tests/test_contiguous_layout.py`。
+- **变更（旧 → 新）**：`field_generator.layout.depot_offset_m` 由标量 `150.0` 改为范围
+  **`{min: 50.0, max: 400.0}`**；`_depot_position` 的连片分支改为：
+  1) 在块区周围抽**任意方向**（`angle ~ U[0, 2π)`）；
+  2) 在该射线上**二分**求「到**最近地块**的距离 = 抽到的 standoff」的点
+     （`standoff ~ U[min, max]`，48 次二分，用逐地块的 shapely 多边形精确判定）；
+  3) 夹到工作区内。
+- **原因（两层）**：
+  1) **规则退化**：原来是把 depot 放在**块区包围盒的角落 + 固定 150 m**，于是只有 4 个对角方向；
+     而地块簇是不规则形状、bbox 远大于簇本身，所以**到最近地块的实际距离在 0~435 m 之间乱跳**，
+     甚至可能落在 bbox 内的空角里。
+  2) **坐标系不匹配 bug（我引入的）**：环境装配时把 **`fields[0].coordinate_transformer`**
+     当作共享坐标系（其原点是 field-1 自己的质心），而我在连片分支里用
+     **工作区坐标系**算块区几何和 depot 位置 —— 两者差一个「工作区中心 → field-1 质心」的平移，
+     使 depot 被整体错位，实测 standoff 变成 0~679 m。原来的 `_depot_position` 用的是
+     `fields[0].coordinate_transformer`，所以旧路径是对的。
+     修法：在工作区坐标系里算完点后**经 WGS84 搬到环境将采用的坐标系**
+     （`transformer.to_latlon` → `fields[0].coordinate_transformer.to_xy`）。
+- **效果（60 局，10 地块，实测到最近地块的距离）**：
+
+  | | 修复前 | **修复后** |
+  | --- | --- | --- |
+  | 距离范围 | 0 ~ 679 m（不可控） | **71 ~ 395 m** |
+  | 落在配置 `[50, 400]` 内 | 51.7% | **100%** |
+  | 方向 | 4 个对角（bbox 角落） | **任意方位角** |
+
+- **测试**：`test_depot_sits_just_outside_the_block` 重写为
+  `test_depot_standoff_and_direction_generalise` —— 对 8 个实例断言**到最近地块的距离落在
+  配置区间内**（±2 m）**且方位角跨度 > 90°**，直接把「按规则泛化」这件事钉住。
+  全量 **134 项**，仍只有 2 个改动前即存在的失败。
+- **影响**：depot 位置变了，**在此之前跑的训练（含 `run_contiguous_layout` 那一次的早期部分）
+  与新分布不可比**，需要重跑。
+- **回滚方法**：`git revert <本提交 SHA>`。
+
+### 42. 场景分布改为「连片农田」：连片生长地块池 + 随机抽取（并重算全部位置尺度） 场景分布改为「连片农田」：连片生长地块池 + 随机抽取（并重算全部位置尺度）
 - **文件**：修改 `coverage_env/env/instance_generator.py`、
   `coverage_env/config/default.yaml`、`coverage_env/rl/decoder/global_state_encoder.py`、
   `coverage_env/rl/graph/graph_builder.py`、`coverage_env/rl/graph/relation_builder.py`、

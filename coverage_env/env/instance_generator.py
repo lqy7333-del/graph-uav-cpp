@@ -134,14 +134,14 @@ class InstanceGenerator:
 
         layout = dict(field_configs.get("layout") or {})
         mode = str(layout.get("mode", "scattered"))
-        block_bounds = None
+        block_parcels = None
         if mode == "scattered":
             fields = self._sample_scattered_fields(
                 rng, num_fields, (min_x, min_y, max_x, max_y),
                 workspace_transformer, min_area, max_area,
             )
         elif mode == "contiguous":
-            fields, block_bounds = self._sample_contiguous_fields(
+            fields, block_parcels = self._sample_contiguous_fields(
                 rng, num_fields, layout, (min_x, min_y, max_x, max_y),
                 workspace_transformer, min_area, max_area,
             )
@@ -149,7 +149,9 @@ class InstanceGenerator:
             raise ValueError(f"Unsupported field_generator.layout.mode: {mode!r}.")
 
         depot_position = self._depot_position(
-            rng, fields, workspace, layout=layout, block_bounds=block_bounds
+            rng, fields, workspace, layout=layout, block_parcels=block_parcels,
+            workspace_bounds=(min_x, min_y, max_x, max_y),
+            transformer=workspace_transformer,
         )
         depot = Depot("depot-1", depot_position)
         uavs = self._build_uavs(rng, randomize_uav=randomize_uav)
@@ -268,22 +270,15 @@ class InstanceGenerator:
                 f"field-{order}", moved, transformer, target_area,
                 min_area, max_area,
             ))
-        # Bounds in the *shared* local frame. They cannot be read back off the
-        # fields here: each Field still carries its own per-parcel transformer
-        # until the environment installs the shared one, so ``xy_polygon`` would
-        # be centred on each parcel instead of on the block.
-        all_points = [
-            (position[0] + shift_x + x, position[1] + shift_y + y)
+        # Per-parcel outlines in the *shared* local frame, used to place the depot.
+        # They cannot be read back off the fields here: each Field still carries its
+        # own per-parcel transformer until the environment installs the shared one,
+        # so ``xy_polygon`` would be centred on each parcel instead of on the block.
+        block_parcels = [
+            [(position[0] + shift_x + x, position[1] + shift_y + y) for x, y in local]
             for _area, local, position, _radius in selected
-            for x, y in local
         ]
-        block_bounds = (
-            min(point[0] for point in all_points),
-            min(point[1] for point in all_points),
-            max(point[0] for point in all_points),
-            max(point[1] for point in all_points),
-        )
-        return fields, block_bounds
+        return fields, block_parcels
 
     @staticmethod
     def _polygon_center_and_radius(points) -> tuple[tuple[float, float], float]:
@@ -439,7 +434,8 @@ class InstanceGenerator:
         )
 
     def _depot_position(
-        self, rng, fields, workspace, *, layout=None, block_bounds=None
+        self, rng, fields, workspace, *, layout=None, block_parcels=None,
+        workspace_bounds=None, transformer=None,
     ):
         """Create a configured or random depot in the shared local frame."""
         depot_config = self.config["depot"]
@@ -451,17 +447,72 @@ class InstanceGenerator:
             raise ValueError(f"Unsupported depot.type: {depot_type!r}.")
         layout = layout or {}
         mode = str(layout.get("mode", "scattered"))
-        if mode == "contiguous" and block_bounds is not None:
-            # Farm headquarters: just outside the parcel block, so the commute is a
-            # real but bounded part of the episode instead of dominating it (a
-            # random workspace position reintroduced a multi-kilometre commute).
-            offset = max(0.0, float(layout.get("depot_offset_m", 150.0)))
-            min_bx, min_by, max_bx, max_by = block_bounds
-            sign_x = rng.choice((-1.0, 1.0))
-            sign_y = rng.choice((-1.0, 1.0))
-            edge_x = max_bx if sign_x > 0.0 else min_bx
-            edge_y = max_by if sign_y > 0.0 else min_by
-            return (edge_x + sign_x * offset, edge_y + sign_y * offset)
+        if mode == "contiguous" and block_parcels:
+            # Farm headquarters. Rules, in order:
+            #   1. pick any direction around the block (not one of four corners);
+            #   2. sit STANDOFF metres beyond the block's actual extent *in that
+            #      direction*, measured as the support function of the parcel
+            #      vertices -- using the bounding box instead let the depot land
+            #      anywhere from touching a parcel to 435 m away, because the
+            #      cluster is far smaller than its box;
+            #   3. stay inside the workspace so the position normalisers hold.
+            limits = layout.get("depot_offset_m", {"min": 50.0, "max": 400.0})
+            if isinstance(limits, dict):
+                low = float(limits.get("min", 50.0))
+                high = float(limits.get("max", 400.0))
+            else:
+                low = high = float(limits)
+            low, high = min(low, high), max(low, high)
+            flat = [point for parcel in block_parcels for point in parcel]
+            centre_x = sum(point[0] for point in flat) / len(flat)
+            centre_y = sum(point[1] for point in flat) / len(flat)
+            angle = rng.uniform(0.0, 2.0 * pi)
+            direction_x, direction_y = cos(angle), sin(angle)
+            standoff = rng.uniform(low, high) if high > low else low
+            # Bisect along the ray for the point whose distance to the NEAREST
+            # parcel equals the sampled standoff. Using the support function
+            # instead only guaranteed the standoff in the sampled direction, so the
+            # nearest parcel could still be touching the depot (measured 0 m) or
+            # several hundred metres away (measured 679 m).
+            from shapely.geometry import Point
+            from shapely.geometry import Polygon as ShapelyPolygon
+
+            parcels = [ShapelyPolygon(parcel) for parcel in block_parcels]
+            farthest = max(
+                hypot(point[0] - centre_x, point[1] - centre_y) for point in flat
+            )
+
+            def nearest_distance(distance: float) -> float:
+                probe = Point(
+                    centre_x + direction_x * distance,
+                    centre_y + direction_y * distance,
+                )
+                return min(parcel.distance(probe) for parcel in parcels)
+
+            lower, upper = 0.0, farthest + high + 200.0
+            for _ in range(48):
+                middle = (lower + upper) / 2.0
+                if nearest_distance(middle) < standoff:
+                    lower = middle
+                else:
+                    upper = middle
+            distance = upper
+            position_x = centre_x + direction_x * distance
+            position_y = centre_y + direction_y * distance
+            if workspace_bounds is not None:
+                min_x, min_y, max_x, max_y = workspace_bounds
+                position_x = min(max(position_x, min_x + 10.0), max_x - 10.0)
+                position_y = min(max(position_y, min_y + 10.0), max_y - 10.0)
+            # The block geometry above lives in the *workspace* frame, but the
+            # environment installs ``fields[0].coordinate_transformer`` as the
+            # shared frame (whose origin is field-1's own centroid), so the point
+            # must be carried across via WGS84. Skipping this shifted the depot by
+            # the workspace-centre-to-field-1 offset and made its true standoff
+            # range from 0 to ~680 m instead of the sampled value.
+            if transformer is not None and fields:
+                latitude, longitude = transformer.to_latlon(position_x, position_y)
+                return fields[0].coordinate_transformer.to_xy(latitude, longitude)
+            return (position_x, position_y)
         latitude = rng.uniform(float(workspace["min_lat"]), float(workspace["max_lat"]))
         longitude = rng.uniform(float(workspace["min_lon"]), float(workspace["max_lon"]))
         return fields[0].coordinate_transformer.to_xy(latitude, longitude)

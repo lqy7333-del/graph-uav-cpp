@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import unittest
 
+from math import atan2, degrees
+
 import numpy as np
+from shapely.geometry import Point
 
 from coverage_env.config import DEFAULT_CONFIG_PATH, load_config
 from coverage_env.env.instance_generator import InstanceGenerator
@@ -77,17 +80,41 @@ class ContiguousLayoutTests(unittest.TestCase):
         )
         self.assertGreater(float(np.median(_edge_gaps(environment))), 100.0)
 
-    def test_depot_sits_just_outside_the_block(self):
-        """A farm headquarters, not a random spot in the workspace."""
-        environment = self._generate(num_fields=10, seed=7005)
-        depot_x, depot_y = environment.depot.get_position()
-        xs = [point[0] for field in environment.fields
-              for point in field.xy_polygon.exterior.coords]
-        ys = [point[1] for field in environment.fields
-              for point in field.xy_polygon.exterior.coords]
-        outside_x = abs(depot_x) > max(abs(min(xs)), abs(max(xs)))
-        outside_y = abs(depot_y) > max(abs(min(ys)), abs(max(ys)))
-        self.assertTrue(outside_x and outside_y, "depot must be outside the block")
+    def test_depot_standoff_and_direction_generalise(self):
+        """A farm headquarters: outside the block, standoff inside its range.
+
+        Both the distance to the farm and the side it sits on must vary across
+        episodes. Measuring the distance to the *nearest parcel* is what matters:
+        an earlier version placed the depot at a fixed bounding-box corner, which
+        on an irregular cluster landed anywhere from touching a parcel to ~680 m
+        away, and a frame mismatch (the environment adopts fields[0]'s own
+        transformer) shifted it by the workspace-to-field-1 offset.
+        """
+        layout = self.config["field_generator"]["layout"]
+        low = float(layout["depot_offset_m"]["min"])
+        high = float(layout["depot_offset_m"]["max"])
+        standoffs, angles = [], []
+        for seed in range(8):
+            environment = self._generate(num_fields=10, seed=7005 + seed)
+            depot = Point(*environment.depot.get_position())
+            standoffs.append(
+                min(field.xy_polygon.distance(depot) for field in environment.fields)
+            )
+            xs = [point[0] for field in environment.fields
+                  for point in field.xy_polygon.exterior.coords]
+            ys = [point[1] for field in environment.fields
+                  for point in field.xy_polygon.exterior.coords]
+            angles.append(degrees(atan2(
+                depot.y - (min(ys) + max(ys)) / 2.0,
+                depot.x - (min(xs) + max(xs)) / 2.0,
+            )))
+        for value in standoffs:
+            self.assertGreaterEqual(value, low - 2.0)
+            self.assertLessEqual(value, high + 2.0)
+        self.assertGreater(
+            max(angles) - min(angles), 90.0,
+            f"depot direction does not generalise: {angles}",
+        )
 
     def test_random_subset_gives_different_instances(self):
         """Two seeds must not produce the same parcel block."""
