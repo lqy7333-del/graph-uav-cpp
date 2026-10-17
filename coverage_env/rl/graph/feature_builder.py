@@ -101,6 +101,9 @@ class UavNodeFeatureBuilder:
         max_payload_scale: float = 60.0,
         speed_scale: float = 10.0,
         coverage_width_scale: float = 12.0,
+        alpha_scale: float = 0.10,
+        beta_scale: float = 0.024,
+        payload_per_area_scale: float = 0.004,
     ) -> None:
         if min(
             max_energy_scale, max_payload_scale, speed_scale, coverage_width_scale
@@ -110,9 +113,12 @@ class UavNodeFeatureBuilder:
         self.max_payload_scale = float(max_payload_scale)
         self.speed_scale = float(speed_scale)
         self.coverage_width_scale = float(coverage_width_scale)
+        self.alpha_scale = float(alpha_scale)
+        self.beta_scale = float(beta_scale)
+        self.payload_per_area_scale = float(payload_per_area_scale)
 
     def build(self, environment) -> torch.Tensor:
-        """Return ``[1, 6]``: ``[energy_ratio, payload_ratio, speed, width, E_max, Q_max]``."""
+        """Return ``[1, 9]``: state, capability, and consumption-rate channels."""
         if not environment.uavs:
             raise ValueError("Cannot build a UAV node without a UAV in the environment.")
         uav = environment.uavs[0]
@@ -136,6 +142,10 @@ class UavNodeFeatureBuilder:
             norm(getattr(uav, "coverage_width", 0.0), self.coverage_width_scale),
             norm(max_energy, self.max_energy_scale),
             norm(max_payload, self.max_payload_scale),
+            norm(getattr(uav, "alpha", 0.0), self.alpha_scale),
+            norm(getattr(uav, "beta", 0.0), self.beta_scale),
+            norm(getattr(uav, "payload_per_area", 0.0),
+                 self.payload_per_area_scale),
         ]], dtype=torch.float32)
 
 

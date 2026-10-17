@@ -81,6 +81,13 @@ uav:
     beta:
       min: 0.016
       max: 0.024
+    # Payload spent per square metre of coverage, i.e. how much area one payload
+    # can treat. The fixed 0.003 let a 40-60 payload unit UAV cover ~5 parcels;
+    # randomising it over 0.002-0.004 doubles that range so the agent has to adapt
+    # its ordering to how far its payload actually reaches.
+    payload_per_area:
+      min: 0.002
+      max: 0.004
 
 coverage:
   default_workload: 0.45
@@ -160,6 +167,13 @@ rl:
     max_payload_scale: 60.0
     speed_scale: 10.0
     coverage_width_scale: 12.0
+    # Capability normalisers for the consumption rates, matched to the uav.ranges
+    # upper bounds so the channels span roughly [0.5, 1]. These rates were already
+    # randomised per episode but were NOT part of any observation, so the agent
+    # could not see how fast it burns energy or payload.
+    alpha_scale: 0.10
+    beta_scale: 0.024
+    payload_per_area_scale: 0.004
   encoder:
     hidden_dim: 128
     num_heads: 4

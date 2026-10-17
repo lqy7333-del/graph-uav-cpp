@@ -73,7 +73,7 @@ class CoveragePolicy(nn.Module):
         # embeddings are position- and count-invariant, so without it neither the
         # critic nor the actor can see where the fields are relative to the depot.
         self.global_state_encoder = GlobalStateEncoder(
-            graph_dim=2 * hidden_dim, uav_dim=10, depot_dim=2, site_dim=12,
+            graph_dim=2 * hidden_dim, uav_dim=13, depot_dim=2, site_dim=12,
             hidden_dim=hidden_dim,
         )
         # Candidate Field/Boundary embeddings now carry static metric coordinates;

@@ -321,7 +321,10 @@ class InstanceGenerator:
                         )),
                     },
                     max_payload=None if max_payload is None else float(max_payload),
-                    payload_per_area=float(uav_config.get("payload_per_area", 0.0)),
+                    payload_per_area=float(self._sample_range(
+                        rng, ranges.get("payload_per_area"),
+                        uav_config.get("payload_per_area", 0.0),
+                    )),
                 )
             )
         return uavs

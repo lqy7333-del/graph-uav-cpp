@@ -50,7 +50,7 @@ class UavGraphNodeTests(unittest.TestCase):
         boundary_count = graph.x_boundary.shape[0]
         self.assertEqual(graph.relation_counts[EDGE_UF], field_count)
         self.assertEqual(graph.relation_counts[EDGE_UB], boundary_count)
-        self.assertEqual(graph.x_uav_node.shape, (1, 6))
+        self.assertEqual(graph.x_uav_node.shape, (1, 9))
 
     def test_uav_edge_distance_channel_is_well_scaled(self):
         """Guard the under-scaling failure mode: distances must span [0, 1]."""
@@ -169,6 +169,33 @@ class UavGraphNodeTests(unittest.TestCase):
             self.assertAlmostEqual(
                 float(graph_config[key]), float(DEFAULT_SCALES[key]), places=6
             )
+
+    def test_consumption_rates_are_observable(self):
+        """alpha/beta/payload_per_area are randomised per episode, so they must be
+        visible. Before this they were neither in ``x_uav`` nor in the UAV node, so
+        the agent could not see how fast it burns energy or payload."""
+        environment = InstanceGenerator(self.config).generate(seed=42)
+        rates = []
+        for _ in range(12):
+            environment.reset()
+            uav = environment.uavs[0]
+            node = self.builder.build_graph(environment).x_uav_node[0]
+            rates.append((uav.alpha, uav.beta, uav.payload_per_area))
+            graph_scale = self.config["rl"]["graph"]
+            self.assertAlmostEqual(
+                float(node[6]), uav.alpha / float(graph_scale["alpha_scale"]), places=5
+            )
+            self.assertAlmostEqual(
+                float(node[7]), uav.beta / float(graph_scale["beta_scale"]), places=5
+            )
+            self.assertAlmostEqual(
+                float(node[8]),
+                uav.payload_per_area / float(graph_scale["payload_per_area_scale"]),
+                places=5,
+            )
+        values = torch.tensor(rates)
+        self.assertGreater(float(values.std(dim=0).min()), 1e-4)
+        self.assertGreater(float(values[:, 2].std()), 1e-4)
 
     def test_capability_channels_are_not_squashed(self):
         """Across randomised episodes the capability channels must span a real band."""

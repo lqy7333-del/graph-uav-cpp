@@ -7,7 +7,43 @@
 
 ## 2026-10-17
 
-### 44. 新分布（连片农田 + 规则化 depot）上的首个基线：**策略在三种地块数上都超过启发式**
+### 45. UAV 泛化补全：`payload_per_area` 随机化 + 三个消耗率参数变成**可观测**
+- **文件**：修改 `coverage_env/config/default.yaml`、
+  `coverage_env/env/instance_generator.py`、`coverage_env/env/environment.py`、
+  `coverage_env/rl/decoder/global_state_encoder.py`、
+  `coverage_env/rl/decoder/action_decoder.py`、`coverage_env/rl/graph/feature_builder.py`、
+  `coverage_env/rl/graph/graph_builder.py`、`coverage_env/rl/encoder/feature_embedding.py`、
+  `coverage_env/rl/encoder/hetero_encoder.py`、
+  `coverage_env/tests/test_global_context_and_role_embedding.py`、`test_graph_builder.py`、
+  `test_uav_graph_node.py`。
+- **发现的核心缺口**：`alpha` / `beta`（单位里程/单位面积的能耗与载荷消耗率）**每局都在随机化，
+  但完全没有进入任何观测** —— 既不在 `x_uav` 10 维里，也不在 UAV 图节点 6 维里。
+  也就是说 agent **看不见自己烧电/烧载有多快**，泛化变成了不可适应的噪声。
+- **变更（旧 → 新）**：
+  1) 新增 `uav.ranges.payload_per_area`（**0.002–0.004**）。这个参数决定「一份载荷能覆盖多少面积」
+     （`payload = payload_per_area × area`），原来固定 0.003，等于把载荷续航固定了。
+  2) **可观测化**：`x_uav` **10 → 13** 维、UAV 图节点特征 **6 → 9** 维，两者都追加
+     `[alpha, beta, payload_per_area]`（按 `alpha_scale=0.10` / `beta_scale=0.024` /
+     `payload_per_area_scale=0.004` 归一化，均取对应 range 上界）。
+  3) `GlobalStateEncoder.uav_dim` 10 → **13**；`CoverageGraphEncoder.uav_input_dim` 6 → **9**。
+- **测试当场抓到一个真 bug**：`get_state()` 里**没有 `payload_per_area`**，于是
+  「UAV 对象」和「state 字典」两个来源算出的特征不一致（`test_uav_rollout_...` /
+  `test_rollout_encoding_is_unchanged` 失败）。这会**破坏 replay 一致性** ——
+  PPO 重放时用 state 重建特征，拿到的 `payload_per_area` 会是 0。
+  已在 `get_state()` 里补齐。
+- **有意不动两项（并说明理由）**：
+  - `sensor_width`：全仓只有存储与构造，**没有任何行为使用**（死配置），随机化它没有意义；
+  - `energy_margin`：只被 **nearest-neighbor 基线**使用，不参与 RL 环境；随机化它只会让
+    参照基线本身变化，不利于对比。
+  - `num_uav` 仍为 1：动作空间 `CoverageAction(field, entry, exit)` 无法寻址多个 UAV，
+    多机是另一个量级的改动。
+- **测试**：新增 `test_consumption_rates_are_observable`（12 局：节点的第 6/7/8 维必须等于
+  `alpha/beta/payload_per_area` 的归一化值，且三者确实每局变化）；更新 3 处维度断言。
+  全量 **135 项**，仍只有 2 个改动前即存在的失败。
+- **影响**：`x_uav` / UAV 节点 / critic 输入维度全变，**旧 checkpoint 不兼容，需从头训练**。
+- **回滚方法**：`git revert <本提交 SHA>`。
+
+### 44. 新分布（连片农田 + 规则化 depot）上的首个基线：**策略在三种地块数上都超过启发式** 新分布（连片农田 + 规则化 depot）上的首个基线：**策略在三种地块数上都超过启发式**
 - **运行**：`run_contiguous_v2/`，100 轮 from scratch（`seed 42`、地块 5~20、4 卡 DDP、
   exit 0、4 rank checksum 一致 = 1061.751273）。
 - **训练日志（25 轮 block 均值）**：reward **−28.66 → −25.67**，`entropy` 4.172 → 3.479，

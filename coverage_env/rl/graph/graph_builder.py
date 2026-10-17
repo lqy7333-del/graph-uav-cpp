@@ -65,6 +65,11 @@ class GraphBuilder:
             max_payload_scale=float(self.config.get("max_payload_scale", 60.0)),
             speed_scale=float(self.config.get("speed_scale", 10.0)),
             coverage_width_scale=float(self.config.get("coverage_width_scale", 12.0)),
+            alpha_scale=float(self.config.get("alpha_scale", 0.10)),
+            beta_scale=float(self.config.get("beta_scale", 0.024)),
+            payload_per_area_scale=float(
+                self.config.get("payload_per_area_scale", 0.004)
+            ),
         )
         self.relation_features = RelationFeatureBuilder(
             d_near=float(self.config.get("d_near_m", 1_500.0)),

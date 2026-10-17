@@ -43,6 +43,9 @@ DEFAULT_SCALES = {
     "max_payload_scale": 60.0,
     "speed_scale": 10.0,
     "coverage_width_scale": 12.0,
+    "alpha_scale": 0.10,
+    "beta_scale": 0.024,
+    "payload_per_area_scale": 0.004,
     # Site-layout scales. The episode reward is path length per unit covered
     # area, so it depends on *where the fields are* relative to the depot and to
     # each other; these bound the matching normalized layout features.
@@ -73,6 +76,9 @@ def _uav_fields(uav_source) -> dict:
         coverage_width = float(uav_source.get("coverage_width", 0.0))
         remaining_energy = float(uav_source.get("remaining_energy", 0.0))
         remaining_payload = float(uav_source.get("remaining_payload", max_payload))
+        alpha = float(uav_source.get("alpha", 0.0))
+        beta = float(uav_source.get("beta", 0.0))
+        payload_per_area = float(uav_source.get("payload_per_area", 0.0))
     else:
         position = getattr(uav_source, "current_position", None) or (0.0, 0.0)
         max_energy = float(getattr(uav_source, "max_energy", 0.0))
@@ -81,6 +87,9 @@ def _uav_fields(uav_source) -> dict:
         coverage_width = float(getattr(uav_source, "coverage_width", 0.0))
         remaining_energy = float(getattr(uav_source, "remaining_energy", 0.0))
         remaining_payload = float(getattr(uav_source, "remaining_payload", max_payload))
+        alpha = float(getattr(uav_source, "alpha", 0.0))
+        beta = float(getattr(uav_source, "beta", 0.0))
+        payload_per_area = float(getattr(uav_source, "payload_per_area", 0.0))
     energy_ratio = remaining_energy / max_energy if max_energy > 0.0 else 0.0
     payload_ratio = remaining_payload / max_payload if max_payload > 0.0 else 0.0
     return {
@@ -93,6 +102,9 @@ def _uav_fields(uav_source) -> dict:
         "remaining_payload": remaining_payload,
         "energy_ratio": energy_ratio,
         "payload_ratio": payload_ratio,
+        "alpha": alpha,
+        "beta": beta,
+        "payload_per_area": payload_per_area,
     }
 
 
@@ -100,7 +112,8 @@ def build_uav_feature(uav_source, scales=None) -> torch.Tensor:
     """Return the 10-dim ``x_UAV`` feature vector.
 
     Order: ``[E_max, Q_max, speed, coverage_width, x_u, y_u,
-    E_remaining, Q_remaining, energy_ratio, payload_ratio]``.
+    E_remaining, Q_remaining, energy_ratio, payload_ratio,
+    alpha, beta, payload_per_area]``.
     ``E_remaining``/``Q_remaining`` are normalized by their global scales so
     they carry an *absolute* budget, while the trailing ratios carry the
     *fraction of own capacity* remaining.
@@ -120,6 +133,11 @@ def build_uav_feature(uav_source, scales=None) -> torch.Tensor:
             _norm(fields["remaining_payload"], scales["max_payload_scale"]),
             _clamp(fields["energy_ratio"]),
             _clamp(fields["payload_ratio"]),
+            # Consumption rates. They are randomised per episode, so they must be
+            # observable or the agent cannot adapt its ordering to them.
+            _norm(fields["alpha"], scales["alpha_scale"]),
+            _norm(fields["beta"], scales["beta_scale"]),
+            _norm(fields["payload_per_area"], scales["payload_per_area_scale"]),
         ],
         dtype=torch.float32,
     )

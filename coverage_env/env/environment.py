@@ -311,6 +311,10 @@ class CoverageEnvironment(FieldEnvironment):
             state["distance"] = state["total_distance"]
             state["alpha"] = uav.alpha
             state["beta"] = uav.beta
+            # Must be mirrored here: the UAV feature vector includes it, and replay
+            # rebuilds that vector from the stored state, so omitting it silently
+            # made the rollout and replay encodings disagree.
+            state["payload_per_area"] = uav.payload_per_area
             state["coverage_width"] = uav.coverage_width
             uav_states[uav.uav_id] = state
         return {

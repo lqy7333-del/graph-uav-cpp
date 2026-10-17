@@ -133,7 +133,7 @@ class CoverageGraphEncoder(nn.Module):
         dropout: float = 0.0,
         field_input_dim: int = 7,
         boundary_input_dim: int = 4,
-        uav_input_dim: int = 6,
+        uav_input_dim: int = 9,
         relation_input_dim: int = 4,
     ) -> None:
         super().__init__()
