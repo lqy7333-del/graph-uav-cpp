@@ -273,13 +273,11 @@ def main() -> None:
     config = load_config(DEFAULT_CONFIG_PATH)
     if args.checkpoint:
         from coverage_env.rl.decoder.hierarchical_decoder import (
-            checkpoint_uses_hierarchical,
+            checkpoint_decoder_flags,
         )
 
         saved = torch.load(args.checkpoint, map_location="cpu")
-        config["rl"]["decoder"]["hierarchical_decoding"] = checkpoint_uses_hierarchical(
-            saved["actor"]
-        )
+        config["rl"]["decoder"].update(checkpoint_decoder_flags(saved["actor"]))
     header = (f"{'seed':>6}{'orders':>8}{'worst':>9}{'median':>9}{'best':>9}"
               f"{'policy':>9}{'nearest':>9}{'gap':>8}{'beats%':>9}")
     if args.two_opt:

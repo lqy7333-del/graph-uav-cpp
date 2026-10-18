@@ -136,13 +136,11 @@ def build_traces(checkpoint, field_counts, *, actor_seed=0):
     config = load_config(DEFAULT_CONFIG_PATH)
     if checkpoint is not None:
         from coverage_env.rl.decoder.hierarchical_decoder import (
-            checkpoint_uses_hierarchical,
+            checkpoint_decoder_flags,
         )
 
         saved = torch.load(checkpoint, map_location="cpu")
-        config["rl"]["decoder"]["hierarchical_decoding"] = checkpoint_uses_hierarchical(
-            saved["actor"]
-        )
+        config["rl"]["decoder"].update(checkpoint_decoder_flags(saved["actor"]))
     scenarios = {}
     for num_fields in field_counts:
         seed = BASE_SEED + num_fields

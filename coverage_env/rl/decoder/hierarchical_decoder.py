@@ -383,3 +383,22 @@ def checkpoint_uses_hierarchical(state_dict) -> bool:
     instead of relying on a flag somebody has to remember.
     """
     return any(str(key).startswith("hierarchical_decoder.") for key in state_dict)
+
+
+def checkpoint_decoder_flags(state_dict) -> dict:
+    """Infer which decoder switches a saved actor state dict was trained with.
+
+    Checkpoints record parameter names only, so loading a run into the wrong
+    variant fails with a wall of shape/key errors. Every evaluation tool must call
+    this before building the policy -- two separate runs were silently evaluated
+    with the wrong flags before this existed.
+    """
+    keys = [str(key) for key in state_dict]
+    hierarchical = any(key.startswith("hierarchical_decoder.") for key in keys)
+    return {
+        "hierarchical_decoding": hierarchical,
+        "candidate_attention": any(
+            key.startswith("hierarchical_decoder.candidate_encoder.")
+            for key in keys
+        ),
+    }

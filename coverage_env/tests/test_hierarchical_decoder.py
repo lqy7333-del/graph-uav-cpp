@@ -14,6 +14,7 @@ import torch
 from coverage_env.config import DEFAULT_CONFIG_PATH, load_config
 from coverage_env.env.instance_generator import InstanceGenerator
 from coverage_env.rl.decoder.action_decoder import CoveragePolicy
+from coverage_env.rl.decoder.hierarchical_decoder import checkpoint_decoder_flags
 
 
 class HierarchicalDecodeTests(unittest.TestCase):
@@ -235,6 +236,26 @@ class HierarchicalDecodeTests(unittest.TestCase):
                 if parameter.grad is None
             ]
             self.assertEqual(unused, [], f"hierarchical={hierarchical}: {unused}")
+
+    def test_checkpoint_flags_round_trip(self):
+        """Every variant must be recoverable from its own state dict.
+
+        Two evaluation runs were silently scored against the wrong decoder before
+        this detection existed, so each combination is pinned here.
+        """
+        for hierarchical, attention in ((True, True), (True, False), (False, False)):
+            config = load_config(DEFAULT_CONFIG_PATH)
+            config["rl"]["decoder"].update({
+                "hierarchical_decoding": hierarchical,
+                "candidate_attention": attention,
+            })
+            policy = CoveragePolicy(self.environment, config=config)
+            flags = checkpoint_decoder_flags(policy.state_dict())
+            self.assertEqual(flags["hierarchical_decoding"], hierarchical)
+            if hierarchical:
+                self.assertEqual(flags["candidate_attention"], attention)
+            else:
+                self.assertFalse(flags["candidate_attention"])
 
     def test_flat_decoder_still_available(self):
         config = load_config(DEFAULT_CONFIG_PATH)
