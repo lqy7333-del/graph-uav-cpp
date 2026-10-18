@@ -199,3 +199,40 @@ class AdvantageConfigTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EntropyAnnealingTests(unittest.TestCase):
+    """The entropy bonus must be held, then decayed, and off when unset.
+
+    A constant bonus left the policy at 3.41 nats of entropy after 400 updates
+    (77% of the log(84)=4.43 uniform maximum), so the policy being *evaluated*
+    greedily was far ahead of the policy being sampled -- and the advantage that
+    ordering has to come through was dominated by exploration noise.
+    """
+
+    def setUp(self):
+        self.config = load_config(DEFAULT_CONFIG_PATH)
+        # `num_fields` must agree with the configured sampling range, so build the
+        # instance after widening the range to a single parcel.
+        self.config["environment"]["num_fields"] = {"min": 1, "max": 1}
+        self.environment = InstanceGenerator(self.config).generate(
+            num_fields=1, seed=7
+        )
+
+    def _agent(self, **overrides):
+        config = load_config(DEFAULT_CONFIG_PATH)
+        config["ppo"].update(overrides)
+        return PPOAgent(CoveragePolicy(self.environment, config=config), config)
+
+    def test_schedule_holds_then_decays_to_zero(self):
+        agent = self._agent(
+            entropy_coef=0.01, entropy_coef_end=0.0, entropy_anneal_start=0.25
+        )
+        self.assertAlmostEqual(agent.set_entropy_progress(0.0), 0.01)
+        self.assertAlmostEqual(agent.set_entropy_progress(0.25), 0.01)
+        self.assertAlmostEqual(agent.set_entropy_progress(0.625), 0.005)
+        self.assertAlmostEqual(agent.set_entropy_progress(1.0), 0.0)
+
+    def test_disabled_when_end_is_unset(self):
+        agent = self._agent(entropy_coef=0.01, entropy_coef_end=None)
+        self.assertAlmostEqual(agent.set_entropy_progress(1.0), 0.01)

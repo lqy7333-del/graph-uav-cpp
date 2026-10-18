@@ -211,6 +211,15 @@ ppo:
   gae_lambda: 0.95
   clip_ratio: 0.2
   entropy_coef: 0.01
+  # Linear annealing of the entropy bonus: held at `entropy_coef` for the first
+  # `entropy_anneal_start` of the run, then decayed to `entropy_coef_end`.
+  # Measured motivation: with a constant 0.01 the policy sat at 3.41 nats of
+  # entropy after 400 updates, i.e. 77% of the log(84)=4.43 uniform maximum. That
+  # both depresses the sampled reward it is logged with and floods the advantage
+  # with exploration noise, which is the signal ordering has to come through.
+  # Set `entropy_coef_end` to null to disable annealing.
+  entropy_coef_end: 0.0
+  entropy_anneal_start: 0.25
   value_coef: 0.5
   epochs: 4
   batch_size: 64

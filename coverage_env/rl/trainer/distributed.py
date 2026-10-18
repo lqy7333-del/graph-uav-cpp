@@ -132,6 +132,11 @@ class DistributedTrainer:
             # in training mode here for DDP to register its reduce hooks.
             self.agent.actor.train()
             self.agent.critic.train()
+            # Advance entropy annealing before the update so the logged value is
+            # the one actually used.
+            current_entropy_coef = self.agent.set_entropy_progress(
+                (update_idx - 1) / max(1, num_updates - 1)
+            )
             stats = self.agent.update(self.buffer)
             self.buffer.clear()
 
@@ -148,6 +153,7 @@ class DistributedTrainer:
                     "update": update_idx,
                     "reward": round(rollout_reward, 4),
                     "actor_loss": round(stats["actor_loss"], 6),
+                    "entropy_coef": round(float(current_entropy_coef), 6),
                     "critic_loss": round(stats["critic_loss"], 6),
                     "coverage_ratio": round(summary["coverage_ratio"], 4),
                     "total_distance": round(summary["total_distance"], 1),

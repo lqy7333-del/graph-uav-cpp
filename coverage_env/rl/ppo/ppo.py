@@ -82,6 +82,18 @@ class PPOAgent:
         self.epochs = int(self.config.get("epochs", 4))
         self.batch_size = int(self.config.get("batch_size", 64))
         self.max_grad_norm = float(self.config.get("max_grad_norm", 0.5))
+        # Entropy annealing. A constant bonus kept the policy at ~77% of maximum
+        # entropy after 400 updates (3.41 nats against log(84)=4.43), which costs
+        # reward on the sampled actions it is evaluated with and, worse, floods the
+        # advantage with exploration noise -- the ordering signal is only ~2 points
+        # against an episode standard deviation of ~2.6.
+        self.entropy_coef = float(self.config.get("entropy_coef", 0.01))
+        self.entropy_coef_start = self.entropy_coef
+        end = self.config.get("entropy_coef_end", None)
+        self.entropy_coef_end = None if end is None else float(end)
+        self.entropy_anneal_start = float(
+            self.config.get("entropy_anneal_start", 0.25)
+        )
         # NOTE: `max_grad_norm` only *rescales* the gradient, and Adam is
         # invariant to a uniform gradient rescale (verified), so clipping does
         # not limit the step size. Do not read `grad_norm == max_grad_norm` as
@@ -116,6 +128,24 @@ class PPOAgent:
         value = self.critic(critic_input).reshape(()).item()
         self.actor.train(was_training)
         return float(value)
+
+    def set_entropy_progress(self, fraction: float) -> float:
+        """Anneal the entropy bonus over the run; return the current coefficient.
+
+        ``fraction`` is the run progress in ``[0, 1]``. The coefficient is held at
+        its start value for ``entropy_anneal_start`` of the run and then decays
+        linearly to ``entropy_coef_end``, keeping early exploration while letting
+        the policy sharpen instead of staying near-uniform.
+        """
+        if self.entropy_coef_end is None:
+            return self.entropy_coef
+        fraction = min(1.0, max(0.0, float(fraction)))
+        hold = min(1.0, max(0.0, self.entropy_anneal_start))
+        scale = 1.0 if fraction <= hold else 1.0 - (fraction - hold) / max(1e-9, 1.0 - hold)
+        self.entropy_coef = self.entropy_coef_end + (
+            self.entropy_coef_start - self.entropy_coef_end
+        ) * scale
+        return self.entropy_coef
 
     def update(self, buffer: RolloutBuffer, *, batched: bool = False) -> dict:
         """Run clipped PPO policy and value updates on the collected rollout.
