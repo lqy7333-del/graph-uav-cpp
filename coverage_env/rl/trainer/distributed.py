@@ -248,6 +248,8 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
     torch.cuda.set_device(rank)
 
     config = load_config()
+    if getattr(args, "set", None):
+        config = _apply_overrides(config, args.set)
     # A fixed count pins the configured range; otherwise the environment draws
     # from [min, max] and resamples fields + UAV parameters on every reset.
     if args.num_fields is not None:
@@ -296,6 +298,26 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
     dist.destroy_process_group()
 
 
+def _apply_overrides(config: dict, overrides) -> dict:
+    """Apply ``key.path=value`` overrides to a loaded config in place."""
+    import json
+
+    for item in overrides:
+        if "=" not in item:
+            raise SystemExit(f"--set expects KEY=VALUE, got {item!r}")
+        key, raw = item.split("=", 1)
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError:
+            value = raw
+        node = config
+        parts = key.strip().split(".")
+        for part in parts[:-1]:
+            node = node.setdefault(part, {})
+        node[parts[-1]] = value
+    return config
+
+
 def main() -> None:
     """Parse arguments and launch one process per GPU."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -316,6 +338,14 @@ def main() -> None:
     )
     parser.add_argument("--checkpoint-dir", type=str, default="coverage_env/results/checkpoints")
     parser.add_argument("--checkpoint-every", type=int, default=50)
+    parser.add_argument(
+        "--set", action="append", default=[], metavar="KEY=VALUE",
+        help="Override one config value, e.g. "
+             "--set rl.decoder.candidate_attention=false. Repeatable; values are "
+             "parsed as JSON when possible (so true/false/null/0.0 work). This "
+             "keeps experiments from having to edit default.yaml, which is how two "
+             "runs previously ended up differing in ways nobody remembered.",
+    )
     parser.add_argument(
         "--resume", type=str, default=None,
         help="Checkpoint file to resume from; training continues at the next "
