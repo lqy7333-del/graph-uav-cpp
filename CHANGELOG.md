@@ -5,9 +5,35 @@
 
 ---
 
-## 2026-10-17
+## 2026-10-18
 
-### 53. 子节点摘要生效：**每一项排序指标都变好**，但幅度有限
+### 54. 方向 1：候选集合自注意力（跨候选交互）
+- **文件**：修改 `coverage_env/rl/decoder/hierarchical_decoder.py`、
+  `coverage_env/rl/decoder/action_decoder.py`、`coverage_env/config/default.yaml`、
+  `coverage_env/tests/test_hierarchical_decoder.py`。
+- **针对的诊断（`docs/ordering_diagnosis.md` §3.3）**：打分是**逐点**的
+  `score_i = f(context_i)`，候选之间**没有任何交互**，唯一共享的信息是池化的 `z_G`
+  （对所有候选完全相同）。而排序是**集合级**选择 —— 「去 A 而不是 B」需要把 A、B 放进
+  同一个比较上下文里。这是「信息不缺、训练不缺，缺比较机制」这一诊断的直接对症改动。
+- **变更**：
+  1) 新增 `CandidateSetAttention`：把候选向量 `[z_F, z_entry, z_exit]`（3H）投影到 H，
+     做**一轮多头自注意力**（`nn.MultiheadAttention`，4 头，`key_padding_mask=~mask`），
+     残差 + LayerNorm 得到每个候选的**上下文向量**。被掩码的候选恒为零向量，
+     避免不可行动作通过注意力泄漏显得有信息量。
+  2) 该上下文注入三级 head：entry/exit head 直接用自己那一行；地块 head 用
+     **该地块所有候选的 max-pool**（与子节点摘要同样的池化方式）。
+  3) 配置开关 `rl.decoder.candidate_attention`（默认 `true`）+ `attention_heads`。
+     关闭时**所有 head 的输入维度不变**，是一个干净的 A/B 开关。
+- **关键测试（直接钉住这条性质）**：
+  - `test_candidate_scores_depend_on_other_candidates`：扰动**一个地块**的候选，
+    要求**另一个地块**的候选概率变化。两者处于**不同的 segment-softmax 组**，
+    所以变化不可能来自共享的分母，只能来自跨候选注意力。
+  - `test_flag_off_restores_pointwise_scoring`：关闭开关后，同样的扰动**不得**影响
+    另一个地块的候选 —— 确认开关能干净回退到旧行为。
+- **测试**：全量 **145 项**，仍只有 2 个改动前即存在的失败。
+- **回滚方法**：`git revert <本提交 SHA>`，或把 `rl.decoder.candidate_attention` 设为 `false`。
+
+### 53. 子节点摘要生效：**每一项排序指标都变好**，但幅度有限 子节点摘要生效：**每一项排序指标都变好**，但幅度有限
 - **运行**：`run_hier_v5`（100 轮）+ `order_hier_v5`（10 实例 × 120 顺序 × 2-opt）。
 - **10 实例顺序参照（同轮次对照）**：
 

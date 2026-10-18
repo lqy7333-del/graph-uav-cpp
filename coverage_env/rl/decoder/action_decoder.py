@@ -96,7 +96,11 @@ class CoveragePolicy(nn.Module):
             else ActionDecoder(decoder_input_dim, hidden_dim)
         )
         self.hierarchical_decoder = (
-            HierarchicalActionDecoder(hidden_dim=hidden_dim)
+            HierarchicalActionDecoder(
+                hidden_dim=hidden_dim,
+                candidate_attention=bool(decoder_config.get("candidate_attention", True)),
+                attention_heads=int(decoder_config.get("attention_heads", 4)),
+            )
             if self.hierarchical_decoding else None
         )
 

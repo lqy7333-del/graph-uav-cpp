@@ -111,6 +111,48 @@ def remaining_set_features(
     )
 
 
+class CandidateSetAttention(nn.Module):
+    """One round of multi-head self-attention over the candidate set.
+
+    Scores are otherwise pointwise: each candidate's context is scored on its own,
+    so a candidate cannot know how it compares to the alternatives. Ordering is a
+    *set-level* choice ("go to A rather than B"), so each candidate is allowed to
+    attend over the whole feasible set and mix that into its context.
+
+    This is the structural answer to "the decoder has candidates but no way to
+    compare them": the only cross-candidate signal before this was the pooled
+    global embedding, which is identical for every candidate.
+    """
+
+    def __init__(self, hidden_dim: int = 128, num_heads: int = 4,
+                 dropout: float = 0.0) -> None:
+        super().__init__()
+        self.hidden_dim = int(hidden_dim)
+        self.norm = nn.LayerNorm(self.hidden_dim)
+        self.projection = nn.Linear(3 * self.hidden_dim, self.hidden_dim)
+        self.attention = nn.MultiheadAttention(
+            self.hidden_dim, num_heads, dropout=dropout, batch_first=True
+        )
+        self.output = nn.Linear(self.hidden_dim, self.hidden_dim)
+
+    def forward(self, action_vectors: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        """Return ``[C, H]`` contextual candidate vectors (masked rows are zero)."""
+        if action_vectors.shape[0] == 0:
+            return action_vectors.new_zeros((0, self.hidden_dim))
+        projected = self.projection(action_vectors)
+        padding = ~mask
+        if bool(padding.all()):
+            return action_vectors.new_zeros((action_vectors.shape[0], self.hidden_dim))
+        attended, _ = self.attention(
+            projected.unsqueeze(0), projected.unsqueeze(0), projected.unsqueeze(0),
+            key_padding_mask=padding.unsqueeze(0), need_weights=False,
+        )
+        mixed = self.output(attended.squeeze(0))
+        # Masked candidates never take part, so keep their row at zero rather than
+        # letting attention leakage make an infeasible action look informative.
+        return self.norm(projected + mixed) * mask.unsqueeze(-1).to(projected.dtype)
+
+
 class HierarchicalActionDecoder(nn.Module):
     """Score ``p(field)``, ``p(entry | field)`` and ``p(exit | field, entry)``.
 
@@ -125,21 +167,37 @@ class HierarchicalActionDecoder(nn.Module):
         *,
         remaining_dim: int = REMAINING_FEATURE_DIM,
         head_hidden: int | None = None,
+        candidate_attention: bool = False,
+        attention_heads: int = 4,
     ) -> None:
         super().__init__()
         self.hidden_dim = int(hidden_dim)
         head_hidden = int(head_hidden or hidden_dim)
+        # Optional cross-candidate interaction; disabled keeps every head's input
+        # dim unchanged so the flag is a clean A/B switch.
+        self.candidate_attention = bool(candidate_attention)
+        self.candidate_encoder = (
+            CandidateSetAttention(self.hidden_dim, attention_heads)
+            if self.candidate_attention else None
+        )
+        contextual_dim = self.hidden_dim if self.candidate_attention else 0
         # Parcel head sees a pooled summary of that parcel's entry/exit options, so
         # "which parcel next" knows how good its gate is. Scoring parcels from z_F
         # alone made the order decision blind to the entry/exit cost -- exactly the
         # dependency that makes "parcel first, then edge" work.
         self.child_projection = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
-        # z_F + z_G + remaining-set geometry + pooled child summary
-        self.field_head = self._mlp(self.hidden_dim * 3 + remaining_dim, head_hidden)
-        # z_F + z_entry + z_G + pooled exits available behind this entry
-        self.entry_head = self._mlp(self.hidden_dim * 4, head_hidden)
-        # z_F + z_entry + z_exit + z_G
-        self.exit_head = self._mlp(self.hidden_dim * 4, head_hidden)
+        # z_F + z_G + remaining-set geometry + pooled child summary (+ set context)
+        self.field_head = self._mlp(
+            self.hidden_dim * 3 + remaining_dim + contextual_dim, head_hidden
+        )
+        # z_F + z_entry + z_G + pooled exits (+ candidate's set context)
+        self.entry_head = self._mlp(
+            self.hidden_dim * 4 + contextual_dim, head_hidden
+        )
+        # z_F + z_entry + z_exit + z_G (+ candidate's set context)
+        self.exit_head = self._mlp(
+            self.hidden_dim * 4 + contextual_dim, head_hidden
+        )
 
     @staticmethod
     def _mlp(input_dim: int, hidden_dim: int) -> nn.Sequential:
@@ -204,6 +262,16 @@ class HierarchicalActionDecoder(nn.Module):
         z_field = action_vectors[:, :hidden]
         z_entry = action_vectors[:, hidden:2 * hidden]
         z_exit = action_vectors[:, 2 * hidden:]
+        # Cross-candidate interaction: every candidate may look at all the others.
+        set_context = (
+            self.candidate_encoder(action_vectors, mask)
+            if self.candidate_encoder is not None else None
+        )
+
+        def with_context(parts):
+            if set_context is None:
+                return torch.cat(parts, dim=-1)
+            return torch.cat(list(parts) + [set_context], dim=-1)
         context = global_embedding.unsqueeze(0).expand(action_vectors.shape[0], -1)
 
         # Level 1: parcels. A parcel is feasible when any of its variants is.
@@ -220,14 +288,19 @@ class HierarchicalActionDecoder(nn.Module):
             segment_max(z_entry, field_segment_tensor, mask, num_fields),
             segment_max(z_exit, field_segment_tensor, mask, num_fields),
         ], dim=-1))
-        field_logits = self.field_head(
-            torch.cat([
-                field_vectors,
-                global_embedding.unsqueeze(0).expand(field_vectors.shape[0], -1),
-                remaining,
-                pooled_children,
-            ], dim=-1)
-        ).squeeze(-1)
+        field_parts = [
+            field_vectors,
+            global_embedding.unsqueeze(0).expand(field_vectors.shape[0], -1),
+            remaining,
+            pooled_children,
+        ]
+        if set_context is not None:
+            # The parcel-level view of the candidate set: best contextual row per
+            # parcel, mirroring the child summary's max-pool.
+            field_parts.append(
+                segment_max(set_context, field_segment_tensor, mask, num_fields)
+            )
+        field_logits = self.field_head(torch.cat(field_parts, dim=-1)).squeeze(-1)
         field_feasible = torch.zeros(num_fields, device=device)
         field_feasible = field_feasible.index_add(
             0, field_segment_tensor, mask.to(field_feasible.dtype)
@@ -249,12 +322,19 @@ class HierarchicalActionDecoder(nn.Module):
         # An entry is as good as the exits it leads to, so it also sees its own
         # pooled exit summary.
         pooled_exits = segment_max(z_exit, entry_segment_tensor, mask, num_entries)
-        entry_logits = self.entry_head(torch.cat([
+        entry_parts = [
             z_field[entry_representative_tensor],
             z_entry[entry_representative_tensor],
             global_embedding.unsqueeze(0).expand(num_entries, -1),
             pooled_exits,
-        ], dim=-1)).squeeze(-1)
+        ]
+        if set_context is not None:
+            entry_parts.append(
+                segment_max(set_context, entry_segment_tensor, mask, num_entries)
+            )
+        entry_logits = self.entry_head(
+            torch.cat(entry_parts, dim=-1)
+        ).squeeze(-1)
         entry_group_feasible = torch.zeros(num_entries, device=device)
         entry_group_feasible = entry_group_feasible.index_add(
             0, entry_segment_tensor, mask.to(entry_group_feasible.dtype)
@@ -268,8 +348,11 @@ class HierarchicalActionDecoder(nn.Module):
         entry_probabilities = entry_group_probabilities[entry_segment_tensor]
 
         # Level 3: exit boundary, conditioned on (parcel, entry).
+        exit_parts = [z_field, z_entry, z_exit, context]
+        if set_context is not None:
+            exit_parts.append(set_context)
         exit_logits = self.exit_head(
-            torch.cat([z_field, z_entry, z_exit, context], dim=-1)
+            torch.cat(exit_parts, dim=-1)
         ).squeeze(-1)
         exit_probabilities = segment_softmax(
             exit_logits, entry_segment_tensor, mask, num_entries

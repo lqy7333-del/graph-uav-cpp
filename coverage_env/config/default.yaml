@@ -182,6 +182,11 @@ rl:
   # distribution and its entropy exact, so PPO and entropy_coef are unchanged.
   decoder:
     hierarchical_decoding: true
+    # Cross-candidate interaction: one round of self-attention over the candidate
+    # set, so a candidate can be scored knowing what the alternatives are. Without
+    # it the only signal shared across candidates is the pooled global vector.
+    candidate_attention: true
+    attention_heads: 4
   encoder:
     hidden_dim: 128
     num_heads: 4

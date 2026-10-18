@@ -57,6 +57,78 @@ class HierarchicalDecodeTests(unittest.TestCase):
         actual = self.output["action_distribution"]
         self.assertTrue(torch.allclose(actual, expected, atol=1e-6))
 
+    def _different_field_pair(self, actions):
+        """Return two candidate indices from different parcels."""
+        first = 0
+        for index, action in enumerate(actions):
+            if action.field_id != actions[first].field_id:
+                return first, index
+        return None
+
+    def test_candidate_scores_depend_on_other_candidates(self):
+        """Direction 1: a candidate must be scored knowing the alternatives.
+
+        Scores used to be pointwise, so the only signal shared across candidates was
+        the pooled global vector. Here we perturb ONE candidate and require another
+        parcel's candidate probability to move. The two indices are in different
+        segment-softmax groups, so the change cannot come from a shared denominator
+        -- it has to come from cross-candidate attention.
+        """
+        decoder = self.policy.hierarchical_decoder
+        if not decoder.candidate_attention:
+            self.skipTest("cross-candidate attention is disabled")
+        hidden = decoder.hidden_dim
+        actions = self.output["actions"]
+        pair = self._different_field_pair(actions)
+        self.assertIsNotNone(pair, "need two parcels to test cross-candidate effects")
+        source, target = pair
+        vectors = self.output["action_input"][:, : 3 * hidden].clone()
+        with torch.no_grad():
+            _, base = decoder(
+                actions, vectors, self.output["global_embedding"],
+                self.output["mask"], self.output["graph"],
+            )
+            perturbed = vectors.clone()
+            perturbed[source] += 1.0
+            _, moved = decoder(
+                actions, perturbed, self.output["global_embedding"],
+                self.output["mask"], self.output["graph"],
+            )
+        self.assertFalse(torch.allclose(
+            base["exit_probabilities"][target],
+            moved["exit_probabilities"][target],
+        ), "another parcel's candidate should have been affected")
+
+    def test_flag_off_restores_pointwise_scoring(self):
+        """The switch must cleanly restore the previous behaviour for A/B."""
+        config = load_config(DEFAULT_CONFIG_PATH)
+        config["rl"]["decoder"]["candidate_attention"] = False
+        policy = CoveragePolicy(self.environment, config=config)
+        policy.eval()
+        decoder = policy.hierarchical_decoder
+        self.assertFalse(decoder.candidate_attention)
+        with torch.no_grad():
+            output = policy(self.state, environment=self.environment)
+        hidden = decoder.hidden_dim
+        actions = output["actions"]
+        source, target = self._different_field_pair(actions)
+        vectors = output["action_input"][:, : 3 * hidden].clone()
+        with torch.no_grad():
+            _, base = decoder(
+                actions, vectors, output["global_embedding"], output["mask"],
+                output["graph"],
+            )
+            perturbed = vectors.clone()
+            perturbed[source] += 1.0
+            _, moved = decoder(
+                actions, perturbed, output["global_embedding"], output["mask"],
+                output["graph"],
+            )
+        self.assertTrue(torch.allclose(
+            base["exit_probabilities"][target],
+            moved["exit_probabilities"][target],
+        ), "without attention a pointwise score must not see other candidates")
+
     def test_parcel_scores_depend_on_the_edges(self):
         """A parcel's score must know how good its entry/exit points are.
 
