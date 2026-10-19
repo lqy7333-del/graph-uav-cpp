@@ -77,7 +77,6 @@ class PPOAgent:
         self.gamma = float(self.config.get("gamma", 0.99))
         self.gae_lambda = float(self.config.get("gae_lambda", 0.95))
         self.clip_ratio = float(self.config.get("clip_ratio", 0.2))
-        self.entropy_coef = float(self.config.get("entropy_coef", 0.01))
         self.value_coef = float(self.config.get("value_coef", 0.5))
         self.epochs = int(self.config.get("epochs", 4))
         self.batch_size = int(self.config.get("batch_size", 64))
@@ -94,6 +93,14 @@ class PPOAgent:
         self.entropy_anneal_start = float(
             self.config.get("entropy_anneal_start", 0.25)
         )
+        # Learning-rate decay. A constant rate keeps injecting gradient noise, so a
+        # long run never comes to rest; decaying it lets the policy settle. The
+        # factor is driven by the same run-progress fraction as the entropy bonus,
+        # so it stretches automatically when `--num-updates` grows.
+        self.lr_schedule = str(self.config.get("lr_schedule", "none")).lower()
+        self.lr_final_scale = float(self.config.get("lr_final_scale", 0.1))
+        self.actor_lr_start = float(actor_learning_rate)
+        self.critic_lr_start = float(critic_learning_rate)
         # NOTE: `max_grad_norm` only *rescales* the gradient, and Adam is
         # invariant to a uniform gradient rescale (verified), so clipping does
         # not limit the step size. Do not read `grad_norm == max_grad_norm` as
@@ -146,6 +153,37 @@ class PPOAgent:
             self.entropy_coef_start - self.entropy_coef_end
         ) * scale
         return self.entropy_coef
+
+    def _set_learning_rate_progress(self, fraction: float):
+        """Decay both optimisers' learning rates; return the actor's current rate."""
+        if self.lr_schedule not in {"linear", "cosine"}:
+            return self.actor_lr_start
+        import math
+
+        fraction = min(1.0, max(0.0, float(fraction)))
+        if self.lr_schedule == "cosine":
+            factor = 0.5 * (1.0 + math.cos(math.pi * fraction))
+        else:
+            factor = 1.0 - fraction
+        scale = self.lr_final_scale + (1.0 - self.lr_final_scale) * factor
+        for group in self.actor_optimizer.param_groups:
+            group["lr"] = self.actor_lr_start * scale
+        for group in self.critic_optimizer.param_groups:
+            group["lr"] = self.critic_lr_start * scale
+        return self.actor_lr_start * scale
+
+    def set_training_progress(self, fraction: float) -> dict:
+        """Advance every schedule tied to run progress.
+
+        The entropy bonus and the learning rate are the two "temperature-like"
+        knobs in this setup: the first sharpens the policy's own distribution, the
+        second shrinks the step size. Both are driven by one progress fraction so
+        they stay aligned and automatically stretch for longer runs.
+        """
+        return {
+            "entropy_coef": self.set_entropy_progress(fraction),
+            "actor_learning_rate": self._set_learning_rate_progress(fraction),
+        }
 
     def update(self, buffer: RolloutBuffer, *, batched: bool = False) -> dict:
         """Run clipped PPO policy and value updates on the collected rollout.

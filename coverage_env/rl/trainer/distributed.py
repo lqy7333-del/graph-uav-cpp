@@ -177,9 +177,10 @@ class DistributedTrainer:
             self.agent.critic.train()
             # Advance entropy annealing before the update so the logged value is
             # the one actually used.
-            current_entropy_coef = self.agent.set_entropy_progress(
+            progress = self.agent.set_training_progress(
                 (update_idx - 1) / max(1, num_updates - 1)
             )
+            current_entropy_coef = progress["entropy_coef"]
             stats = self.agent.update(self.buffer)
             self.buffer.clear()
 
@@ -198,6 +199,9 @@ class DistributedTrainer:
                     "actor_loss": round(stats["actor_loss"], 6),
                     "shaped_reward": round(shaped_rollout_reward, 4),
                     "entropy_coef": round(float(current_entropy_coef), 6),
+                    "actor_learning_rate": round(
+                        float(progress["actor_learning_rate"]), 8
+                    ),
                     "critic_loss": round(stats["critic_loss"], 6),
                     "coverage_ratio": round(summary["coverage_ratio"], 4),
                     "total_distance": round(summary["total_distance"], 1),

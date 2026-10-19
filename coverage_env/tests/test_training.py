@@ -236,3 +236,51 @@ class EntropyAnnealingTests(unittest.TestCase):
     def test_disabled_when_end_is_unset(self):
         agent = self._agent(entropy_coef=0.01, entropy_coef_end=None)
         self.assertAlmostEqual(agent.set_entropy_progress(1.0), 0.01)
+
+
+class LearningRateScheduleTests(unittest.TestCase):
+    """Second "temperature-like" knob: the step size, decayed over the run.
+
+    The entropy bonus sharpens the policy's distribution; the learning rate shrinks
+    the update step. A constant rate keeps injecting noise, so a long run never
+    comes to rest -- which is why long runs want a decay.
+    """
+
+    def setUp(self):
+        self.config = load_config(DEFAULT_CONFIG_PATH)
+        self.config["environment"]["num_fields"] = {"min": 1, "max": 1}
+        self.environment = InstanceGenerator(self.config).generate(
+            num_fields=1, seed=7
+        )
+
+    def _agent(self, **overrides):
+        config = load_config(DEFAULT_CONFIG_PATH)
+        config["environment"]["num_fields"] = {"min": 1, "max": 1}
+        config["ppo"].update(overrides)
+        return PPOAgent(CoveragePolicy(self.environment, config=config), config)
+
+    def test_cosine_decays_both_optimisers_to_the_final_scale(self):
+        agent = self._agent(lr_schedule="cosine", lr_final_scale=0.1)
+        start = agent.set_training_progress(0.0)["actor_learning_rate"]
+        self.assertAlmostEqual(start, 3e-4)
+        middle = agent.set_training_progress(0.5)["actor_learning_rate"]
+        self.assertAlmostEqual(middle, 3e-4 * 0.55, places=9)
+        end = agent.set_training_progress(1.0)["actor_learning_rate"]
+        self.assertAlmostEqual(end, 3e-5, places=9)
+        # The critic decays by the same factor from its own (10x) starting rate.
+        self.assertAlmostEqual(agent.critic_optimizer.param_groups[0]["lr"], 3e-4,
+                               places=9)
+
+    def test_linear_decays_monotonically(self):
+        agent = self._agent(lr_schedule="linear", lr_final_scale=0.0)
+        rates = [agent.set_training_progress(f)["actor_learning_rate"]
+                 for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
+        self.assertEqual(rates, sorted(rates, reverse=True))
+        self.assertAlmostEqual(rates[0], 3e-4)
+        self.assertAlmostEqual(rates[-1], 0.0, places=12)
+
+    def test_none_keeps_the_configured_rate(self):
+        agent = self._agent(lr_schedule="none")
+        agent.set_training_progress(1.0)
+        self.assertAlmostEqual(agent.actor_optimizer.param_groups[0]["lr"], 3e-4)
+        self.assertAlmostEqual(agent.critic_optimizer.param_groups[0]["lr"], 3e-3)
