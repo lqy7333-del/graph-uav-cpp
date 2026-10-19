@@ -192,6 +192,17 @@ rl:
     num_heads: 4
     dropout: 0.1
 
+# Potential-based reward shaping for the ordering sub-problem: `r' = r +
+# gamma*Phi(s') - Phi(s)` with `Phi(s) = -strength * remaining_tour_length(s) /
+# total_area`. Phi is 0 once every parcel is covered, so the shaped return differs
+# from the true one by the constant `-Phi(s_0)` and the optimal policy is
+# unchanged (Ng et al. 1999). Only the learning dynamics change: the ordering
+# signal becomes a per-step quantity instead of a difference of distant returns.
+# Evaluation always uses the raw environment reward, so results stay comparable.
+shaping:
+  enable: false
+  strength: 1.0
+
 ppo:
   learning_rate: 0.0003
   # Each optimizer gets its own rate. Adam moves a parameter by roughly lr per

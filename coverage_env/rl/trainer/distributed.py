@@ -42,9 +42,13 @@ class DistributedTrainer:
     """Collect a fixed-length rollout per rank, then one synchronized PPO update."""
 
     def __init__(self, environment, agent, *, rank: int = 0, world_size: int = 1,
-                 checkpoint_dir=None, checkpoint_every: int = 50) -> None:
+                 checkpoint_dir=None, checkpoint_every: int = 50,
+                 config: dict | None = None) -> None:
         self.environment = environment
         self.agent = agent
+        # Full experiment config; the single-process Trainer stores the same thing.
+        # Read defensively (tests build this class without a config).
+        self.config = config or {}
         self.rank = int(rank)
         self.world_size = int(world_size)
         self.buffer = RolloutBuffer()
@@ -57,6 +61,18 @@ class DistributedTrainer:
         ``start_update`` lets a resumed run continue at the next update index
         while still using the same absolute target (``num_updates``).
         """
+        shaping_config = (self.config or {}).get("shaping") or {}
+        shaping_enable = bool(shaping_config.get("enable", False))
+        shaping_strength = float(shaping_config.get("strength", 1.0))
+        if shaping_enable:
+            from coverage_env.rl.shaping import potential
+
+            potential_before_step = potential(
+                self.environment, shaping_strength, self.environment.total_area
+            )
+        else:
+            potential_before_step = 0.0
+
         for update_idx in range(max(1, start_update), num_updates + 1):
             # Sampling is stochastic and must not feed the autograd graph.
             self.agent.actor.eval()
@@ -68,6 +84,7 @@ class DistributedTrainer:
             # label each with the episode's own field count so the log can show
             # a trend and compare magnitudes across field counts.
             episode_reward = 0.0
+            shaped_rollout_reward = 0.0
             completed_rewards: list[float] = []
             completed_fields: list[int] = []
 
@@ -85,6 +102,25 @@ class DistributedTrainer:
                     value = self.agent.value_from_output(output)
 
                 next_state, reward, env_done, _info = self.environment.step(action)
+                # Potential-based shaping (see coverage_env/rl/shaping.py). The
+                # policy learns from `learning_reward`; everything logged as
+                # `reward` stays raw so runs remain comparable and evaluation is
+                # unaffected.
+                if shaping_enable:
+                    from coverage_env.rl.shaping import potential, shaped_reward
+
+                    potential_after_step = potential(
+                        self.environment, shaping_strength,
+                        self.environment.total_area,
+                    )
+                    learning_reward = shaped_reward(
+                        reward, potential_before_step, potential_after_step,
+                        self.agent.gamma,
+                    )
+                else:
+                    potential_after_step = 0.0
+                    learning_reward = reward
+                shaped_rollout_reward += float(learning_reward)
                 rollout_reward += float(reward)
                 episode_reward += float(reward)
                 if env_done:
@@ -116,7 +152,7 @@ class DistributedTrainer:
                         "mask": output["mask"].detach().cpu().tolist(),
                     },
                     action,
-                    reward,
+                    learning_reward,
                     {
                         "observation": deepcopy(next_state),
                         "graph": _clone_graph(next_graph),
@@ -127,6 +163,13 @@ class DistributedTrainer:
                     next_value,
                 )
                 state = self.environment.reset() if env_done else next_state
+                if shaping_enable:
+                    from coverage_env.rl.shaping import potential
+
+                    potential_before_step = potential(
+                        self.environment, shaping_strength,
+                        self.environment.total_area,
+                    ) if env_done else potential_after_step
 
             # Gradients are synchronized during backward, so the model must be
             # in training mode here for DDP to register its reduce hooks.
@@ -153,6 +196,7 @@ class DistributedTrainer:
                     "update": update_idx,
                     "reward": round(rollout_reward, 4),
                     "actor_loss": round(stats["actor_loss"], 6),
+                    "shaped_reward": round(shaped_rollout_reward, 4),
                     "entropy_coef": round(float(current_entropy_coef), 6),
                     "critic_loss": round(stats["critic_loss"], 6),
                     "coverage_ratio": round(summary["coverage_ratio"], 4),
@@ -286,6 +330,7 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
     trainer = DistributedTrainer(
         environment, agent, rank=rank, world_size=world_size,
         checkpoint_dir=args.checkpoint_dir, checkpoint_every=args.checkpoint_every,
+        config=config,
     )
     trainer.train(args.num_updates, args.rollout_steps, start_update=start_update)
 
