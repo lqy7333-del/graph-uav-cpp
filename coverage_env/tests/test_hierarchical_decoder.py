@@ -281,12 +281,13 @@ class HierarchicalDecodeTests(unittest.TestCase):
                 "field_representatives": [0, 1],
             },
         }
+        # Explicit opt-in: only the ordering metric uses this decode.
         self.assertEqual(
-            CoveragePolicy.greedy_action(output).field_id, "field-A"
+            CoveragePolicy.greedy_action(output, hierarchical=True).field_id, "field-A"
         )
+        # Default stays the joint argmax, which is what deployment uses.
         self.assertEqual(
-            CoveragePolicy.greedy_action(output, hierarchical=False).field_id,
-            "field-B",
+            CoveragePolicy.greedy_action(output).field_id, "field-B"
         )
 
     def test_greedy_falls_back_without_factored_extras(self):
@@ -319,7 +320,7 @@ class HierarchicalDecodeTests(unittest.TestCase):
                 "field_representatives": [0, 2],
             },
         }
-        chosen = CoveragePolicy.greedy_action(output)
+        chosen = CoveragePolicy.greedy_action(output, hierarchical=True)
         self.assertEqual(chosen.field_id, "field-A")
         self.assertEqual(chosen.entry_boundary_id, "B0")
 

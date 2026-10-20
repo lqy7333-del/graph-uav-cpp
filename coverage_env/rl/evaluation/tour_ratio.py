@@ -124,7 +124,9 @@ def policy_visit_order(actor, environment) -> list[str]:
             distribution = output["action_distribution"]
             if distribution.numel() == 0 or float(distribution.detach().sum()) <= 0:
                 break
-            action = CoveragePolicy.greedy_action(output)
+            # This metric isolates the *order*, so it deliberately decodes the
+            # parcel from the field head alone and ignores how good its gate is.
+            action = CoveragePolicy.greedy_action(output, hierarchical=True)
             if action.field_id not in order:
                 order.append(action.field_id)
             state, _reward, done, _info = environment.step(action)

@@ -390,24 +390,22 @@ class CoveragePolicy(nn.Module):
         return output["actions"][index]
 
     @staticmethod
-    def greedy_action(output, *, hierarchical: bool = True) -> CoverageAction:
+    def greedy_action(output, *, hierarchical: bool = False) -> CoverageAction:
         """Select the best feasible action.
 
-        With the factored decoder the joint probability is
-        ``p(field) * p(entry|field) * p(exit|field, entry)``. Taking ``argmax`` over
-        that product is **not** the same as "best parcel, then its best gate":
+        ``hierarchical=False`` (the default) takes the argmax over the whole joint
+        distribution, which is the right choice for **deployment and for measuring the
+        actual objective**: the product ``p(field) * p(entry|field) * p(exit|...)``
+        accounts for what the chosen gate costs, and measurements confirm it wins
+        (5 of 6 fixed instance groups by 0.2-0.8 reward).
 
-        each level is normalised inside its own parent, so a parcel with fewer
-        entry/exit variants gets larger per-variant probabilities, and the product
-        argmax is biased towards it for reasons that have nothing to do with the
-        route. Measured on a trained checkpoint the two disagreed on **20% of steps**
-        and the product argmax selected a parcel the field head had not ranked first
-        (its marginal was 0.29 lower). Hierarchical decoding -- parcel first, then the
-        best gate for it -- is the intended semantics and measurably better:
-        ``tour_ratio`` 1.2844 -> 1.2525 on the same weights.
+        ``hierarchical=True`` instead takes the best parcel from the field head and
+        then that parcel's best gate. That deliberately **ignores** how good the gate
+        is, so it is only appropriate for metrics that isolate the *order*
+        (``tour_ratio``). Do not use it for deployment: on the real reward it is worse.
 
         Falls back to the product argmax when the output has no factored extras
-        (the flat decoder), which is the correct behaviour there.
+        (the flat decoder).
         """
         distribution = output["action_distribution"]
         if distribution.numel() == 0 or float(distribution.detach().sum()) <= 0.0:
