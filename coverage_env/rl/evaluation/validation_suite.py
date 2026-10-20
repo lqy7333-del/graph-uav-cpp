@@ -142,6 +142,8 @@ def _ci(values):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=str, nargs="*", default=[None])
+    parser.add_argument("--instances", type=int, default=INSTANCES_PER_COUNT,
+                        help="Instances per field count; more shrinks the paired CI.")
     args = parser.parse_args()
 
     for checkpoint in args.checkpoint:
@@ -164,9 +166,10 @@ def main() -> None:
             f"{'补/距离':>10}{'覆盖':>8}{'完成':>7}{'配对(策略-NN)':>22}"
         )
         print(header)
+        count_instances = int(args.instances)
         for count in FIELD_COUNTS:
             policy_rows, baseline_rows, deltas = [], [], []
-            for index in range(INSTANCES_PER_COUNT):
+            for index in range(count_instances):
                 environment = InstanceGenerator(config).generate(
                     num_fields=count, seed=BASE_SEED + count * 100 + index,
                     randomize_each_reset=False,
@@ -184,7 +187,7 @@ def main() -> None:
                 f"{_mean([r['resupplies'] for r in policy_rows]):>5.1f}/"
                 f"{_mean([r['resupply_steps_distance'] for r in policy_rows]):>4.0f}"
                 f"{_mean([r['coverage_ratio'] for r in policy_rows]):>7.1%}"
-                f"{sum(1 for r in policy_rows if r['completed']):>4}/{INSTANCES_PER_COUNT}"
+                f"{sum(1 for r in policy_rows if r['completed']):>4}/{count_instances}"
                 f"{_mean(deltas):>14.2f} ± {_ci(deltas):<6.2f}"
             )
             failed = [r["reason"] for r in policy_rows if not r["completed"]]
