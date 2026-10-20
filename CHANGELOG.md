@@ -7,7 +7,34 @@
 
 ## 2026-10-20
 
-### 66. **修正 greedy 解码：改为层次化**（此前所有 greedy 评估低估了模型）
+### 67. 两个度量必须分开报告：**排序口径与真实奖励口径给出不同的最优 checkpoint**
+- **文件**：仅记录结果（`coverage_env/results/order_metric_200inst_record.txt`）。
+- **排序口径**（`tour_ratio`，200 实例，层次化解码 —— 该指标刻意只隔离顺序、忽略门的代价）：
+
+  | checkpoint | tour_ratio | SE | 与 NN（1.1334）差距 |
+  | --- | --- | --- | --- |
+  | **run_long2000_v11 / ckpt_800** | **1.2589** | 0.0109 | 11% |
+  | run_long2000_v11 / ckpt_1300 | 1.2781 | 0.0118 | 13% |
+  | run_hier_v5 / ckpt_100（子节点摘要） | 1.2979 | 0.0124 | 15% |
+  | run_child_anneal_v8 / ckpt_400 | 1.3031 | 0.0125 | 15% |
+  | run_long_v3 / ckpt_400（flat） | 1.3983 | 0.0146 | 23% |
+
+  → **2000 轮长训练的两个 checkpoint 都优于此前记录的最好值**（旧最好 1.2852/1.2903），
+  但与 NN 仍有 11~13% 差距。
+- **真实奖励口径**（`validation_suite`，固定实例，联合 argmax = 部署口径）：
+
+  | checkpoint | n=5 | n=10 | n=20 |
+  | --- | --- | --- | --- |
+  | ckpt_800 | −20.56 | −24.19 | −26.27 |
+  | **ckpt_1300** | **−19.97** | **−23.80** | **−25.40** |
+
+- **关键结论：两个口径的最优点不是同一个 checkpoint。**
+  ckpt_800 的**顺序**更好（1.2589），ckpt_1300 的**执行**更好（真实奖励三档全胜）。
+  这不矛盾 —— `tour_ratio` 只衡量「顺序长短」，完全不含「进/出口选择」的代价；
+  而真实奖励两者都含。**今后任何结论都必须标明用的是哪个口径。**
+- **长训练状态**：1576/2000，熵已降到约 2.95（上限的 67%）。
+
+### 66. **修正 greedy 解码：改为层次化**（此前所有 greedy 评估低估了模型） **修正 greedy 解码：改为层次化**（此前所有 greedy 评估低估了模型）
 - **文件**：修改 `coverage_env/rl/decoder/action_decoder.py`、
   `coverage_env/rl/evaluation/{ordering_probe,tour_ratio,validation_suite}.py`、
   `coverage_env/visualization/policy_paths.py`、`coverage_env/results/probe_policy_metrics.py`、
