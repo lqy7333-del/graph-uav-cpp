@@ -65,7 +65,7 @@ def greedy_chooser(actor):
         distribution = output["action_distribution"]
         if distribution.numel() == 0 or float(distribution.detach().sum()) <= 0:
             return None
-        return output["actions"][int(distribution.argmax().item())]
+        return CoveragePolicy.greedy_action(output)
 
     return choose
 

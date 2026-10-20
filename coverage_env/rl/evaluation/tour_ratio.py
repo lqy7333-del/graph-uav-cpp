@@ -124,7 +124,7 @@ def policy_visit_order(actor, environment) -> list[str]:
             distribution = output["action_distribution"]
             if distribution.numel() == 0 or float(distribution.detach().sum()) <= 0:
                 break
-            action = output["actions"][int(distribution.argmax().item())]
+            action = CoveragePolicy.greedy_action(output)
             if action.field_id not in order:
                 order.append(action.field_id)
             state, _reward, done, _info = environment.step(action)

@@ -5,9 +5,52 @@
 
 ---
 
-## 2026-10-19
+## 2026-10-20
 
-### 65. 固定验证集 + 成本分项（把训练曲线与性能评估拆开）
+### 66. **修正 greedy 解码：改为层次化**（此前所有 greedy 评估低估了模型）
+- **文件**：修改 `coverage_env/rl/decoder/action_decoder.py`、
+  `coverage_env/rl/evaluation/{ordering_probe,tour_ratio,validation_suite}.py`、
+  `coverage_env/visualization/policy_paths.py`、`coverage_env/results/probe_policy_metrics.py`、
+  `coverage_env/tests/test_hierarchical_decoder.py`。
+- **发现（这次筛查最重要的副产品）**：层次化解码器把概率分解成
+  `p(地块)·p(门|地块)`，但 **`greedy_action` 取的是乘积的 argmax** ——
+  而乘积 argmax **不等于**「先地块后门」：
+  - 每一级都在**自己的父级内部归一化**，所以**门组合数更少的地块，每个变体的概率更大** ✗
+  - 于是乘积 argmax 会**系统性偏向门更少的地块**，这与几何、与排序都无关
+  - 实测（ckpt_1300）：两者在 **20% 的步上不一致**，且不一致时**联合 argmax 选中的地块
+    的边缘概率比地块头的 argmax 低 0.29**
+- **影响范围（必须区分）**：
+
+  | 环节 | 用的是什么 | 是否受影响 |
+  | --- | --- | --- |
+  | 训练采样（rollout 选动作） | 联合分布多项采样 | **不受影响** —— 从乘积分布采样**数学上等价于**层次采样 |
+  | 训练 log-prob / 熵 / GAE | 联合分布 | 不受影响（链式法则精确） |
+  | **greedy 解码**（评估 + 部署） | 联合 argmax | **受影响** ✗ |
+
+  所以**正在跑的 2000 轮训练没有失效**，但**此前所有 greedy 口径的评估都低估了模型**
+  （`tour_ratio` 全部对比、`policy_paths`、`validation_suite`、探针里的 "trained policy"）。
+- **修正效果（同一权重，只换解码方式）**：
+
+  | checkpoint | 联合 argmax | **层次 greedy** | 差 |
+  | --- | --- | --- | --- |
+  | `run_long2000_v11/ckpt_800` | 1.2844 | **1.2525** | −0.032 |
+  | `run_long2000_v11/ckpt_1300` | 1.2712 | **1.2563** | −0.015 |
+
+  40 个实例中 **10 个改善、0 个变差**（其余两者相同）。
+  两个 checkpoint 都**低于此前记录的最好值 1.2852**；与 NN（1.1334）的差距
+  从 15% 缩小到 **约 10%**。
+- **变更**：`CoveragePolicy.greedy_action(output, *, hierarchical=True)`；
+  当输出没有分层附加信息时（flat 解码器）**自动回落到乘积 argmax**（那里是正确的）；
+  所有评估入口统一改用它。
+- **测试（3 项新增）**：
+  - 构造「A 的地块概率更高、B 的门概率更高」的样本 → 层次化解码必须选 **A**，
+    而联合 argmax 选 **B**（直接钉住这条偏差）
+  - 无分层信息时回落到乘积 argmax
+  - 选定地块后，仍必须在该地块内取最优门
+  全量 **161 项**，仍只有 2 个改动前即存在的失败。
+- **回滚方法**：`git revert <本提交 SHA>`。
+
+### 65. 固定验证集 + 成本分项（把训练曲线与性能评估拆开） 固定验证集 + 成本分项（把训练曲线与性能评估拆开）
 - **文件**：新增 `coverage_env/rl/evaluation/validation_suite.py`。
 - **背景（条目 63/64 的方差分解）**：日志里的 `mean_ep_reward` 每个 update 只平均 **8.4 局**，
   而跨实例 sd 是 **2.69**（地块数 5~20、尺寸、UAV 参数每局都不同），

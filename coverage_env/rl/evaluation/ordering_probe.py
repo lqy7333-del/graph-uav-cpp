@@ -136,7 +136,7 @@ def collect(actor, config, episodes: int, seed: int) -> dict:
             if label is None:
                 break
             actions = output["actions"]
-            chosen = actions[int(distribution.argmax().item())]
+            chosen = CoveragePolicy.greedy_action(output)
             centroids = {
                 field.field_id: field.centroid for field in environment.fields
             }

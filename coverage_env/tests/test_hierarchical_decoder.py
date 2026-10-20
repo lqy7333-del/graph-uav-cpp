@@ -13,6 +13,7 @@ import torch
 
 from coverage_env.config import DEFAULT_CONFIG_PATH, load_config
 from coverage_env.env.instance_generator import InstanceGenerator
+from coverage_env.rl.action_space import CoverageAction
 from coverage_env.rl.decoder.action_decoder import CoveragePolicy
 from coverage_env.rl.decoder.hierarchical_decoder import checkpoint_decoder_flags
 
@@ -256,6 +257,71 @@ class HierarchicalDecodeTests(unittest.TestCase):
                 self.assertEqual(flags["candidate_attention"], attention)
             else:
                 self.assertFalse(flags["candidate_attention"])
+
+    def test_hierarchical_greedy_ignores_gate_dominance(self):
+        """Decoding must follow the parcel head, not the product of the levels.
+
+        Levels are normalised inside their own parent, so a parcel with fewer
+        entry/exit variants gets larger per-variant probabilities. Here parcel B has a
+        much more likely gate, which wins the product argmax, while the parcel head
+        clearly prefers A. Hierarchical decoding must return A.
+        """
+        actions = [
+            CoverageAction("field-A", "B0", "B0"),
+            CoverageAction("field-B", "B0", "B0"),
+        ]
+        output = {
+            "actions": actions,
+            "mask": torch.tensor([True, True]),
+            # product argmax -> index 1 (parcel B)
+            "action_distribution": torch.tensor([0.11, 0.405]),
+            "hierarchical": {
+                # parcel head argmax -> index 0 (parcel A)
+                "field_probabilities": torch.tensor([0.55, 0.45]),
+                "field_representatives": [0, 1],
+            },
+        }
+        self.assertEqual(
+            CoveragePolicy.greedy_action(output).field_id, "field-A"
+        )
+        self.assertEqual(
+            CoveragePolicy.greedy_action(output, hierarchical=False).field_id,
+            "field-B",
+        )
+
+    def test_greedy_falls_back_without_factored_extras(self):
+        """The flat decoder has no levels, so the product argmax is correct there."""
+        output = {
+            "actions": [
+                CoverageAction("field-A", "B0", "B0"),
+                CoverageAction("field-B", "B0", "B0"),
+            ],
+            "mask": torch.tensor([True, True]),
+            "action_distribution": torch.tensor([0.2, 0.8]),
+        }
+        self.assertEqual(
+            CoveragePolicy.greedy_action(output).field_id, "field-B"
+        )
+
+    def test_hierarchical_greedy_picks_the_best_gate_of_that_parcel(self):
+        """Within the chosen parcel it must still take the most likely gate."""
+        actions = [
+            CoverageAction("field-A", "B0", "B0"),
+            CoverageAction("field-A", "B1", "B1"),
+            CoverageAction("field-B", "B0", "B0"),
+        ]
+        output = {
+            "actions": actions,
+            "mask": torch.tensor([True, True, True]),
+            "action_distribution": torch.tensor([0.30, 0.20, 0.50]),
+            "hierarchical": {
+                "field_probabilities": torch.tensor([0.6, 0.4]),
+                "field_representatives": [0, 2],
+            },
+        }
+        chosen = CoveragePolicy.greedy_action(output)
+        self.assertEqual(chosen.field_id, "field-A")
+        self.assertEqual(chosen.entry_boundary_id, "B0")
 
     def test_flat_decoder_still_available(self):
         config = load_config(DEFAULT_CONFIG_PATH)
