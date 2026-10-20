@@ -168,3 +168,33 @@ class DomainRandomizationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FieldCountStrategyTests(unittest.TestCase):
+    """`cycle` walks the range so the logged mean stops depending on the draw.
+
+    Measured: the same policy scores ~4 reward points worse on 20-field episodes than
+    on 5-field ones (the resupply legs are not covered by the area normalisation),
+    which is larger than a whole long run's improvement. Drawing counts uniformly
+    makes the per-update mean depend on which counts that update happened to get.
+    """
+
+    def setUp(self):
+        self.config = load_config(DEFAULT_CONFIG_PATH)
+        self.config["environment"]["num_fields_strategy"] = "cycle"
+
+    def test_cycle_walks_the_range_in_order_and_wraps(self):
+        generator = InstanceGenerator(self.config)
+        rng = random.Random(0)
+        counts = [generator.sample_num_fields(rng) for _ in range(18)]
+        limits = self.config["environment"]["num_fields"]
+        expected = list(range(int(limits["min"]), int(limits["max"]) + 1))
+        self.assertEqual(counts[: len(expected)], expected)
+        self.assertEqual(counts[len(expected):], expected[:2])
+
+    def test_uniform_stays_the_default(self):
+        config = load_config(DEFAULT_CONFIG_PATH)
+        generator = InstanceGenerator(config)
+        rng = random.Random(0)
+        counts = {generator.sample_num_fields(rng) for _ in range(60)}
+        self.assertGreater(len(counts), 1, "uniform sampling must still vary the count")

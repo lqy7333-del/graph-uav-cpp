@@ -61,6 +61,12 @@ class DistributedTrainer:
         ``start_update`` lets a resumed run continue at the next update index
         while still using the same absolute target (``num_updates``).
         """
+        # Per-field-count reward EMAs, so the log can report a mean in which every
+        # field count carries the same weight. The plain mean is biased by whichever
+        # counts this update happened to draw (5-field and 20-field episodes differ by
+        # ~4 reward points), which is why the raw curve was unreadable.
+        count_emas: dict = {}
+        ema_alpha = 0.1
         shaping_config = (self.config or {}).get("shaping") or {}
         shaping_enable = bool(shaping_config.get("enable", False))
         shaping_strength = float(shaping_config.get("strength", 1.0))
@@ -127,7 +133,13 @@ class DistributedTrainer:
                     # The environment still describes the episode that just
                     # finished, so its field count labels this episode.
                     completed_rewards.append(episode_reward)
-                    completed_fields.append(len(self.environment.fields))
+                    count_here = len(self.environment.fields)
+                    completed_fields.append(count_here)
+                    previous = count_emas.get(count_here)
+                    count_emas[count_here] = (
+                        episode_reward if previous is None
+                        else previous + ema_alpha * (episode_reward - previous)
+                    )
                     episode_reward = 0.0
                 with torch.no_grad():
                     # DDP does not proxy custom attributes; reach the wrapped
@@ -206,6 +218,10 @@ class DistributedTrainer:
                     "coverage_ratio": round(summary["coverage_ratio"], 4),
                     "total_distance": round(summary["total_distance"], 1),
                     "episodes": episodes,
+                    "balanced_reward": (
+                        round(sum(count_emas.values()) / len(count_emas), 4)
+                        if count_emas else ""
+                    ),
                     "mean_ep_reward": (
                         round(mean_episode_reward, 4)
                         if mean_episode_reward is not None else ""

@@ -4,6 +4,12 @@ environment:
   num_fields:
     min: 5
     max: 20
+  # How the per-episode field count is chosen: `uniform` draws from the range above
+  # (maximum variety, but the logged mean then depends on which counts were drawn);
+  # `cycle` walks the range in order so every update sees a predictable set. The
+  # measured reward difference between 5 and 20 field episodes is ~4 points, larger
+  # than a whole long run's improvement, so `cycle` makes the curve comparable.
+  num_fields_strategy: uniform
   workspace:
     min_lat: 31.218
     max_lat: 31.232

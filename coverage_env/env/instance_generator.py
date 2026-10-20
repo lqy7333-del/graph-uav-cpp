@@ -19,6 +19,8 @@ class InstanceGenerator:
     def __init__(self, config: dict) -> None:
         """Store the experiment config and validate required sections."""
         self.config = config
+        # Only used by environment.num_fields_strategy == "cycle".
+        self._field_cycle_index = 0
         for section in ("environment", "field_generator", "depot", "uav", "coverage"):
             if section not in config:
                 raise ValueError(f"Missing configuration section: {section}")
@@ -73,7 +75,24 @@ class InstanceGenerator:
         minimum = int(count_config["min"])
         maximum = int(count_config["max"])
         if num_fields is None:
-            num_fields = rng.randint(minimum, maximum)
+            strategy = str(
+                self.config["environment"].get("num_fields_strategy", "uniform")
+            ).lower()
+            if strategy == "cycle":
+                # Walk the configured range in order instead of drawing uniformly.
+                # Each update then covers a predictable set of field counts, so the
+                # logged mean stops depending on which counts the sampler happened to
+                # draw -- that drift is 4.03 reward points across 5..20 fields, i.e.
+                # larger than a whole long run's improvement.
+                span = maximum - minimum + 1
+                num_fields = minimum + (self._field_cycle_index % span)
+                self._field_cycle_index += 1
+            elif strategy == "uniform":
+                num_fields = rng.randint(minimum, maximum)
+            else:
+                raise ValueError(
+                    f"Unsupported environment.num_fields_strategy: {strategy!r}"
+                )
         if not minimum <= int(num_fields) <= maximum:
             raise ValueError(
                 f"num_fields={num_fields} is outside configured range "
