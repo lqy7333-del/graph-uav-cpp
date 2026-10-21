@@ -79,14 +79,33 @@ def nearest_field_chooser():
             return None
         mask = environment.get_action_mask(actions)
         position = environment.uavs[0].current_position
-        best, best_distance = None, float("inf")
+        # Nearest parcel first, then its cheapest gate. Ranking candidates by the
+        # parcel-centroid distance alone leaves every gate of that parcel tied, so the
+        # first enumerated pair wins -- an arbitrary gate that depresses the baseline.
+        nearest_field, nearest_distance = None, float("inf")
         for action, feasible in zip(actions, mask):
             if not feasible:
                 continue
-            field = environment.get_field(action.field_id)
             distance = hypot(
-                field.centroid[0] - position[0], field.centroid[1] - position[1]
+                environment.get_field(action.field_id).centroid[0] - position[0],
+                environment.get_field(action.field_id).centroid[1] - position[1],
             )
+            if distance < nearest_distance:
+                nearest_field, nearest_distance = action.field_id, distance
+        if nearest_field is None:
+            break
+        boundaries = {
+            boundary.id: boundary.center
+            for boundary in environment.get_field(nearest_field).boundaries
+        }
+        best, best_distance = None, float("inf")
+        for action, feasible in zip(actions, mask):
+            if not feasible or action.field_id != nearest_field:
+                continue
+            entry = boundaries.get(action.entry_boundary_id)
+            if entry is None:
+                continue
+            distance = hypot(entry[0] - position[0], entry[1] - position[1])
             if distance < best_distance:
                 best, best_distance = action, distance
         return best

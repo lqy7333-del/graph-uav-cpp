@@ -103,17 +103,38 @@ def _run(environment, choose) -> dict:
 
 
 def _nearest_field_choice(environment, _state):
-    """Fixed baseline: nearest unfinished parcel, cheapest gate for the rule."""
+    """Two-level baseline: nearest unfinished parcel, then its cheapest gate.
+
+    The gate part matters. Candidates of one parcel all share the same centroid
+    distance, so ranking candidates by that distance and keeping the first feasible
+    one silently picks whatever pair the enumerator emitted first (usually ``B0/B0``)
+    -- an arbitrary gate that systematically depresses this baseline and inflates any
+    "beats the baseline" claim. Greedy gate choice here is the one that minimises the
+    approach distance to the entry boundary, which is what a myopic rule can know.
+    """
     actions = environment.get_action_candidates()
     mask = environment.get_action_mask(actions)
     position = environment.uavs[0].current_position
-    best, best_key = None, None
+    nearest_field, nearest_distance = None, float("inf")
     for action, feasible in zip(actions, mask):
         if not feasible:
             continue
-        field = environment.get_field(action.field_id)
-        key = _distance(position, field.centroid)
-        if best_key is None or key < best_key:
+        distance = _distance(position, environment.get_field(action.field_id).centroid)
+        if distance < nearest_distance:
+            nearest_field, nearest_distance = action.field_id, distance
+    if nearest_field is None:
+        return None
+    field = environment.get_field(nearest_field)
+    entries = {boundary.id: boundary.center for boundary in field.boundaries}
+    best, best_key = None, float("inf")
+    for action, feasible in zip(actions, mask):
+        if not feasible or action.field_id != nearest_field:
+            continue
+        entry = entries.get(action.entry_boundary_id)
+        if entry is None:
+            continue
+        key = _distance(position, entry)
+        if key < best_key:
             best, best_key = action, key
     return best
 
