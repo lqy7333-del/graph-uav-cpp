@@ -786,8 +786,12 @@ class CoverageEnvironment(FieldEnvironment):
             return high
 
         best = 0.0
-        # Only refine when the estimated upper bound exceeds the real budget.
-        for _ in range(10):
+        # Only refine when the estimated upper bound exceeds the real budget. Each
+        # probe is a full geometry plan, so this loop is the dominant cost of a step
+        # (measured: 12 previews per step on the clustered instances). Five bisection
+        # steps resolve the workload ratio to 1/32, which is far below the payload and
+        # energy granularity that decides feasibility.
+        for _ in range(5):
             ratio = (low + high) / 2.0
             if ratio <= 0.0:
                 break

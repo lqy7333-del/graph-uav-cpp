@@ -117,6 +117,12 @@ plot:
   save_gif: false
 
 rl:
+  # The configuration executor plans its previews on ``grid_resolution`` and
+  # silently falls back to 5 m when it is absent -- four times the cells of the
+  # field generator's 10 m grid, for no gain in fidelity. Measured: one env step
+  # on the clustered 20-parcel instances took 1.4-2.5 s, dominated by the
+  # workload-feasibility previews that call it.
+  grid_resolution: 10.0
   gamma: 1.0
   learning_rate: 0.0003
   batch_size: 64
