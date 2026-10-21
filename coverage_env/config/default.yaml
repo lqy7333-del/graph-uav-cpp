@@ -11,17 +11,19 @@ environment:
   # than a whole long run's improvement, so `cycle` makes the curve comparable.
   num_fields_strategy: uniform
   workspace:
-    min_lat: 31.218
-    max_lat: 31.232
-    min_lon: 121.462
-    max_lon: 121.478
+    # ~3.3 km x 2.9 km. Enlarged with the 0.5-3 ha parcels: the scattered layout has to
+    # fit 20 of them without overlap, which the previous 1.5 km box could not do.
+    min_lat: 31.210
+    max_lat: 31.240
+    min_lon: 121.455
+    max_lon: 121.485
   random_seed: 20261012
   max_episode_steps_per_field: 12
 
 field_generator:
   field_size:
-    min_area: 1000.0
-    max_area: 6000.0
+    min_area: 5000.0
+    max_area: 30000.0
   shape:
     min_vertices: 3
     max_vertices: 5
@@ -34,8 +36,15 @@ field_generator:
   # 60% of the travelled distance was flying between fields rather than covering
   # them. ``scattered`` is kept so older baselines stay reproducible.
   layout:
-    mode: contiguous
+    mode: clustered
     gap_m: 15.0
+    # clustered mode: tight parcels inside a block, wide tracks between blocks.
+    # Real farmland is asymmetric this way; a uniform lattice leaves the visiting
+    # order nothing to exploit (measured: uniform spacing made the order worth ~0).
+    cluster_min: 2
+    cluster_max: 4
+    cluster_inner_gap_m: 4.0
+    cluster_gap_m: 90.0
     pool_oversample: 1.5
     growth_attempts: 60
     # Farm headquarters placement. Both the *direction* around the block and the

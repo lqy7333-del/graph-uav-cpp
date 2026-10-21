@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import random
+
+from shapely.geometry import Polygon
 from math import ceil, cos, hypot, pi, sin, sqrt
 
 from coverage_env.env.depot import Depot
@@ -164,6 +166,11 @@ class InstanceGenerator:
                 rng, num_fields, layout, (min_x, min_y, max_x, max_y),
                 workspace_transformer, min_area, max_area,
             )
+        elif mode == "clustered":
+            fields, block_parcels = self._sample_clustered_fields(
+                rng, num_fields, layout, (min_x, min_y, max_x, max_y),
+                workspace_transformer, min_area, max_area,
+            )
         else:
             raise ValueError(f"Unsupported field_generator.layout.mode: {mode!r}.")
 
@@ -211,6 +218,170 @@ class InstanceGenerator:
             fields.append(field)
             centers_and_radii.append((center[0], center[1], radius_bound))
         return fields
+
+    def _sample_clustered_fields(
+        self, rng, num_fields, layout, bounds, transformer, min_area, max_area,
+    ) -> list[Field]:
+        """Parcels grouped into a few tight clusters separated by real tracks.
+
+        Real farmland is asymmetric: parcels inside one block sit a few metres apart
+        across a farm track, while separate blocks are tens to hundreds of metres
+        apart. That asymmetry is what makes the visiting order worth optimising.
+
+        The uniform ``contiguous`` layout did not produce it. Measured: configured
+        ``gap_m`` was 15 m but the realised boundary clearance was 41-45 m, and the
+        parcels covered only 10-16% of their block -- close to a sparse lattice, where
+        every hop is the same length and "nearest neighbour" is already near-optimal.
+
+        Placement here bisects on the *real polygon-to-polygon distance* instead of
+        using circumscribed circles, so the requested clearance is the achieved one.
+        """
+        min_x, min_y, max_x, max_y = bounds
+        shape = self.config["field_generator"]["shape"]
+        inner_gap = max(0.0, float(layout.get("cluster_inner_gap_m", 4.0)))
+        outer_gap = max(inner_gap, float(layout.get("cluster_gap_m", 90.0)))
+        cluster_count = min(
+            int(layout.get("cluster_max", 4)),
+            max(int(layout.get("cluster_min", 2)), int(ceil(num_fields / 5.0))),
+        )
+        cluster_count = max(1, min(cluster_count, num_fields))
+        sizes = [num_fields // cluster_count] * cluster_count
+        for index in range(num_fields - sum(sizes)):
+            sizes[index % cluster_count] += 1
+
+        def clearance(points_a, points_b) -> float:
+            if len(points_a) < 3 or len(points_b) < 3:
+                return float("inf")
+            return Polygon(points_a).distance(Polygon(points_b))
+
+        def bisect_offset(anchor, local, angle, target, centre):
+            """Offset along ``angle`` from ``centre`` giving exactly ``target`` gap."""
+            cosine, sine = cos(angle), sin(angle)
+
+            def gap_at(distance):
+                moved = [
+                    (centre[0] + distance * cosine + x, centre[1] + distance * sine + y)
+                    for x, y in local
+                ]
+                return clearance(moved, anchor)
+
+            low, high = 0.0, 1.0
+            while gap_at(high) < target and high < 1e6:
+                high *= 2.0
+                low = high / 2.0
+            for _ in range(48):
+                mid = 0.5 * (low + high)
+                if gap_at(mid) < target:
+                    low = mid
+                else:
+                    high = mid
+            return high
+
+        def grow(count: int):
+            placed: list[tuple[list[tuple[float, float]], tuple[float, float]]] = []
+            for _ in range(count):
+                target_area = rng.uniform(min_area, max_area)
+                polygon = self._irregular_polygon_xy(rng, (0.0, 0.0), target_area, shape)
+                centre, _radius = self._polygon_center_and_radius(polygon)
+                local = [(x - centre[0], y - centre[1]) for x, y in polygon]
+                if not placed:
+                    placed.append((local, (0.0, 0.0)))
+                    continue
+                anchor_points, anchor_position = placed[rng.randrange(len(placed))]
+                absolute_anchor = [
+                    (anchor_position[0] + x, anchor_position[1] + y) for x, y in anchor_points
+                ]
+                angle = rng.uniform(0.0, 2.0 * pi)
+                distance = bisect_offset(
+                    absolute_anchor, local, angle, inner_gap, anchor_position
+                )
+                placed.append((
+                    local,
+                    (anchor_position[0] + distance * cos(angle),
+                     anchor_position[1] + distance * sin(angle)),
+                ))
+            return placed
+
+        clusters = [grow(count) for count in sizes]
+
+        # Park clusters so their real clearance is ``outer_gap``.
+        cluster_positions = [(0.0, 0.0)]
+        for index in range(1, len(clusters)):
+            anchor_index = rng.randrange(index)
+            anchor_centre = cluster_positions[anchor_index]
+            best, best_distance = None, 0.0
+            for _attempt in range(24):
+                angle = rng.uniform(0.0, 2.0 * pi)
+                # Grow the offset until every parcel pair clears ``outer_gap``.
+                def all_clear(distance):
+                    centre_now = (anchor_centre[0] + distance * cos(angle),
+                                  anchor_centre[1] + distance * sin(angle))
+                    # Every earlier cluster must be respected, not only the anchor:
+                    # checking just the anchor lets a later cluster park right next to
+                    # an earlier one, which merges the blocks (measured: max nearest
+                    # clearance collapsed to 4 m, i.e. one blob).
+                    for earlier in range(index):
+                        other_centre = cluster_positions[earlier]
+                        for _local, position in clusters[index]:
+                            moved = [(centre_now[0] + position[0] + x,
+                                      centre_now[1] + position[1] + y) for x, y in _local]
+                            for other_local, other_position in clusters[earlier]:
+                                anchor_points = [
+                                    (other_centre[0] + other_position[0] + x,
+                                     other_centre[1] + other_position[1] + y)
+                                    for x, y in other_local
+                                ]
+                                if clearance(moved, anchor_points) < outer_gap:
+                                    return False
+                    return True
+
+                low, high = 0.0, 1.0
+                while not all_clear(high) and high < 1e6:
+                    high *= 2.0
+                if not all_clear(high):
+                    continue
+                for _step in range(40):
+                    mid = 0.5 * (low + high)
+                    if all_clear(mid):
+                        high = mid
+                    else:
+                        low = mid
+                best = (anchor_centre[0] + high * cos(angle),
+                        anchor_centre[1] + high * sin(angle))
+                best_distance = high
+                break
+            if best is None:
+                raise RuntimeError(
+                    "Unable to separate the field clusters; reduce cluster_gap_m."
+                )
+            cluster_positions.append(best)
+
+        parcels: list[tuple[float, list[tuple[float, float]]]] = []
+        for centre, cluster in zip(cluster_positions, clusters):
+            for local, position in cluster:
+                parcels.append((
+                    rng.uniform(min_area, max_area),
+                    [(centre[0] + position[0] + x, centre[1] + position[1] + y)
+                     for x, y in local],
+                ))
+        rng.shuffle(parcels)
+        parcels = parcels[:num_fields]
+
+        mean_x = sum(sum(x for x, _ in pts) / len(pts) for _a, pts in parcels) / len(parcels)
+        mean_y = sum(sum(y for _, y in pts) / len(pts) for _a, pts in parcels) / len(parcels)
+        shift_x = (min_x + max_x) / 2.0 - mean_x
+        shift_y = (min_y + max_y) / 2.0 - mean_y
+
+        fields = []
+        for order, (target_area, points) in enumerate(parcels, start=1):
+            moved = [(shift_x + x, shift_y + y) for x, y in points]
+            fields.append(self._field_with_area(
+                f"field-{order}", moved, transformer, target_area, min_area, max_area,
+            ))
+        block_parcels = [
+            [(shift_x + x, shift_y + y) for x, y in points] for _a, points in parcels
+        ]
+        return fields, block_parcels
 
     def _sample_contiguous_fields(
         self, rng, num_fields, layout, bounds, transformer, min_area, max_area,
