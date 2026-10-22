@@ -258,7 +258,7 @@ ppo:
   # with exploration noise, which is the signal ordering has to come through.
   # Set `entropy_coef_end` to null to disable annealing.
   entropy_coef_end: 0.0
-  entropy_anneal_start: 0.25
+  entropy_anneal_start: 0.1
   # Learning-rate decay, driven by the same run-progress fraction as the entropy
   # bonus. `none` keeps the previous behaviour; `cosine` decays from the configured
   # rate to `lr_final_scale` of it by the last update. Used for long runs so the
