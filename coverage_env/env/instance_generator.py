@@ -252,7 +252,11 @@ class InstanceGenerator:
 
         for _attempt in range(200):
             # Block sized so the whole pool of parcels fills it.
-            side = (pool_size * mean_area) ** 0.5
+            # The 8 m track is cut OUT of each parcel, so the block must be bigger by
+            # the inset loss or every parcel would end up under min_area after
+            # insetting (~25% loss for a 1 ha parcel with an 8 m track).
+            shrink = 1.0 - min(0.45, gap / max((mean_area ** 0.5), 1e-6))
+            side = (pool_size * mean_area / max(shrink * shrink, 0.35)) ** 0.5
             aspect = rng.uniform(0.8, 1.4)
             width, height = side * aspect, side / max(aspect, 1e-6)
             centre = ((min_x + max_x) / 2.0, (min_y + max_y) / 2.0)
@@ -278,7 +282,7 @@ class InstanceGenerator:
                 parcels.extend(strips)
             if not parcels:
                 continue
-            if any(not (min_area <= piece.area <= max_area) for piece in parcels):
+            if any(not (min_area * 0.9 <= piece.area <= max_area * 1.3) for piece in parcels):
                 continue
             # Three- and five-sided parcels are legitimate (a track cutting a corner
             # leaves a triangle beside a pentagon); only reject degenerate shapes.
@@ -287,26 +291,26 @@ class InstanceGenerator:
 
             parcels = self._corner_cut(rng, parcels, min_area, max_area, 0.14)
 
-            # Inset so shared boundaries become narrow farm tracks.
+            # Inset so shared boundaries become farm tracks, and drop individual
+            # pieces that no longer make a valid parcel. Rejecting the whole
+            # tessellation for one bad piece made generation fail ~7% of the time
+            # (an 8 m track removes ~25% of a 1 ha parcel, so borderline pieces are
+            # common); dropping just those and checking the count is enough.
             objects = []
             for piece in parcels:
                 inset = piece.buffer(-gap / 2.0) if gap > 0.0 else piece
-                if inset.is_empty or inset.geom_type != "Polygon" or inset.area < min_area:
-                    inset = piece
+                if inset.is_empty or inset.geom_type != "Polygon" or not inset.is_valid:
+                    continue
+                if not (min_area <= inset.area <= max_area):
+                    continue
+                if len(list(inset.exterior.coords)) - 1 < 3:
+                    continue
+                # 4*pi*area/perimeter^2 is 1 for a circle, ~0.8 for a square and below
+                # 0.05 only for needle-shaped pieces that collapse when projected.
+                if 4.0 * pi * inset.area / max(inset.length, 1e-9) ** 2 < 0.05:
+                    continue
                 objects.append(inset)
-
-            # The inset (and the corner cut) can leave a sliver that is invalid or
-            # collapses when projected to lat/lon -- retry rather than emit it.
-            # A very elongated sliver is technically valid but collapses when the
-            # polygon is projected to lat/lon and back, so bound the shape too:
-            # 4*pi*area/perimeter^2 is 1 for a circle, ~0.8 for a square and below
-            # 0.05 only for needle-shaped pieces.
-            if any(
-                not piece.is_valid or piece.area < min_area
-                or len(list(piece.exterior.coords)) - 1 < 3
-                or 4.0 * pi * piece.area / max(piece.length, 1e-9) ** 2 < 0.05
-                for piece in objects
-            ):
+            if len(objects) < num_fields:
                 continue
 
             if len(objects) > num_fields:

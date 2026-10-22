@@ -40,7 +40,7 @@ field_generator:
     # that share edges -- what real field boundaries look like. Avoids the earlier
     # mistake of scattering independent polygons with gaps between them.
     mode: tessellated
-    parcel_gap_m: 1.5
+    parcel_gap_m: 8.0
     # Tessellate this many times more parcels than are worked, then keep a random
     # subset: the unworked parcels become the real gaps between worked ones.
     tessellated_oversample: 2.0
