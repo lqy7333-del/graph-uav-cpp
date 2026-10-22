@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import random
 
-from shapely.geometry import Polygon
+from shapely.geometry import LineString, MultiPolygon, Polygon
+from shapely.ops import split as split_geometry
 from math import ceil, cos, hypot, pi, sin, sqrt
 
 from coverage_env.env.depot import Depot
@@ -166,6 +167,11 @@ class InstanceGenerator:
                 rng, num_fields, layout, (min_x, min_y, max_x, max_y),
                 workspace_transformer, min_area, max_area,
             )
+        elif mode == "tessellated":
+            fields, block_parcels = self._sample_tessellated_fields(
+                rng, num_fields, layout, (min_x, min_y, max_x, max_y),
+                workspace_transformer, min_area, max_area,
+            )
         elif mode == "clustered":
             fields, block_parcels = self._sample_clustered_fields(
                 rng, num_fields, layout, (min_x, min_y, max_x, max_y),
@@ -219,6 +225,226 @@ class InstanceGenerator:
             centers_and_radii.append((center[0], center[1], radius_bound))
         return fields
 
+    def _sample_tessellated_fields(
+        self, rng, num_fields, layout, bounds, transformer, min_area, max_area,
+    ) -> list[Field]:
+        """Subdivide ONE land block into parcels along farm tracks, like real farmland.
+
+        Real parcels are convex, usually four-sided (rectangles or trapezoids) and
+        arranged in bands along the working direction, all sharing boundaries; they
+        are not a jigsaw of triangles. See the field-boundary datasets built from
+        aerial imagery (AI4Boundaries, ESSD 2023).
+
+        So the block is cut into a few **rows** first, then each row is cut across
+        into parcels. Cut angles carry a small jitter so the result is trapezoids
+        rather than a perfect grid, and neighbouring parcels share a boundary that is
+        inset by ``parcel_gap_m / 2`` to become a farm track.
+
+        Only ``num_fields`` of the resulting parcels are worked: a farm does not treat
+        every parcel on the same day, and the unworked ones become the real gaps that
+        give the visiting order structure.
+        """
+        min_x, min_y, max_x, max_y = bounds
+        gap = max(0.0, float(layout.get("parcel_gap_m", 1.5)))
+        mean_area = 0.5 * (min_area + max_area)
+        oversample = max(1.0, float(layout.get("tessellated_oversample", 2.0)))
+        pool_size = max(num_fields, int(round(num_fields * oversample)))
+
+        for _attempt in range(200):
+            # Block sized so the whole pool of parcels fills it.
+            side = (pool_size * mean_area) ** 0.5
+            aspect = rng.uniform(0.8, 1.4)
+            width, height = side * aspect, side / max(aspect, 1e-6)
+            centre = ((min_x + max_x) / 2.0, (min_y + max_y) / 2.0)
+            block = Polygon([
+                (centre[0] - width / 2, centre[1] - height / 2),
+                (centre[0] + width / 2, centre[1] - height / 2),
+                (centre[0] + width / 2, centre[1] + height / 2),
+                (centre[0] - width / 2, centre[1] + height / 2),
+            ])
+            dominant = rng.uniform(0.0, pi)
+            # Rows: long bands along the working direction.
+            rows = max(2, min(4, int(round(pool_size / 5.0))))
+            row_pieces = self._band_cuts(rng, block, dominant + pi / 2.0, rows)
+            if row_pieces is None:
+                continue
+            parcels = []
+            for piece in row_pieces:
+                share = max(1, int(round(pool_size * piece.area / block.area)))
+                strips = self._band_cuts(rng, piece, dominant, share)
+                if strips is None:
+                    parcels = None
+                    break
+                parcels.extend(strips)
+            if not parcels:
+                continue
+            if any(not (min_area <= piece.area <= max_area) for piece in parcels):
+                continue
+            # Three- and five-sided parcels are legitimate (a track cutting a corner
+            # leaves a triangle beside a pentagon); only reject degenerate shapes.
+            if any(not 3 <= len(list(piece.exterior.coords)) - 1 <= 6 for piece in parcels):
+                continue
+
+            parcels = self._corner_cut(rng, parcels, min_area, max_area, 0.14)
+
+            # Inset so shared boundaries become narrow farm tracks.
+            objects = []
+            for piece in parcels:
+                inset = piece.buffer(-gap / 2.0) if gap > 0.0 else piece
+                if inset.is_empty or inset.geom_type != "Polygon" or inset.area < min_area:
+                    inset = piece
+                objects.append(inset)
+
+            # The inset (and the corner cut) can leave a sliver that is invalid or
+            # collapses when projected to lat/lon -- retry rather than emit it.
+            # A very elongated sliver is technically valid but collapses when the
+            # polygon is projected to lat/lon and back, so bound the shape too:
+            # 4*pi*area/perimeter^2 is 1 for a circle, ~0.8 for a square and below
+            # 0.05 only for needle-shaped pieces.
+            if any(
+                not piece.is_valid or piece.area < min_area
+                or len(list(piece.exterior.coords)) - 1 < 3
+                or 4.0 * pi * piece.area / max(piece.length, 1e-9) ** 2 < 0.05
+                for piece in objects
+            ):
+                continue
+
+            if len(objects) > num_fields:
+                keep = sorted(rng.sample(range(len(objects)), num_fields))
+                objects = [objects[index] for index in keep]
+
+            # Building the Field projects the outline to lat/lon and back, which can
+            # still fail for a marginal shape no local check catches; retry the whole
+            # tessellation rather than propagate.
+            try:
+                fields = []
+                for order, piece in enumerate(objects, start=1):
+                    points = list(piece.exterior.coords)[:-1]
+                    fields.append(self._field_with_area(
+                        f"field-{order}", points, transformer, piece.area,
+                        min_area, max_area,
+                    ))
+            except (ValueError, RuntimeError):
+                continue
+            block_parcels = [list(piece.exterior.coords)[:-1] for piece in objects]
+            return fields, block_parcels
+
+        raise RuntimeError(
+            "Unable to tessellate the field block; loosen field_generator.field_size."
+        )
+
+    def _corner_cut(self, rng, parcels, min_area, max_area, probability=0.14):
+        """Slice a corner off a minority of parcels, leaving a triangle and a pentagon.
+
+        Real boundaries are mostly four-sided, but a road or track cutting a corner
+        leaves a triangle next to a pentagon. Cutting a convex quad through two
+        opposite sides can only ever give quads, so this cuts near a corner on purpose:
+        the triangle sits at the corner and the remainder gains a fifth side.
+        """
+        result = []
+        for piece in parcels:
+            if rng.random() > probability:
+                result.append(piece)
+                continue
+            corners = list(piece.exterior.coords)[:-1]
+            if len(corners) < 4:
+                result.append(piece)
+                continue
+            index = rng.randrange(len(corners))
+            corner = corners[index]
+            before = corners[index - 1]
+            after = corners[(index + 1) % len(corners)]
+            # The corner triangle at fractions (t, t) along the two edges has area
+            # t^2 times the area of the full corner triangle, so the cut position is
+            # available in closed form.
+            full = abs(
+                (before[0] - corner[0]) * (after[1] - corner[1])
+                - (after[0] - corner[0]) * (before[1] - corner[1])
+            ) / 2.0
+            if full <= 0.0:
+                result.append(piece)
+                continue
+            target = rng.uniform(max(min_area, 0.35 * piece.area),
+                                 min(max_area, 0.5 * piece.area))
+            ratio = max(0.05, min(0.95, (target / full) ** 0.5))
+            point_a = (corner[0] + ratio * (before[0] - corner[0]),
+                       corner[1] + ratio * (before[1] - corner[1]))
+            point_b = (corner[0] + ratio * (after[0] - corner[0]),
+                       corner[1] + ratio * (after[1] - corner[1]))
+            triangle = Polygon([corner, point_a, point_b])
+            if triangle.area < min_area or triangle.area > max_area:
+                result.append(piece)
+                continue
+            remainder = piece.difference(triangle)
+            candidate = []
+            for part in getattr(remainder, "geoms", [remainder]):
+                if part.geom_type == "Polygon" and part.area > 0.0:
+                    candidate.append(part)
+            if len(candidate) != 1:
+                result.append(piece)
+                continue
+            pentagon = candidate[0]
+            if not (min_area <= pentagon.area <= max_area):
+                result.append(piece)
+                continue
+            result.extend([triangle, pentagon])
+        return result
+
+    def _band_cuts(self, rng, polygon, angle, count, tilt_probability=0.12):
+        """Cut ``polygon`` into ``count`` bands across ``angle`` with jittered cuts.
+
+        Each cut is a straight line close to perpendicular to the band direction, so
+        the pieces stay convex and four-sided instead of degenerating into triangles.
+        """
+        if count <= 1:
+            return [polygon]
+        bounds_i = polygon.bounds
+        extent = max(bounds_i[2] - bounds_i[0], bounds_i[3] - bounds_i[1])
+        # Most cuts run across the band (square corners, four-sided parcels), but real
+        # boundaries are not all square: a track cutting a corner leaves a triangle
+        # next to a pentagon. A minority of cuts is therefore tilted.
+        direction = (cos(angle + pi / 2.0), sin(angle + pi / 2.0))
+        # Cut positions: evenly spaced with jitter, expressed as fractions along the
+        # polygon's projection on the cut normal.
+        normal = (-direction[1], direction[0])
+        corners = list(polygon.exterior.coords)
+        projections = [normal[0] * x + normal[1] * y for x, y in corners]
+        low, high = min(projections), max(projections)
+        span = high - low
+        if span <= 0.0:
+            return None
+        fractions = sorted(
+            (index + rng.uniform(-0.22, 0.22)) / count for index in range(1, count)
+        )
+        pieces = [polygon]
+        for fraction in fractions:
+            if not 0.05 < fraction < 0.95:
+                continue
+            offset = low + span * fraction
+            origin = (normal[0] * offset, normal[1] * offset)
+            reach = 4.0 * extent
+            if rng.random() < tilt_probability:
+                skew = rng.choice((-1.0, 1.0)) * rng.uniform(0.12, 0.30)
+                cut_direction = (
+                    cos(angle + pi / 2.0 + skew), sin(angle + pi / 2.0 + skew)
+                )
+            else:
+                cut_direction = direction
+            cut = LineString([
+                (origin[0] - cut_direction[0] * reach, origin[1] - cut_direction[1] * reach),
+                (origin[0] + cut_direction[0] * reach, origin[1] + cut_direction[1] * reach),
+            ])
+            updated = []
+            for piece in pieces:
+                for part in split_geometry(piece, cut).geoms:
+                    updated.extend(
+                        part.geoms if isinstance(part, MultiPolygon) else [part]
+                    )
+            pieces = [piece for piece in updated if not piece.is_empty and piece.area > 0.0]
+            if len(pieces) != len(updated):
+                return None
+        return pieces if len(pieces) == count else None
+
     def _sample_clustered_fields(
         self, rng, num_fields, layout, bounds, transformer, min_area, max_area,
     ) -> list[Field]:
@@ -240,6 +466,7 @@ class InstanceGenerator:
         shape = self.config["field_generator"]["shape"]
         inner_gap = max(0.0, float(layout.get("cluster_inner_gap_m", 4.0)))
         outer_gap = max(inner_gap, float(layout.get("cluster_gap_m", 90.0)))
+        attempts = max(4, int(layout.get("growth_attempts", 60)))
         cluster_count = min(
             int(layout.get("cluster_max", 4)),
             max(int(layout.get("cluster_min", 2)), int(ceil(num_fields / 5.0))),
@@ -278,28 +505,75 @@ class InstanceGenerator:
             return high
 
         def grow(count: int):
+            """Grow ``count`` parcels, each placed clear of *every* earlier parcel.
+
+            An earlier version bisected the distance against the anchor parcel only, so
+            the third parcel could clear its anchor while landing on top of another one.
+            Measured: 5/150 parcel pairs intersected at n=5, with up to 8,399 m2 of
+            overlap -- close to a whole parcel. The clearance must therefore be checked
+            against all placed parcels, and since the minimum over them is not monotone
+            along a ray, this scans the ray and bisects only the final bracket.
+            """
             placed: list[tuple[list[tuple[float, float]], tuple[float, float]]] = []
             for _ in range(count):
                 target_area = rng.uniform(min_area, max_area)
                 polygon = self._irregular_polygon_xy(rng, (0.0, 0.0), target_area, shape)
-                centre, _radius = self._polygon_center_and_radius(polygon)
+                centre, radius = self._polygon_center_and_radius(polygon)
                 local = [(x - centre[0], y - centre[1]) for x, y in polygon]
                 if not placed:
                     placed.append((local, (0.0, 0.0)))
                     continue
-                anchor_points, anchor_position = placed[rng.randrange(len(placed))]
-                absolute_anchor = [
-                    (anchor_position[0] + x, anchor_position[1] + y) for x, y in anchor_points
-                ]
-                angle = rng.uniform(0.0, 2.0 * pi)
-                distance = bisect_offset(
-                    absolute_anchor, local, angle, inner_gap, anchor_position
-                )
-                placed.append((
-                    local,
-                    (anchor_position[0] + distance * cos(angle),
-                     anchor_position[1] + distance * sin(angle)),
-                ))
+
+                def min_gap(origin, angle, distance):
+                    """Smallest clearance from the candidate to every placed parcel."""
+                    cosine, sine = cos(angle), sin(angle)
+                    moved = [
+                        (origin[0] + distance * cosine + x,
+                         origin[1] + distance * sine + y) for x, y in local
+                    ]
+                    worst = float("inf")
+                    for other, position in placed:
+                        absolute = [(position[0] + x, position[1] + y) for x, y in other]
+                        worst = min(worst, clearance(moved, absolute))
+                        if worst < inner_gap:
+                            return worst
+                    return worst
+
+                position = None
+                ordered = sorted(placed, key=lambda entry: entry[1])
+                for _attempt in range(max(4, attempts)):
+                    anchor_points, anchor_position = ordered[rng.randrange(len(ordered))]
+                    angle = rng.uniform(0.0, 2.0 * pi)
+                    # Scan outward from the anchor until clear of everyone, then
+                    # bisect that last bracket so the parcel stays as close as it can.
+                    previous = 0.0
+                    distance = 0.0
+                    limit = 6.0 * radius + 400.0
+                    while distance <= limit:
+                        if min_gap(anchor_position, angle, distance) >= inner_gap:
+                            break
+                        previous = distance
+                        distance += max(2.0, radius / 8.0)
+                    if distance > limit:
+                        continue
+                    low, high = previous, distance
+                    for _step in range(30):
+                        mid = 0.5 * (low + high)
+                        if min_gap(anchor_position, angle, mid) >= inner_gap:
+                            high = mid
+                        else:
+                            low = mid
+                    position = (
+                        anchor_position[0] + high * cos(angle),
+                        anchor_position[1] + high * sin(angle),
+                    )
+                    break
+                if position is None:
+                    raise RuntimeError(
+                        "Unable to grow a clustered field block; grow the workspace or "
+                        "reduce field_generator.field_size."
+                    )
+                placed.append((local, position))
             return placed
 
         clusters = [grow(count) for count in sizes]
@@ -640,7 +914,11 @@ class InstanceGenerator:
             raise ValueError(f"Unsupported depot.type: {depot_type!r}.")
         layout = layout or {}
         mode = str(layout.get("mode", "scattered"))
-        if mode == "contiguous" and block_parcels:
+        # Both packed layouts place the depot as farm headquarters a short standoff
+        # beyond the block. `clustered` used to fall through to the generic random
+        # branch, which dropped it anywhere in the enlarged workspace -- measured
+        # 1300-1700 m from the parcels instead of the configured 50-400 m.
+        if mode in ("contiguous", "clustered", "tessellated") and block_parcels:
             # Farm headquarters. Rules, in order:
             #   1. pick any direction around the block (not one of four corners);
             #   2. sit STANDOFF metres beyond the block's actual extent *in that

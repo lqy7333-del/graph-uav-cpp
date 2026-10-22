@@ -36,7 +36,14 @@ field_generator:
   # 60% of the travelled distance was flying between fields rather than covering
   # them. ``scattered`` is kept so older baselines stay reproducible.
   layout:
-    mode: clustered
+    # tessellated: one land block split by straight boundaries into adjacent parcels
+    # that share edges -- what real field boundaries look like. Avoids the earlier
+    # mistake of scattering independent polygons with gaps between them.
+    mode: tessellated
+    parcel_gap_m: 1.5
+    # Tessellate this many times more parcels than are worked, then keep a random
+    # subset: the unworked parcels become the real gaps between worked ones.
+    tessellated_oversample: 2.0
     gap_m: 15.0
     # clustered mode: tight parcels inside a block, wide tracks between blocks.
     # Real farmland is asymmetric this way; a uniform lattice leaves the visiting
