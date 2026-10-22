@@ -113,7 +113,9 @@ def local_search(environment, start, sweeps=12):
                 score = replay(environment, candidate)
                 if score is not None and score > best_score + 1e-9:
                     best, best_score, improved = candidate, score, True
-        # --- reorder moves: 2-opt reversal and pairwise swap
+        # --- reorder moves: 2-opt reversal, pairwise swap, and single-visit relocate.
+        # Relocate matters: a visit that belongs later in the tour can only be moved
+        # there by an insert/remove move, not by swaps and reversals.
         count = len(best)
         for i in range(count):
             for j in range(i + 1, count):
@@ -124,6 +126,16 @@ def local_search(environment, start, sweeps=12):
                     score = replay(environment, candidate)
                     if score is not None and score > best_score + 1e-9:
                         best, best_score, improved = candidate, score, True
+        for i in range(count):
+            for j in range(count):
+                if i == j:
+                    continue
+                candidate = list(best)
+                visit = candidate.pop(i)
+                candidate.insert(j, visit)
+                score = replay(environment, candidate)
+                if score is not None and score > best_score + 1e-9:
+                    best, best_score, improved = candidate, score, True
         if not improved:
             break
     return best, best_score
@@ -135,6 +147,8 @@ def main() -> None:
     parser.add_argument("--field-count", type=int, default=5)
     parser.add_argument("--instances", type=int, default=5)
     parser.add_argument("--sweeps", type=int, default=12)
+    parser.add_argument("--restarts", type=int, default=0,
+                        help="Extra shuffled starts for the local search.")
     parser.add_argument("--base-seed", type=int, default=1000)
     args = parser.parse_args()
 
@@ -178,10 +192,28 @@ def main() -> None:
         heuristic_sequence = trace(environment, _nearest_field_choice)
         heuristic_score = replay(environment, heuristic_sequence) if heuristic_sequence else None
 
-        _seq_a, from_policy = local_search(environment, policy_sequence, args.sweeps) if policy_sequence else (None, None)
-        _seq_b, from_heuristic = local_search(environment, heuristic_sequence, args.sweeps) if heuristic_sequence else (None, None)
-        candidates = [value for value in (from_policy, from_heuristic) if value is not None]
+        starts = {}
+        if policy_sequence:
+            starts["policy"] = local_search(environment, policy_sequence, args.sweeps)[1]
+        if heuristic_sequence:
+            starts["heuristic"] = local_search(environment, heuristic_sequence, args.sweeps)[1]
+        # Multi-start: shuffled copies of the heuristic's visits, so the search is not
+        # trapped in the basin of a single starting order.
+        import random as _random
+        rng = _random.Random(args.base_seed + index)
+        base = heuristic_sequence or policy_sequence
+        for trial in range(args.restarts):
+            if not base:
+                break
+            shuffled = list(base)
+            rng.shuffle(shuffled)
+            starts[f"shuffle{trial}"] = local_search(environment, shuffled, args.sweeps)[1]
+        from_policy = starts.get("policy")
+        from_heuristic = starts.get("heuristic")
+        candidates = [value for value in starts.values() if value is not None]
         best = max(candidates) if candidates else None
+        valid = {name: value for name, value in starts.items() if value is not None}
+        best_start = max(valid, key=valid.get) if valid else "-"
         if None in (policy_score, best):
             print(f"{seed:>6}  评估失败")
             continue
