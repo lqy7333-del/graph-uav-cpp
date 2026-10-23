@@ -7,6 +7,17 @@
 
 ## 2026-10-23
 
+### 89. 为当前空间动作增加真实环境 cost-to-go 教师与成对排序接口（本次未运行训练）
+- **新增文件**：
+  - `coverage_env/rl/evaluation/cost_to_go_oracle.py`：对每个候选 `(field, entry, exit)` 在独立环境副本上执行真实 `step()`，再从后继状态做限时束搜索；以总飞行距离增量作为 cost-to-go 标签。
+  - `coverage_env/rl/trainer/cost_to_go_ranking.py`：保存状态/图/候选集/可行掩码/搜索标签，并提供归一化成对排序损失和显式单样本更新接口。
+  - `coverage_env/tests/test_cost_to_go_oracle.py`、`coverage_env/tests/test_cost_to_go_ranking.py`：覆盖状态隔离、后继状态搜索、终止动作、未知标签和排序梯度方向。
+- **修改文件**：`coverage_env/rl/evaluation/beam_oracle.py` 增加 `reset` 参数；默认仍重置环境以保持原完整任务搜索行为，`reset=False` 时可从精确的中间状态继续搜索。
+- **旧 → 新**：策略只能根据当前网络分数自行学习全局后果 → 可用相同当前状态下候选动作的真实后续任务距离构造排序监督；未知搜索结果保留为未知，不伪装成不可行或高成本。
+- **设计边界**：动作仍为 `(field, entry boundary, exit boundary)`，没有新增返航动作，也没有改变 PPO、GNN、奖励或环境执行逻辑。每个候选动作都运行独立限时搜索，接口默认最多抽取 16 个可行动作，调用方可调整；该方法提供“搜索找到的最好完整解”标签，不声称全局最优。
+- **验证**：只运行定向单元测试，不执行策略训练或 PPO episode。
+- **回滚**：`git revert <本条对应提交>`。
+
 ### 88. 方案 B 续跑到 600 轮：**与无前瞻的 v14@800 完全持平（差 ≤0.10，均在噪声内）**
 - **运行**：`run_v15_lookahead` 200 → 600 轮（恒定 LR 1e-4、`entropy_coef=0`）
 - **最终配对验证（10 实例/档，策略 − 两行规则）**：

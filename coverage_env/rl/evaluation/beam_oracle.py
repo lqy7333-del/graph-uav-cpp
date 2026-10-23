@@ -59,11 +59,18 @@ def branch_actions(environment, limit):
     return picked
 
 
-def beam_search(environment, *, beam, branches, max_depth, budget_seconds, verbose=True):
+def beam_search(
+    environment, *, beam, branches, max_depth, budget_seconds,
+    verbose=True, reset=True,
+):
     import torch  # noqa: F401  (the env pulls torch in through its own imports)
 
     root = copy.deepcopy(environment)
-    root.reset()
+    # Full-episode oracle calls start from reset by default. Cost-to-go queries
+    # pass reset=False so every candidate is evaluated from the exact same
+    # intermediate UAV/coverage/resource state.
+    if reset:
+        root.reset()
     nodes = [(0.0, [], root)]
     best = None
     started = time.time()
