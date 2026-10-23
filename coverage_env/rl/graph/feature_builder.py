@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from math import atan2, degrees, pi
+from math import atan2, ceil, degrees, hypot, pi
 
 import torch
 
@@ -26,9 +26,28 @@ class FieldFeatureBuilder:
         self.position_scale_m = float(position_scale_m)
 
     def build(self, environment) -> torch.Tensor:
-        """Return [area, perimeter, compactness, orientation, remaining, center_x, center_y]."""
+        """Return area/geometry, remaining work, and per-parcel look-ahead.
+
+        The look-ahead columns exist because the audit showed the valuable
+        improvements are not orderings within a fixed trip structure but *changes to
+        the structure itself*: the order decides how much of each parcel gets covered
+        before the payload runs out, which decides the total coverage distance. A
+        policy that only sees the current payload cannot anticipate that, so each
+        parcel now reports whether one visit would finish it, what would be left
+        afterwards, and whether the UAV could still reach any other parcel.
+        """
         rows = []
-        for field in environment.fields:
+        uav = environment.uavs[0] if environment.uavs else None
+        remaining_payload = float(getattr(uav, "remaining_payload", 0.0)) if uav else 0.0
+        max_payload = float(getattr(uav, "max_payload", 1.0)) if uav else 1.0
+        density = float(getattr(uav, "payload_per_area", 0.004)) if uav else 0.004
+        needs = []
+        for candidate_field in environment.fields:
+            uncovered = sum(
+                point.point_area for point in candidate_field.grid_points if not point.covered
+            )
+            needs.append(uncovered * density)
+        for index, field in enumerate(environment.fields):
             total_grid_area = sum(point.point_area for point in field.grid_points)
             remaining = sum(point.point_area for point in field.grid_points if not point.covered)
             remaining_ratio = (
@@ -46,8 +65,18 @@ class FieldFeatureBuilder:
                 max(0.0, min(1.0, remaining_ratio)),
                 max(-1.0, min(1.0, float(field.centroid[0]) / self.position_scale_m)),
                 max(-1.0, min(1.0, float(field.centroid[1]) / self.position_scale_m)),
+                # ---- look-ahead ----
+                1.0 if remaining_payload + 1e-9 >= needs[index] else 0.0,
+                max(0.0, min(1.0, (remaining_payload - needs[index]) / max_payload))
+                if max_payload > 0.0 else 0.0,
+                1.0 if any(
+                    other != index
+                    and remaining_payload - needs[index] + 1e-9 >= needs[other]
+                    and needs[other] > 1e-9
+                    for other in range(len(needs))
+                ) else 0.0,
             ])
-        return torch.tensor(rows, dtype=torch.float32).reshape(-1, 7)
+        return torch.tensor(rows, dtype=torch.float32).reshape(-1, 10)
 
 
 class BoundaryFeatureBuilder:
@@ -81,8 +110,15 @@ class BoundaryFeatureBuilder:
                 _angle_to_unit(angle),
                 max(-1.0, min(1.0, float(boundary.center[0]) / self.position_scale_m)),
                 max(-1.0, min(1.0, float(boundary.center[1]) / self.position_scale_m)),
+                # Distance from this gate to the depot: leaving through a gate close
+                # to the depot is what makes a resupply leg cheap, which the beam
+                # search exploited for 462-698 m per episode.
+                max(0.0, min(1.0, hypot(
+                    boundary.center[0] - environment.depot.get_position()[0],
+                    boundary.center[1] - environment.depot.get_position()[1],
+                ) / self.position_scale_m)),
             ])
-        return torch.tensor(rows, dtype=torch.float32).reshape(-1, 4)
+        return torch.tensor(rows, dtype=torch.float32).reshape(-1, 5)
 
 
 class UavNodeFeatureBuilder:
@@ -146,6 +182,22 @@ class UavNodeFeatureBuilder:
             norm(getattr(uav, "beta", 0.0), self.beta_scale),
             norm(getattr(uav, "payload_per_area", 0.0),
                  self.payload_per_area_scale),
+            # ---- look-ahead ----
+            # How many more payload-loads the remaining work needs: the single
+            # clearest summary of the trip structure the policy has to plan.
+            min(1.0, ceil(
+                (sum(
+                    sum(point.point_area for point in f.grid_points if not point.covered)
+                    for f in environment.fields
+                ) * float(getattr(uav, "payload_per_area", 0.004)))
+                / max(remaining_payload, 1e-9)
+            ) / 8.0) if remaining_payload > 1e-9 else 1.0,
+            min(1.0, (
+                sum(sum(point.point_area for point in f.grid_points if not point.covered)
+                    for f in environment.fields)
+                / max(sum(sum(point.point_area for point in f.grid_points)
+                          for f in environment.fields), 1e-9)
+            )),
         ]], dtype=torch.float32)
 
 

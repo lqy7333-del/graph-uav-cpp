@@ -49,7 +49,7 @@ def probe_points(geometry) -> list[tuple[float, float]]:
     return points
 
 
-def collect_connector_inputs(steps: int = 8, seed: int = 42) -> list[tuple]:
+def collect_connector_inputs(steps: int = 20, seed: int = 42) -> list[tuple]:
     """Run a small deterministic rollout and record every connector call.
 
     ``boundary_aware_sweep`` imports the connector lazily, so patching the
@@ -141,7 +141,7 @@ class VisibilityConnectorTests(unittest.TestCase):
         self.assertGreater(pairs, 200, "predicate sweep too small to be meaningful")
 
     def test_prepared_predicate_matches_scalar_on_real_regions(self):
-        captured = collect_connector_inputs(steps=8)
+        captured = collect_connector_inputs(steps=20)
         self.assertGreater(len(captured), 10, "no connector calls captured")
         checked = 0
         for start, end, geometry in captured[:20]:
@@ -162,7 +162,7 @@ class VisibilityConnectorTests(unittest.TestCase):
 
     def test_pair_cache_matches_uncached_on_real_inputs(self):
         """The per-region memo must not change a single waypoint."""
-        captured = collect_connector_inputs(steps=8)
+        captured = collect_connector_inputs(steps=20)
         by_geometry: dict[int, tuple] = {}
         for start, end, geometry in captured:
             by_geometry.setdefault(id(geometry), (geometry, []))[1].append((start, end))

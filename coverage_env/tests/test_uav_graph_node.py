@@ -50,7 +50,7 @@ class UavGraphNodeTests(unittest.TestCase):
         boundary_count = graph.x_boundary.shape[0]
         self.assertEqual(graph.relation_counts[EDGE_UF], field_count)
         self.assertEqual(graph.relation_counts[EDGE_UB], boundary_count)
-        self.assertEqual(graph.x_uav_node.shape, (1, 9))
+        self.assertEqual(graph.x_uav_node.shape, (1, 11))
 
     def test_uav_edge_distance_channel_is_well_scaled(self):
         """Guard the under-scaling failure mode: distances must span [0, 1]."""
@@ -206,8 +206,11 @@ class UavGraphNodeTests(unittest.TestCase):
             rows.append(self.builder.build_graph(environment).x_uav_node[0])
         stacked = torch.stack(rows)
         # Dims 0/1 are the *state* ratios, which are 1.0 at reset by construction;
-        # dims 2-5 are the per-episode capability channels this scale fix targets.
-        capability = stacked[:, 2:]
+        # dims 2-8 are the per-episode capability/consumption channels this scale fix
+        # targets. Dims 9/10 are the per-parcel look-ahead (work still outstanding and
+        # how many loads it needs): both are constant at reset, so they are excluded
+        # rather than silently widening the failure to a channel this test is not about.
+        capability = stacked[:, 2:9]
         spread = capability.max(dim=0).values - capability.min(dim=0).values
         self.assertGreater(
             float(spread.min()), 0.1, f"a capability channel is squashed: {spread.tolist()}"

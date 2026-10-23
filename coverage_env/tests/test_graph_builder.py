@@ -41,8 +41,8 @@ class GraphBuilderTests(unittest.TestCase):
         self.assertIsInstance(graph, Data)
         field_count = len(self.environment.fields)
         boundary_count = sum(len(field.boundaries) for field in self.environment.fields)
-        self.assertEqual(graph.x_field.shape, (field_count, 7))
-        self.assertEqual(graph.x_boundary.shape, (boundary_count, 4))
+        self.assertEqual(graph.x_field.shape, (field_count, 10))
+        self.assertEqual(graph.x_boundary.shape, (boundary_count, 5))
         self.assertTrue(torch.all(graph.x_field[:, 5:7].abs() <= 1.0))
         self.assertTrue(torch.all(graph.x_boundary[:, 2:4].abs() <= 1.0))
         position_scale = self.config["rl"]["graph"]["position_scale_m"]
@@ -57,7 +57,7 @@ class GraphBuilderTests(unittest.TestCase):
             self.assertTrue(torch.allclose(graph.x_boundary[index, 2:4], expected_center))
         self.assertEqual(graph.global_feature.shape, (5,))
         # One UAV node is appended after every Field and Boundary node.
-        self.assertEqual(graph.x_uav_node.shape, (1, 9))
+        self.assertEqual(graph.x_uav_node.shape, (1, 11))
         self.assertEqual(graph.uav_node_index, field_count + boundary_count)
         self.assertEqual(graph.num_nodes, field_count + boundary_count + 1)
         self.assertTrue(torch.all(graph.x_uav_node >= 0.0))
