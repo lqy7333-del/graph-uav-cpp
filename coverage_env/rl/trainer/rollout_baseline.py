@@ -80,12 +80,13 @@ def _sample_episode(environment, policy, *, seed):
     while not done and steps < 500:
         state = environment.get_state()
         output = policy(state, environment=environment)
-        distribution = output["distribution"]
+        distribution = output["action_distribution"]
         if not torch.isfinite(distribution).all() or float(distribution.sum()) <= 0.0:
             break
         index = int(torch.multinomial(distribution.detach().cpu(), 1).item())
         action = output["actions"][index]
-        log_prob_sum = log_prob_sum + output["log_probs"][index]
+        # The policy exposes the distribution, not precomputed log-probs.
+        log_prob_sum = log_prob_sum + torch.log(distribution[index].clamp_min(1e-12))
         _s, reward, done, info = environment.step(action)
         total_reward += float(reward)
         steps += 1
@@ -117,8 +118,11 @@ class RolloutBaselineTrainer:
 
     def __init__(self, agent, config, *, instance_seeds, num_fields=(5, 20),
                  learning_rate=None, promotion_instances=20, promotion_alpha=0.10):
+        # Accept either the policy itself or an agent that wraps one: PPOAgent
+        # exposes the network under a different attribute, so requiring ``.policy``
+        # here made the trainer unusable with the real agent.
         self.agent = agent
-        self.policy = agent.policy
+        self.policy = getattr(agent, "policy", None) or getattr(agent, "actor", agent)
         self.config = config
         _assert_unit_gamma(config["ppo"])
         self.baseline = copy.deepcopy(self.policy)
