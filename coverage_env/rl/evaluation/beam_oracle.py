@@ -101,11 +101,36 @@ def branch_actions(environment, limit, *, diverse_fields=False):
     return selected
 
 
+def select_beam(frontier, beam, *, diverse_frontier=False):
+    """Pick the surviving nodes, optionally keeping one leader per root field.
+
+    ``diverse_frontier`` reserves a slot for the best node of every root action's
+    field before filling the rest by accumulated reward. Without it the first-layer
+    beam can be filled by several gates of one parcel, so every completed path
+    shares a root field and the cost-to-go labels never compare different parcels.
+    Nodes are ``(value, sequence, state[, trace])`` and ``sequence[0][0]`` is the
+    root action's field id.
+    """
+    ordered = sorted(frontier, key=lambda item: item[0], reverse=True)
+    if not diverse_frontier:
+        return ordered[:beam]
+    leaders = {}
+    others = []
+    for item in ordered:
+        root_field = item[1][0][0] if item[1] else None
+        if root_field not in leaders:
+            leaders[root_field] = item
+        else:
+            others.append(item)
+    leading = sorted(leaders.values(), key=lambda item: item[0], reverse=True)
+    return (leading + others)[:beam]
+
+
 def beam_search(
     environment, *, beam, branches, max_depth, budget_seconds,
     verbose=True, reset=True, return_trace=False,
     trace_context_builder=None, diverse_fields=False,
-    max_completed_paths=4096,
+    diverse_frontier=False, max_completed_paths=4096,
 ):
     import torch  # noqa: F401  (the env pulls torch in through its own imports)
 
@@ -206,8 +231,7 @@ def beam_search(
         if not frontier:
             termination_reason = "frontier_empty"
             break
-        frontier.sort(key=lambda item: item[0], reverse=True)
-        nodes = frontier[:beam]
+        nodes = select_beam(frontier, beam, diverse_frontier=diverse_frontier)
         if verbose:
             print(f"  depth {depth + 1}: {len(frontier)} nodes, best so far "
                   f"{nodes[0][0]:.2f}, steps {steps}, "

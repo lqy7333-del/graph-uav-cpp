@@ -174,6 +174,9 @@ def collect_beam_cost_to_go_examples(
         return_trace=True,
         trace_context_builder=snapshot_context,
         diverse_fields=diverse_fields,
+        # Keep one survivor per root field so the root state can be compared
+        # across parcels; otherwise every completed path shares one root field.
+        diverse_frontier=True,
         max_completed_paths=max_completed_paths,
     )
 
