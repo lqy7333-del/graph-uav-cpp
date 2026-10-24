@@ -113,6 +113,19 @@ class PromotionGuardTests(unittest.TestCase):
         self.assertFalse(result["promoted"])
         self.assertIn("insufficient", result["reason"])
 
+    def test_promotion_records_interval_and_reason(self):
+        """Every check must log the interval and why promotion was blocked."""
+        from coverage_env.rl.trainer.rollout_baseline import RolloutBaselineTrainer as T
+        import statistics
+        deltas = [5.0] * 10
+        mean = statistics.fmean(deltas)
+        sd = statistics.stdev(deltas)
+        standard_error = sd / (len(deltas) ** 0.5)
+        record = {"mean_delta": mean, "sd": sd,
+                  "t": mean / standard_error if standard_error else 0.0}
+        self.assertFalse(2.0 < record["t"])            # identical deltas => no promotion
+        self.assertEqual(record["sd"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

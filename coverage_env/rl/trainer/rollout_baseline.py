@@ -207,11 +207,23 @@ class RolloutBaselineTrainer:
                     "n": len(deltas)}
         mean = statistics.fmean(deltas)
         sd = statistics.stdev(deltas) if len(deltas) > 1 else 0.0
-        t = mean / (sd / (len(deltas) ** 0.5)) if sd > 0 else 0.0
+        standard_error = sd / (len(deltas) ** 0.5) if sd > 0 else 0.0
+        t = mean / standard_error if standard_error > 0 else 0.0
+        # Two-sided 95% interval on the paired mean (t critical ~2.1 for n>=13).
+        ci_half = 2.1 * standard_error
         # One-sided: promote only when the current actor is better by a margin.
         promoted = t > 2.0 and mean > 0.0
-        record = {"n": len(deltas), "mean_delta": mean, "t": t,
-                  "wins": current_wins, "promoted": promoted}
+        if promoted:
+            reason = "promoted: paired mean improvement is significant"
+        elif mean <= 0.0:
+            reason = "blocked: paired mean improvement is not positive"
+        elif t <= 2.0:
+            reason = "blocked: t statistic below the 2.0 threshold"
+        else:
+            reason = "blocked: unknown"
+        record = {"n": len(deltas), "mean_delta": mean, "sd": sd, "t": t,
+                  "ci95": [mean - ci_half, mean + ci_half],
+                  "wins": current_wins, "promoted": promoted, "reason": reason}
         if promoted:
             self.baseline.load_state_dict(self.policy.state_dict())
             for parameter in self.baseline.parameters():
