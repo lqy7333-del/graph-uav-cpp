@@ -19,6 +19,7 @@ from coverage_env.rl.evaluation.cost_to_go_oracle import (
     ActionCostEstimate,
     evaluate_candidate_action_costs,
 )
+from coverage_env.rl.evaluation.beam_oracle import beam_search
 
 
 @dataclass
@@ -118,6 +119,105 @@ def collect_cost_to_go_example(
         search_steps=search_steps,
         total_area=max(total_area, 1e-12),
     )
+
+
+def collect_beam_cost_to_go_examples(
+    environment,
+    policy,
+    *,
+    beam: int = 4,
+    branches: int = 8,
+    max_depth: int = 32,
+    budget_seconds: float = 600.0,
+    reset: bool = True,
+    diverse_fields: bool = True,
+    max_completed_paths: int = 4096,
+) -> tuple[Any, int, list[CostToGoRankingExample], dict]:
+    """Run one beam search and recover labels for its explored state-action tree.
+
+    Every completed search path contributes its *actual remaining distance*
+    to each state-action edge on that path. Costs are aggregated by minimum
+    completed distance for the same edge. An action without a completed
+    descendant remains unlabeled. Therefore this can produce pairwise labels
+    for many search states in one search, but only where at least two actions
+    from the same state have completed descendants.
+
+    The source environment is not mutated. Returned examples preserve the full
+    candidate list and feasibility mask at each expanded state; branch-pruned
+    and unresolved actions are explicitly left without costs.
+    """
+    search_environment = deepcopy(environment)
+    if reset:
+        search_environment.reset()
+    total_area = float(getattr(search_environment, "total_area", 0.0))
+    if total_area <= 0.0:
+        total_area = sum(float(field.area) for field in search_environment.fields)
+    total_area = max(total_area, 1e-12)
+
+    def snapshot_context(state, actions, mask):
+        return {
+            "observation": deepcopy(state.get_state()),
+            "graph": _snapshot_graph(policy.graph_builder.build_graph(state)),
+            "actions": list(actions),
+            "feasible_mask": [bool(value) for value in mask],
+            "total_area": total_area,
+        }
+
+    best, steps, trace = beam_search(
+        search_environment,
+        beam=beam,
+        branches=branches,
+        max_depth=max_depth,
+        budget_seconds=budget_seconds,
+        verbose=False,
+        reset=False,
+        return_trace=True,
+        trace_context_builder=snapshot_context,
+        diverse_fields=diverse_fields,
+        max_completed_paths=max_completed_paths,
+    )
+
+    examples = [
+        CostToGoRankingExample(
+            observation=context["observation"],
+            graph=context["graph"],
+            actions=context["actions"],
+            feasible_mask=context["feasible_mask"],
+            costs=context["costs"],
+            statuses=context["statuses"],
+            search_steps=context["search_steps"],
+            total_area=context["total_area"],
+        )
+        for context in trace["contexts"]
+        if any(cost is not None for cost in context["costs"])
+    ]
+    diagnostics = {
+        key: value for key, value in trace.items() if key != "contexts"
+    }
+    diagnostics["expanded_contexts"] = len(trace["contexts"])
+    diagnostics["labeled_contexts"] = len(examples)
+    diagnostics["rankable_contexts"] = sum(
+        _has_distinct_cost_pair(example.costs, example.feasible_mask)
+        for example in examples
+    )
+    diagnostics["candidate_labels"] = sum(
+        example.labeled_action_count for example in examples
+    )
+    diagnostics["field_coverage_by_context"] = [
+        sorted({action.field_id for action, cost in zip(example.actions, example.costs)
+                if cost is not None})
+        for example in examples
+    ]
+    return best, steps, examples, diagnostics
+
+
+def _has_distinct_cost_pair(costs, feasible_mask) -> bool:
+    values = [
+        float(cost) for cost, feasible in zip(costs, feasible_mask)
+        if feasible and cost is not None
+    ]
+    return any(left != right for index, left in enumerate(values)
+               for right in values[index + 1:])
 
 
 def pairwise_cost_ranking_loss(

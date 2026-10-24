@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-10-24
+
+### 90. 单次束搜索回收多状态 cost-to-go 标签，避免逐候选重复完整搜索
+- **修改文件**：`coverage_env/rl/evaluation/beam_oracle.py`、`coverage_env/rl/trainer/cost_to_go_ranking.py`、`coverage_env/rl/trainer/__init__.py`、`coverage_env/tests/test_cost_to_go_oracle.py`。
+- **旧 → 新**：每个 `(state, action)` 都从该动作后独立运行完整束搜索 → 一次 episode 束搜索记录展开树；对每条找到的完整路径，把终局累计距离减去决策状态累计距离，回传给路径上的 state-action。相同 state-action 聚合已找到完整后缀中的最小距离。
+- **标签语义**：只有搜索找到完整后缀的动作才有成本；未展开、被分支裁剪、没有完整后缀的动作保持 `None`，不伪装成高成本。成对排序只对同一状态下至少两个已标注且成本不同的动作有效；单条最优轨迹自身不足以构成 pair。
+- **全局候选覆盖**：cost-to-go trace 默认跨地块均匀抽取首批分支，再轮流加入替代边界组合；普通 `beam_search` 默认仍用原 nearest-first 行为，保持已有调用兼容。
+- **新增接口**：`collect_beam_cost_to_go_examples(environment, policy, ...)` 返回搜索结果、带标签的中间状态样本和诊断统计，包括完成路径数、标签状态数、可排序状态数、pair 数和每状态已标注地块。
+- **验证边界**：标签是限时束搜索实际找到的完整解成本，不代表全局最优；单次搜索是否产出足够的可比较标签，需先在训练工作站做小规模 pilot。本机只跑代码测试，不启动训练。
+- **回滚**：`git revert <本条对应提交>`。
+
 ## 2026-10-23
 
 ### 89. 为当前空间动作增加真实环境 cost-to-go 教师与成对排序接口（本次未运行训练）

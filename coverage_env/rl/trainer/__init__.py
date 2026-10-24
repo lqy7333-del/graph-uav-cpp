@@ -3,6 +3,7 @@
 from coverage_env.rl.trainer.cost_to_go_ranking import (
     CostToGoRankingExample,
     CostToGoRankingTrainer,
+    collect_beam_cost_to_go_examples,
     collect_cost_to_go_example,
     pairwise_cost_ranking_loss,
 )
@@ -12,6 +13,7 @@ __all__ = [
     "CostToGoRankingExample",
     "CostToGoRankingTrainer",
     "Trainer",
+    "collect_beam_cost_to_go_examples",
     "collect_cost_to_go_example",
     "pairwise_cost_ranking_loss",
 ]
