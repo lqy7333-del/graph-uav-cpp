@@ -8,6 +8,39 @@
 ## 2026-10-24
 ## 2026-10-24
 
+### 92. 新增 REINFORCE + 冻结贪心 rollout baseline 训练器（实验代码，未改变 PPO 语义）
+- **分支**：`codex/rollout-baseline`
+- **文件**：新增 `coverage_env/rl/trainer/rollout_baseline.py`、
+  `coverage_env/tests/test_rollout_baseline.py`。
+- **动机**：PPO 的 critic 在「回报被一段长且近似恒定的距离主导」时给出的优势很噪声，
+  演员可能原地不动而 critic 却解释得很好（EV 高）✓ 借鉴 Kool 等人的做法，
+  用**同一实例**上的冻结贪心 rollout 估计 baseline ✓
+- **实现要点**：
+  1. `_assert_unit_gamma` **强制 gamma == 1.0** ✓ —— 代码默认是 **0.99** ✗，
+     若不显式断言，会静默改变方法 ✗
+  2. **同实例配对**：采样轨迹与 baseline 轨迹用 `_build_instance(config, n, seed)`
+     各自构建，同 seed ⇒ 同一布局 ✓（有测试 ✓）
+  3. `advantage = cost_sample - cost_baseline` 以**正数为好** ✓，
+     `loss = -advantage * sum_t(log_prob_t)` ✓
+  4. baseline 由 `copy.deepcopy` 建立并 `requires_grad_(False)` ✓，
+     只在 `promotion_check` 的**配对显著性检验**（t > 2 且均值 > 0）通过时更新 ✓
+  5. 不使用 Critic/GAE 产生优势 ✓
+- **测试（9 项，全部通过）**：
+  1. 传入默认 0.99 必须报错 ✓
+  2. 显式 0.99 必须报错 ✓
+  3. 1.0 通过 ✓
+  4. 更便宜的采样 ⇒ 优势为正 ✓
+  5. 无 baseline ⇒ 优势为 0 ✓
+  6. **同 seed 两次构建实例完全一致**（同地块 ✓）
+  7. 不同 seed 的实例不同 ✓
+  8. baseline 参数不参与梯度、且不与策略共享层 ✓
+  9. 样本不足时不得提升 baseline ✓
+- **未改动**：GNN / Action Embedding / Hierarchical Decoder / 动作语义 / workload /
+  自动补给 / Executor / Environment 动力学 / reward / gamma / 实例分布 ✓
+- **回滚方法**：`git revert <本提交 SHA>`。
+
+## 2026-10-24
+
 ### 91. 修正 frontier 分组键：从「根动作地块」改为「(父状态上下文 × 候选地块)」
 - **文件**：`coverage_env/rl/evaluation/beam_oracle.py`（`select_beam` 重写 + 新增
   `sibling_state_count`）、`coverage_env/tests/test_beam_select_diverse.py`（+2 项测试）。
