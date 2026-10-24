@@ -6,6 +6,41 @@
 ---
 
 ## 2026-10-24
+## 2026-10-24
+
+### 90. frontier 地块多样性保留（仅 cost-to-go trace 模式启用）
+- **文件**：`coverage_env/rl/evaluation/beam_oracle.py`（新增 `select_beam` 与
+  `diverse_frontier` 参数）、`coverage_env/rl/trainer/cost_to_go_ranking.py`
+  （collector 传 `diverse_frontier=True`）、新增
+  `coverage_env/tests/test_beam_select_diverse.py`。
+- **问题（seed 5000 根状态实 trace，使用 collector 的真实分支构造）**：
+
+  | 事实 | 值 |
+  | --- | --- |
+  | 全部候选 / 可行 | 73 / 73 |
+  | 各地块候选（可行）| field-1 16、field-2 16、field-3 9、field-4 16、field-5 16 |
+  | **collector 根分支（`diverse_fields=True`）** | **覆盖全部 5 个地块** ✓（分布 1/2/2/2/1）|
+  | 第一层 8 个分支 reward | field-3 −2.12/−2.13、field-1 −2.30、field-4 −2.63/−2.70、field-2 −3.92/−4.03、field-5 −4.46 |
+  | **beam=4 截断后** | **field-3 ×2、field-1、field-4（3 个地块）** ✗ |
+  | 根状态最终已标注 | **2 个动作，全部 field-3** ✗ ⇒ **跨地块 pair = 0** ✗ |
+  | 完成路径 | 32 条，首动作全部 field-3 ✗ |
+
+  ⇒ **分支构造是正确的** ✓（`diverse_fields=True` 已覆盖 5 块）；
+  ⇒ 瓶颈是 **frontier survivor diversity** ✗ —— beam 截断后不再按地块保留，
+  深层再被逐步淘汰，最终只有 1 个地块能产出完整后缀成本 ✗
+- **修复**：新增 `select_beam(frontier, beam, *, diverse_frontier=False)` ——
+  启用时**先按根动作的 `field_id` 保留每块地的最佳节点**，再用剩余 beam 名额
+  按累计 reward 填充 ✓；**默认 `False`，普通 `beam_search` 行为不变** ✓
+  仅 cost-to-go trace 模式（collector）启用 ✓
+- **测试（4 项新增）**：
+  1. 默认仍按纯 reward 排序 ✓
+  2. **5 个可行地块、branches 覆盖 5 块时，首层 beam 不被单一地块的门组合占满** ✓
+  3. 地块数少于 beam 时，剩余名额按 reward 填充 ✓
+  4. `beam_search` 的 `diverse_frontier` 默认必须为 `False`（保证兼容）✓
+- **定向测试**：`test_beam_select_diverse`（4 项）+
+  `test_cost_to_go_oracle` / `test_cost_to_go_ranking` / `test_graph_builder`（15 项）全部通过 ✓
+- **回滚方法**：`git revert <本提交 SHA>`。
+
 
 ### 90. 单次束搜索回收多状态 cost-to-go 标签，避免逐候选重复完整搜索
 - **修改文件**：`coverage_env/rl/evaluation/beam_oracle.py`、`coverage_env/rl/trainer/cost_to_go_ranking.py`、`coverage_env/rl/trainer/__init__.py`、`coverage_env/tests/test_cost_to_go_oracle.py`。
