@@ -8,7 +8,36 @@
 ## 2026-10-24
 ## 2026-10-24
 
-### 90. frontier 地块多样性保留（仅 cost-to-go trace 模式启用）
+### 91. 修正 frontier 分组键：从「根动作地块」改为「(父状态上下文 × 候选地块)」
+- **文件**：`coverage_env/rl/evaluation/beam_oracle.py`（`select_beam` 重写 + 新增
+  `sibling_state_count`）、`coverage_env/tests/test_beam_select_diverse.py`（+2 项测试）。
+- **为什么要改**：条目 90 按「根动作的 `field_id`」分组 ✗ —— 这不能保证
+  **同一状态**下保留不同地块的候选 ✗：frontier 里的节点可能来自**不同父状态**，
+  「最近动作地块相同」不代表它们是可比的兄弟动作 ✗
+- **正确规则**：标签只在**同一状态内**可比 ✓ ⇒ 分组键必须是
+  **`(父状态 context id, 候选动作所属 field)`** ✓
+  - context id 由 trace path 提供（`trace_path[-1][0]` 即动作被展开时所处的状态 ✓）
+  - 非 trace 模式下退回按 field 分组 ✓
+- **测试（+2 项，共 6 项）**：
+  1. **同一最近地块但不同父状态的节点不得被当作兄弟** ✓
+  2. `sibling_state_count` 只统计「子节点覆盖多个地块」的父状态 ✓
+- **小规模验证（2 实例 × beam 4/8，5 地块，600 s 预算）**：
+
+  | seed | beam | 耗时 | 可排序状态 | **其中多地块** | pair | **跨地块 pair** | **完整后缀率** |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | 5000 | 4 | 128 s | 7 | **3** | 115 | 3 | **7.2%** |
+  | 5000 | 8 | 253 s | 15 | **6** | 231 | 6 | 7.6% |
+  | 5001 | 4 | 99 s | 7 | **3** | 115 | 3 | 6.3% |
+  | 5001 | 8 | 192 s | 15 | **6** | 231 | 6 | 6.6% |
+
+  - 多地块可排序状态：**1 → 3（beam=4）/ 6（beam=8）** ✓ 规则生效
+  - 但**跨地块 pair 只有 3–6 个/实例** ✗，**完整后缀率仅 6–8%** ✗
+  - 权重未变化 ✓
+- **判定：未达扩大 pilot 的标准** ✗（建议标准：多地块状态 ≥3 ✓、跨地块 pair ≥10 ✗、
+  完整后缀率 ≥15% ✗）⇒ **正式预训练继续暂缓** ✓
+- **下一步建议**：在少量选定状态上**定向扩展候选**（而非整体加大 beam）✓
+
+### 90. frontier 地块多样性保留（仅 cost-to-go trace 模式启用） frontier 地块多样性保留（仅 cost-to-go trace 模式启用）
 - **文件**：`coverage_env/rl/evaluation/beam_oracle.py`（新增 `select_beam` 与
   `diverse_frontier` 参数）、`coverage_env/rl/trainer/cost_to_go_ranking.py`
   （collector 传 `diverse_frontier=True`）、新增

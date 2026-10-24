@@ -32,6 +32,33 @@ class SelectBeamTests(unittest.TestCase):
         chosen = select_beam(frontier, 3, diverse_frontier=True)
         self.assertEqual([round(n[0], 1) for n in chosen], [-1.0, -2.0, -1.2])
 
+    def test_groups_by_parent_state_not_by_root_field(self):
+        """Same last field from different parents must NOT be treated as siblings."""
+        from coverage_env.rl.evaluation.beam_oracle import select_beam
+
+        def node(value, field, parent, gate=0):
+            return (value, [(field, f"B{gate}", "B0")], object(), [(parent, 0, 0.0)])
+
+        # Two parents, each with two fields (A high, B low); a third parent with A only.
+        frontier = [node(-1.0, "field-A", 0), node(-5.0, "field-B", 0),
+                    node(-1.2, "field-A", 1), node(-5.2, "field-B", 1),
+                    node(-1.4, "field-A", 2)]
+        chosen = select_beam(frontier, 5, diverse_frontier=True)
+        survivors = {(n[3][-1][0], n[1][-1][0]) for n in chosen}
+        for parent in (0, 1):
+            self.assertIn((parent, "field-A"), survivors, f"父状态 {parent} 丢了 field-A")
+            self.assertIn((parent, "field-B"), survivors, f"父状态 {parent} 丢了 field-B")
+
+    def test_sibling_state_count_counts_parents_with_multiple_fields(self):
+        from coverage_env.rl.evaluation.beam_oracle import sibling_state_count
+
+        def node(value, field, parent):
+            return (value, [(field, "B0", "B0")], object(), [(parent, 0, 0.0)])
+
+        nodes = [node(-1.0, "field-A", 0), node(-2.0, "field-B", 0),
+                 node(-3.0, "field-A", 1), node(-4.0, "field-A", 1)]
+        self.assertEqual(sibling_state_count(nodes), 1)
+
     def test_beam_search_default_still_available(self):
         import inspect
         from coverage_env.rl.evaluation.beam_oracle import beam_search

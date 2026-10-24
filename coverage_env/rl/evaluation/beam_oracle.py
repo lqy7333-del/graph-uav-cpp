@@ -102,14 +102,18 @@ def branch_actions(environment, limit, *, diverse_fields=False):
 
 
 def select_beam(frontier, beam, *, diverse_frontier=False):
-    """Pick the surviving nodes, optionally keeping one leader per root field.
+    """Pick the surviving nodes, optionally keeping same-state sibling branches.
 
-    ``diverse_frontier`` reserves a slot for the best node of every root action's
-    field before filling the rest by accumulated reward. Without it the first-layer
-    beam can be filled by several gates of one parcel, so every completed path
-    shares a root field and the cost-to-go labels never compare different parcels.
-    Nodes are ``(value, sequence, state[, trace])`` and ``sequence[0][0]`` is the
-    root action's field id.
+    Labels are only comparable **within one state**, so what must survive the beam
+    is: for a given parent state, branches that differ in which *parcel* they go to.
+    Grouping by the root field (the previous rule) or by the last action's field alone
+    is not enough -- frontier nodes can come from different parents, and a shared last
+    field does not make them siblings.
+
+    The key is therefore ``(parent context id, candidate action's field)``. The
+    context id is available from the trace path in cost-to-go mode; nodes are
+    ``(value, sequence, state, trace_path)`` and ``trace_path[-1][0]`` is the context
+    the action was expanded from.
     """
     ordered = sorted(frontier, key=lambda item: item[0], reverse=True)
     if not diverse_frontier:
@@ -117,13 +121,27 @@ def select_beam(frontier, beam, *, diverse_frontier=False):
     leaders = {}
     others = []
     for item in ordered:
-        root_field = item[1][0][0] if item[1] else None
-        if root_field not in leaders:
-            leaders[root_field] = item
+        sequence = item[1]
+        trace_path = item[3] if len(item) > 3 else []
+        field = sequence[-1][0] if sequence else None
+        parent = trace_path[-1][0] if trace_path else None
+        key = (parent, field)
+        if key not in leaders:
+            leaders[key] = item
         else:
             others.append(item)
     leading = sorted(leaders.values(), key=lambda item: item[0], reverse=True)
     return (leading + others)[:beam]
+
+
+def sibling_state_count(nodes):
+    """Number of parent states whose surviving children span more than one parcel."""
+    by_parent = {}
+    for _value, sequence, _state, *rest in nodes:
+        trace_path = rest[0] if rest else []
+        parent = trace_path[-1][0] if trace_path else None
+        by_parent.setdefault(parent, set()).add(sequence[-1][0] if sequence else None)
+    return sum(1 for fields in by_parent.values() if len(fields) > 1)
 
 
 def beam_search(
