@@ -1,5 +1,27 @@
 ## 2026-10-25
 
+### 95. 优势基线替换实验（控制组完成，实验组因超时未完成）
+- **问题**：同一 PPO 框架内，**贪心 rollout 基线能否替代 critic 基线**？
+- **设计（严格单变量）**：两组同用轨迹级广播优势、同 init / 种子 / rollout / 优化器 /
+  clip / γ=1 / 评估集 ✓；唯一差异是基线来源 ✓
+  - 控制组 `broadcast_critic`：轨迹回报 − **V(s₀)** ✓
+  - 实验组 `broadcast_nn`：轨迹回报 − **最近邻回报** ✓
+  - critic 的辅助价值损失两组**同样训练** ✓
+  - 奖励为负成本 ⇒ 更便宜的轨迹得到**正优势** ✓
+- **测试（+3 项，共 7 项通过）**：`nn_baselines` 初始为空 ✓；
+  **两种基线给出不同优势** ✓（critic `[11,11,6,6]` vs nn `[1,1,1,1]` ✓）；缺基线抛错 ✓
+- **本轮修掉的 4 个实现问题**：
+  1. `_record_nn_baseline` 放在 `if __name__ == "__main__"` 之后 ✗ → 移入类内 ✓
+  2. `PPOAgent` 缺 `nn_baselines` ✗ → `__init__` 初始化 ✓
+  3. `device` 应为 `self.device` ✓
+  4. **钩子挂在 `reset() if env_done else next_state` 之后 ⇒ 每步都跑一次完整 NN rollout** ✗
+     实测 **18 min/update** ✗ → 改为**仅 `env_done` 时**记录 ✓
+- **运行状态**：控制组**完成** ✓（2,498 s ✓，`adv=broadcast_critic` ✓，checkpoint ✓）；
+  实验组**两次中断** ✗（缺属性 8 s ✗；修好后 **605/620 被 90 min 超时杀死** ✗，
+  且 `--checkpoint-every 10` ⇒ **无 checkpoint 落盘** ✗）
+- **结论**：**本轮无基线对比结论** ✗
+- **回滚方法**：`git revert <本提交 SHA>`。
+
 ### 93. 训练信号三组单变量消融：批内中心化、优势粒度（GAE vs 轨迹广播）
 - **分支**：`codex/rollout-baseline`
 - **文件**：`coverage_env/rl/ppo/ppo.py`（新增 `advantage_mode`）、
