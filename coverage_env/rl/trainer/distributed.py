@@ -83,6 +83,7 @@ class DistributedTrainer:
             # Sampling is stochastic and must not feed the autograd graph.
             self.agent.actor.eval()
             state = self.environment.reset()
+            self._record_nn_baseline()
             rollout_reward = 0.0
             # Under field-count generalization a 128-step rollout spans several
             # episodes with different field counts, so the rollout sum alone is
@@ -100,6 +101,7 @@ class DistributedTrainer:
                     distribution = output["action_distribution"]
                     while distribution.numel() == 0 or float(distribution.detach().sum()) <= 0.0:
                         state = self.environment.reset()
+                        self._record_nn_baseline()
                         output = self.agent.actor(state, environment=self.environment)
                         distribution = output["action_distribution"]
                     action_index = int(torch.multinomial(distribution, 1).item())
@@ -175,6 +177,11 @@ class DistributedTrainer:
                     next_value,
                 )
                 state = self.environment.reset() if env_done else next_state
+                # Only a finished episode starts a new instance; recording on every
+                # step re-ran a full nearest-neighbour rollout per transition
+                # (18 min/update instead of ~3).
+                if env_done:
+                    self._record_nn_baseline()
                 if shaping_enable:
                     from coverage_env.rl.shaping import potential
 
@@ -272,6 +279,27 @@ class DistributedTrainer:
                 self._append_log(row)
                 if self.checkpoint_dir and update_idx % self.checkpoint_every == 0:
                     self._save_checkpoint(update_idx)
+
+
+    def _record_nn_baseline(self):
+        """Nearest-neighbour return for the current instance (baseline-replacement test)."""
+        mode = str(self.agent.config.get("advantage_mode", "gae")).lower()
+        if mode != "broadcast_nn":
+            return
+        from copy import deepcopy as _deepcopy
+        from coverage_env.rl.evaluation.validation_suite import _nearest_field_choice
+
+        trial = _deepcopy(self.environment)
+        trial.reset()
+        total, steps, done = 0.0, 0, False
+        while not done and steps < 300:
+            action = _nearest_field_choice(trial, None)
+            if action is None:
+                break
+            _s, reward, done, _info = trial.step(action)
+            total += float(reward)
+            steps += 1
+        self.agent.nn_baselines.append(total)
 
 
     def _append_log(self, row: dict) -> None:
@@ -430,6 +458,9 @@ def main() -> None:
     os.environ["MASTER_PORT"] = str(_free_port())
     mp.spawn(_worker, args=(world_size, args), nprocs=world_size, join=True)
 
+
+if __name__ == "__main__":
+    main()
 
 if __name__ == "__main__":
     main()

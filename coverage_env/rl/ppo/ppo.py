@@ -39,6 +39,8 @@ class PPOAgent:
         config = config or {}
         self.config = config.get("ppo", config)
         self.actor = actor
+        # Per-episode nearest-neighbour returns for advantage_mode=broadcast_nn.
+        self.nn_baselines = []
         self.device = torch.device(device or next(actor.parameters()).device)
         self.actor.to(self.device)
         # The critic consumes ``z_G`` plus the raw UAV/depot/site features. The
@@ -198,7 +200,47 @@ class PPOAgent:
             return gae_advantages
         if mode == "broadcast":
             return self._broadcast_episode_returns(transitions, returns, device)
+        if mode == "broadcast_critic":
+            # Baseline-replacement control: episode return - V(s_0).
+            return self._broadcast_baseline_advantage(
+                transitions, returns, device, source="critic")
+        if mode == "broadcast_nn":
+            # Baseline-replacement test: episode return - nearest-neighbour return.
+            return self._broadcast_baseline_advantage(
+                transitions, returns, device, source="nn",
+                nn_baselines=getattr(self, "nn_baselines", None))
         raise ValueError(f"unknown advantage_mode: {mode}")
+
+    def _broadcast_baseline_advantage(self, transitions, returns, device, *, source,
+                                      nn_baselines=None):
+        """Broadcast (episode return - baseline) to every step of that episode.
+
+        ``source="critic"`` uses the critic's value at the episode's first state;
+        ``source="nn"`` uses the nearest-neighbour return recorded during sampling.
+        Rewards are negative costs, so a cheaper sampled route yields a positive
+        advantage: R_sample - R_baseline = C_baseline - C_sample.
+        """
+        advantages = torch.zeros(len(transitions), device=device)
+        start = 0
+        episode = 0
+        for index, row in enumerate(transitions):
+            last = index == len(transitions) - 1
+            if not (row.done or last):
+                continue
+            episode_return = float(returns[index])
+            if source == "critic":
+                baseline = float(transitions[start].value)
+            else:
+                if not nn_baselines or episode >= len(nn_baselines):
+                    raise ValueError(
+                        "advantage_mode=broadcast_nn needs one nearest-neighbour "
+                        "baseline per episode, recorded during sampling."
+                    )
+                baseline = float(nn_baselines[episode])
+            advantages[start:index + 1] = episode_return - baseline
+            start = index + 1
+            episode += 1
+        return advantages
 
     def _broadcast_episode_returns(self, transitions, returns, device):
         """Broadcast each episode's total return to all of its steps."""
@@ -236,6 +278,8 @@ class PPOAgent:
         # dispatch, so ``advantage_mode=broadcast`` silently trained plain GAE.
         advantages = self._select_advantages(transitions, returns, advantages, self.device)
         self.last_advantage_mode = str(self.config.get("advantage_mode", "gae")).lower()
+        if isinstance(getattr(self, "nn_baselines", None), list):
+            self.nn_baselines.clear()
         # Diagnostic only: the raw advantage scale, captured *before* the
         # per-update normalization that makes its magnitude uninformative.
         advantage_std = self._tensor_std(advantages)
