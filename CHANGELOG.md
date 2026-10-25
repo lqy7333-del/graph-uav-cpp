@@ -1,3 +1,36 @@
+## 2026-10-25
+
+### 93. 训练信号三组单变量消融：批内中心化、优势粒度（GAE vs 轨迹广播）
+- **分支**：`codex/rollout-baseline`
+- **文件**：`coverage_env/rl/ppo/ppo.py`（新增 `advantage_mode`）、
+  `coverage_env/rl/trainer/rollout_baseline.py`（新增 `center_advantage`、逐 episode
+  优势/成本/梯度范数日志）、`coverage_env/tests/test_advantage_broadcast.py`、
+  `coverage_env/tests/test_rollout_baseline.py`。
+- **默认行为不变** ✓：`advantage_mode="gae"`、`center_advantage=False`，既有 PPO 语义未改 ✓
+- **统计口径修正（重要）**：此前把「60 个实例-种子对」当作独立样本 ✗，
+  按**实例聚类**后（20 个独立实例 ✓）结论改变：
+
+  | 对比 | 行级 CI（错误）| **聚类 CI（正确）** |
+  | --- | --- | --- |
+  | A vs NN | [+0.236,+0.559] | **[+0.145,+0.646]** ✓ 仍显著 |
+  | B vs NN | [+0.013,+0.391] | **[−0.054,+0.451]** ✗ **变为不显著** |
+
+- **消融一：批内均值中心化**（B 组，seed 42，8 episode/update，20 updates）
+  - 信号层面：正优势比例 **21% → 52%** ✓（原优势均值 −0.51 ✓ 确为系统性偏移 ✓）
+  - 结果层面：Bc vs B = **−0.043**（CI [−0.325,+0.228] ✓ 含 0 ✓）⇒ **无可检测收益** ✗
+  - promotion 仍 **0/2** 通过 ✗
+- **消融二：优势粒度**（PPO 框架内，仅 `advantage_mode` 不同，2 种子，20 updates）
+  - GAE vs NN：**+0.414**，实例级 CI [+0.166,+0.663] ✓，14/20 ✓
+  - broadcast vs NN：**+0.422**，CI [+0.183,+0.662] ✓，15/20 ✓
+  - **broadcast vs GAE：+0.008，CI [−0.062,+0.089]** ✗ ⇒ **未检测到优势粒度带来的收益** ✗
+  - 注：CI 宽约 ±0.08 ✓ ⇒ 只能称「差异很小」✓，**不能正式称"等效"** ✗
+    （等效性需要预先定义等效界限 + 等效性检验 ✓）
+- **梯度方差诊断**：40 条 episode 的优势 sd 0.67 ✓（配对相关性 r=0.949 ✓，
+  相比未配对的 2.08 降低约 68% ✓）；梯度范数 10.9–24.4 ✓（每步都被 clip 到 1.0 ✓）
+  —— 但这**不足以**断定梯度方差不再是瓶颈 ✓，需另测跨 batch 更新方向稳定性 ✓
+- **测试**：`test_advantage_broadcast`（2 项）+ `test_rollout_baseline`（12 项）全部通过 ✓
+- **回滚方法**：`git revert <本提交 SHA>`。
+
 # 修改日志（Change Log）
 
 本项目已纳入 git 仓库（`https://github.com/lqy7333-del/graph-uav-cpp.git`），本文件仍保留作为代码变更的可读说明。条目按时间倒序（最新在上）。

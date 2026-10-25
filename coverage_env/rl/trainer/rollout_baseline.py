@@ -50,6 +50,11 @@ class RolloutBaselineStats:
     baseline_rollout_steps: int = 0
     promotions: int = 0
     promotion_log: list = field(default_factory=list)
+    advantages: list = field(default_factory=list)
+    sample_costs: list = field(default_factory=list)
+    baseline_costs: list = field(default_factory=list)
+    grad_norms: list = field(default_factory=list)
+    centered_advantages: list = field(default_factory=list)
 
 
 def _assert_unit_gamma(ppo_config):
@@ -117,7 +122,8 @@ class RolloutBaselineTrainer:
     """REINFORCE updates against a frozen greedy baseline on the same instances."""
 
     def __init__(self, agent, config, *, instance_seeds, num_fields=(5, 20),
-                 learning_rate=None, promotion_instances=20, promotion_alpha=0.10):
+                 learning_rate=None, promotion_instances=20, promotion_alpha=0.10,
+                 center_advantage=False):
         # Accept either the policy itself or an agent that wraps one: PPOAgent
         # exposes the network under a different attribute, so requiring ``.policy``
         # here made the trainer unusable with the real agent.
@@ -137,6 +143,10 @@ class RolloutBaselineTrainer:
         self.num_fields = num_fields
         self.promotion_instances = int(promotion_instances)
         self.promotion_alpha = float(promotion_alpha)
+        # When True, subtract the batch mean advantage. Without it every advantage is
+        # negative in practice (the sampled policy is worse than frozen greedy), so the
+        # update only pushes down whatever was sampled and gives no relative signal.
+        self.center_advantage = bool(center_advantage)
         self.stats = RolloutBaselineStats()
 
     # -- training ---------------------------------------------------------
@@ -164,8 +174,7 @@ class RolloutBaselineTrainer:
         import random
         self.policy.train()
         self.optimizer.zero_grad(set_to_none=True)
-        batch_loss = None
-        used = 0
+        collected = []
         for seed in random.Random(self.stats.episodes).sample(
             self.instance_seeds, min(num_episodes, len(self.instance_seeds))
         ):
@@ -177,16 +186,28 @@ class RolloutBaselineTrainer:
             if not result.success or result.baseline_cost is None:
                 continue
             self.stats.successes += 1
-            advantage = result.advantage
-            term = -advantage * result.log_prob_sum / max(num_episodes, 1)
+            self.stats.advantages.append(result.advantage)
+            self.stats.sample_costs.append(result.sample_cost)
+            self.stats.baseline_costs.append(result.baseline_cost)
+            collected.append((result.advantage, result.log_prob_sum))
+        if not collected:
+            return {"loss": 0.0, "episodes": 0, "skipped": num_episodes}
+        mean_advantage = (
+            sum(a for a, _ in collected) / len(collected) if self.center_advantage else 0.0
+        )
+        batch_loss = None
+        for advantage, log_prob_sum in collected:
+            scaled = (advantage - mean_advantage) / max(num_episodes, 1)
+            self.stats.centered_advantages.append(advantage - mean_advantage)
+            term = -scaled * log_prob_sum
             batch_loss = term if batch_loss is None else batch_loss + term
-            used += 1
-        if batch_loss is None:
-            return {"loss": 0.0, "episodes": used, "skipped": num_episodes}
         batch_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.policy.parameters(), 1.0)
+        total_norm = torch.nn.utils.clip_grad_norm_(self.policy.parameters(), 1.0)
+        self.stats.grad_norms.append(float(total_norm))
         self.optimizer.step()
-        return {"loss": float(batch_loss.detach()), "episodes": used, "skipped": num_episodes - used}
+        return {"loss": float(batch_loss.detach()), "episodes": len(collected),
+                "skipped": num_episodes - len(collected),
+                "grad_norm": float(total_norm), "mean_advantage": mean_advantage}
 
     # -- baseline promotion ----------------------------------------------
     def promotion_check(self, promotion_seeds):

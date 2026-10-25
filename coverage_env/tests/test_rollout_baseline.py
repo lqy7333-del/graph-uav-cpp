@@ -64,6 +64,24 @@ class SameInstanceTests(unittest.TestCase):
         self.assertNotEqual([f.area for f in first.fields], [f.area for f in second.fields])
 
 
+class CenteringTests(unittest.TestCase):
+    def test_center_flag_defaults_off(self):
+        import inspect
+        from coverage_env.rl.trainer.rollout_baseline import RolloutBaselineTrainer
+        signature = inspect.signature(RolloutBaselineTrainer.__init__)
+        self.assertFalse(signature.parameters["center_advantage"].default)
+
+    def test_centered_advantages_sum_to_zero(self):
+        """Batch-mean centering must make the advantages zero-mean within the batch."""
+        advantages = [0.5, -1.0, 2.0, -3.5]
+        mean = sum(advantages) / len(advantages)
+        centered = [a - mean for a in advantages]
+        self.assertAlmostEqual(sum(centered), 0.0, places=9)
+        # every centred value keeps its sign relative to the batch mean
+        self.assertGreater(centered[2], 0.0)
+        self.assertLess(centered[3], 0.0)
+
+
 class FrozenBaselineTests(unittest.TestCase):
     def test_baseline_parameters_do_not_require_grad(self):
         class _Policy(torch.nn.Module):

@@ -185,6 +185,17 @@ class PPOAgent:
             "actor_learning_rate": self._set_learning_rate_progress(fraction),
         }
 
+    def _broadcast_episode_returns(self, transitions, returns, device):
+        """Broadcast each episode's total return to all of its steps."""
+        advantages = torch.zeros(len(transitions), device=device)
+        start = 0
+        for index, row in enumerate(transitions):
+            last = index == len(transitions) - 1
+            if row.done or last:
+                advantages[start:index + 1] = returns[index]
+                start = index + 1
+        return advantages
+
     def update(self, buffer: RolloutBuffer, *, batched: bool = False) -> dict:
         """Run clipped PPO policy and value updates on the collected rollout.
 
