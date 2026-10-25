@@ -185,6 +185,21 @@ class PPOAgent:
             "actor_learning_rate": self._set_learning_rate_progress(fraction),
         }
 
+    def _select_advantages(self, transitions, returns, gae_advantages, device):
+        """Pick the advantage estimator named by ``ppo.advantage_mode``.
+
+        ``gae`` (default) keeps the per-step generalized advantage estimate.
+        ``broadcast`` replaces every step's advantage with its episode's total
+        return, which is what a whole-trajectory REINFORCE estimator uses. The
+        critic's returns are untouched either way, so its value loss is identical.
+        """
+        mode = str(self.config.get("advantage_mode", "gae")).lower()
+        if mode == "gae":
+            return gae_advantages
+        if mode == "broadcast":
+            return self._broadcast_episode_returns(transitions, returns, device)
+        raise ValueError(f"unknown advantage_mode: {mode}")
+
     def _broadcast_episode_returns(self, transitions, returns, device):
         """Broadcast each episode's total return to all of its steps."""
         advantages = torch.zeros(len(transitions), device=device)
@@ -216,6 +231,11 @@ class PPOAgent:
             [row.done for row in transitions],
             self.gamma, self.gae_lambda, device=self.device,
         )
+        # The advantage granularity is selected here, in one testable place. An
+        # earlier revision only added the broadcast helper without wiring this
+        # dispatch, so ``advantage_mode=broadcast`` silently trained plain GAE.
+        advantages = self._select_advantages(transitions, returns, advantages, self.device)
+        self.last_advantage_mode = str(self.config.get("advantage_mode", "gae")).lower()
         # Diagnostic only: the raw advantage scale, captured *before* the
         # per-update normalization that makes its magnitude uninformative.
         advantage_std = self._tensor_std(advantages)

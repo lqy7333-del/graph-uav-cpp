@@ -255,7 +255,9 @@ class DistributedTrainer:
                     if episodes else " | eps=0"
                 )
                 print(
-                    f"[DDP] update {update_idx}/{num_updates} | steps={rollout_steps} "
+                    f"[DDP] update {update_idx}/{num_updates} "
+                    f'adv={getattr(self.agent, "last_advantage_mode", "gae")} | '
+                    f"steps={rollout_steps} "
                     f"reward={rollout_reward:.3f} coverage={summary['coverage_ratio']:.1%} "
                     f"actor_loss={stats['actor_loss']:.5f} critic_loss={stats['critic_loss']:.5f}"
                     f"{episode_note}\n"
