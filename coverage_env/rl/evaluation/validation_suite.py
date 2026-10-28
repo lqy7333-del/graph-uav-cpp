@@ -39,6 +39,8 @@ from coverage_env.env.instance_generator import InstanceGenerator
 from coverage_env.rl.decoder.action_decoder import CoveragePolicy
 from coverage_env.rl.decoder.hierarchical_decoder import checkpoint_decoder_flags
 from coverage_env.rl.ppo.ppo import PPOAgent
+from coverage_env.rl.checkpoint import evaluation_config
+from coverage_env.rl.evaluation.distance_accounting import step_distances
 
 FIELD_COUNTS = (5, 10, 20)
 INSTANCES_PER_COUNT = 5
@@ -54,6 +56,7 @@ def _run(environment, choose) -> dict:
     """Execute one episode with ``choose(environment, state)``; return cost sources."""
     state = environment.reset()
     transit = coverage = resupply_distance = 0.0
+    final_return = 0.0
     resupplies = 0
     reward = 0.0
     done = False
@@ -62,27 +65,15 @@ def _run(environment, choose) -> dict:
         action = choose(environment, state)
         if action is None:
             break
-        previous = environment.uavs[0].current_position
         state, step_reward, done, info = environment.step(action)
         reward += float(step_reward)
-        path = [tuple(point) for point in info.get("path", [])]
-        length = sum(
-            _distance(a, b) for a, b in zip(path[:-1], path[1:])
-        ) if len(path) > 1 else 0.0
-        field = environment.get_field(info.get("selected_field"))
-        entry = None
-        if field is not None:
-            for boundary in field.boundaries:
-                if boundary.id == info.get("entry_boundary"):
-                    entry = boundary.center
-                    break
-        moved = _distance(previous, entry) if (previous and entry) else 0.0
-        moved = min(moved, length) if length > 0 else 0.0
+        covered, moved, replenishment, returned = step_distances(info)
         transit += moved
-        coverage += max(0.0, length - moved)
+        coverage += covered
+        resupply_distance += replenishment
+        final_return += returned
         if info.get("auto_resupply"):
             resupplies += 1
-            resupply_distance += length
         if done:
             break
     summary = environment.get_summary()
@@ -92,6 +83,7 @@ def _run(environment, choose) -> dict:
         "transit": transit,
         "coverage": coverage,
         "resupply_steps_distance": resupply_distance,
+        "final_return_distance": final_return,
         "resupplies": int(summary.get("resupply_count", resupplies)),
         "coverage_ratio": float(summary.get("coverage_ratio", 0.0)),
         "completed": bool(info.get("success")) and str(
@@ -170,13 +162,16 @@ def main() -> None:
     for checkpoint in args.checkpoint:
         config = load_config(DEFAULT_CONFIG_PATH)
         if checkpoint:
-            saved = torch.load(checkpoint, map_location="cpu")
-            config["rl"]["decoder"].update(checkpoint_decoder_flags(saved["actor"]))
+            saved = torch.load(checkpoint, map_location="cpu", weights_only=False)
+            config = evaluation_config(saved, config)
+        counts = config["environment"]["num_fields"]
+        counts.update(min=min(counts["min"], min(FIELD_COUNTS)),
+                      max=max(counts["max"], max(FIELD_COUNTS)))
         torch.manual_seed(0)
         seed_environment = InstanceGenerator(config).generate(num_fields=5, seed=BASE_SEED)
         policy = CoveragePolicy(seed_environment, config=config)
         if checkpoint:
-            PPOAgent(policy, config).load_checkpoint(checkpoint, map_location="cpu")
+            policy.load_state_dict(saved["actor"])
         policy.eval()
         name = (checkpoint or "untrained").split("/")[-1]
         if checkpoint and "/" in checkpoint:

@@ -16,7 +16,11 @@ from __future__ import annotations
 import argparse
 import os
 import socket
+import json
+import random
 from copy import deepcopy
+from pathlib import Path
+import numpy as np
 
 import torch
 import torch.distributed as dist
@@ -29,6 +33,8 @@ from coverage_env.rl.buffer.rollout_buffer import RolloutBuffer
 from coverage_env.rl.decoder.action_decoder import CoveragePolicy
 from coverage_env.rl.ppo.ppo import PPOAgent
 from coverage_env.rl.trainer.trainer import _clone_graph
+from coverage_env.rl.trainer.episode import nearest_neighbor_return, current_potential, learning_reward
+from coverage_env.rl.checkpoint import capture_rng_state, restore_rng_state, assert_rank_parameters_equal
 
 
 def _free_port() -> int:
@@ -54,6 +60,8 @@ class DistributedTrainer:
         self.buffer = RolloutBuffer()
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_every = int(checkpoint_every)
+        self._count_emas = {}
+        self.run_metadata = {}
 
     def train(self, num_updates: int, rollout_steps: int, *, start_update: int = 1) -> None:
         """Run ``num_updates`` synchronized updates of ``rollout_steps`` steps each.
@@ -65,19 +73,10 @@ class DistributedTrainer:
         # field count carries the same weight. The plain mean is biased by whichever
         # counts this update happened to draw (5-field and 20-field episodes differ by
         # ~4 reward points), which is why the raw curve was unreadable.
-        count_emas: dict = {}
+        count_emas = self._count_emas
         ema_alpha = 0.1
-        shaping_config = (self.config or {}).get("shaping") or {}
-        shaping_enable = bool(shaping_config.get("enable", False))
-        shaping_strength = float(shaping_config.get("strength", 1.0))
-        if shaping_enable:
-            from coverage_env.rl.shaping import potential
-
-            potential_before_step = potential(
-                self.environment, shaping_strength, self.environment.total_area
-            )
-        else:
-            potential_before_step = 0.0
+        self.run_metadata.update(num_updates=num_updates, rollout_steps=rollout_steps,
+                                 world_size=self.world_size)
 
         for update_idx in range(max(1, start_update), num_updates + 1):
             # Sampling is stochastic and must not feed the autograd graph.
@@ -94,12 +93,19 @@ class DistributedTrainer:
             shaped_rollout_reward = 0.0
             completed_rewards: list[float] = []
             completed_fields: list[int] = []
+            completed_summaries = []
 
             for _ in range(rollout_steps):
                 with torch.no_grad():
                     output = self.agent.actor(state, environment=self.environment)
                     distribution = output["action_distribution"]
+                    retries = 0
                     while distribution.numel() == 0 or float(distribution.detach().sum()) <= 0.0:
+                        if self.buffer.transitions and not self.buffer.transitions[-1].done:
+                            raise RuntimeError("Nonterminal environment returned no feasible action.")
+                        retries += 1
+                        if retries > 16:
+                            raise RuntimeError("Could not sample a feasible initial instance after 16 resets.")
                         state = self.environment.reset()
                         self._record_nn_baseline()
                         output = self.agent.actor(state, environment=self.environment)
@@ -109,26 +115,15 @@ class DistributedTrainer:
                     log_prob = torch.log(distribution[action_index].clamp_min(1e-12))
                     value = self.agent.value_from_output(output)
 
+                before = current_potential(self.environment, self.config)
                 next_state, reward, env_done, _info = self.environment.step(action)
                 # Potential-based shaping (see coverage_env/rl/shaping.py). The
                 # policy learns from `learning_reward`; everything logged as
                 # `reward` stays raw so runs remain comparable and evaluation is
                 # unaffected.
-                if shaping_enable:
-                    from coverage_env.rl.shaping import potential, shaped_reward
-
-                    potential_after_step = potential(
-                        self.environment, shaping_strength,
-                        self.environment.total_area,
-                    )
-                    learning_reward = shaped_reward(
-                        reward, potential_before_step, potential_after_step,
-                        self.agent.gamma,
-                    )
-                else:
-                    potential_after_step = 0.0
-                    learning_reward = reward
-                shaped_rollout_reward += float(learning_reward)
+                shaped = learning_reward(self.environment, reward, before, env_done,
+                                         self.config, self.agent.gamma)
+                shaped_rollout_reward += float(shaped)
                 rollout_reward += float(reward)
                 episode_reward += float(reward)
                 if env_done:
@@ -137,6 +132,7 @@ class DistributedTrainer:
                     completed_rewards.append(episode_reward)
                     count_here = len(self.environment.fields)
                     completed_fields.append(count_here)
+                    completed_summaries.append(self.environment.get_summary())
                     previous = count_emas.get(count_here)
                     count_emas[count_here] = (
                         episode_reward if previous is None
@@ -166,7 +162,7 @@ class DistributedTrainer:
                         "mask": output["mask"].detach().cpu().tolist(),
                     },
                     action,
-                    learning_reward,
+                    shaped,
                     {
                         "observation": deepcopy(next_state),
                         "graph": _clone_graph(next_graph),
@@ -182,13 +178,11 @@ class DistributedTrainer:
                 # (18 min/update instead of ~3).
                 if env_done:
                     self._record_nn_baseline()
-                if shaping_enable:
-                    from coverage_env.rl.shaping import potential
 
-                    potential_before_step = potential(
-                        self.environment, shaping_strength,
-                        self.environment.total_area,
-                    ) if env_done else potential_after_step
+            # This tail is a time-limit fragment, not a complete broadcast label.
+            # GAE still bootstraps its stored next_value.
+            if self.buffer.transitions and not self.buffer.transitions[-1].done:
+                self.buffer.transitions[-1].truncated = True
 
             # Keep the SAME deterministic network mode used for sampling. Calling
             # ``train()`` here re-enabled dropout, so the recomputed log-probs differed
@@ -226,8 +220,14 @@ class DistributedTrainer:
                         float(progress["actor_learning_rate"]), 8
                     ),
                     "critic_loss": round(stats["critic_loss"], 6),
-                    "coverage_ratio": round(summary["coverage_ratio"], 4),
-                    "total_distance": round(summary["total_distance"], 1),
+                    # Completed-episode means on rank 0, not a partial/reset mission.
+                    "coverage_ratio": (round(sum(s["coverage_ratio"] for s in completed_summaries) / episodes, 4)
+                                       if episodes else ""),
+                    "total_distance": (round(sum(s["total_distance"] for s in completed_summaries) / episodes, 1)
+                                       if episodes else ""),
+                    "metrics_scope": "rank0_completed_episodes",
+                    "current_partial_distance": round(summary["total_distance"], 1),
+                    "current_partial_coverage": round(summary["coverage_ratio"], 4),
                     "episodes": episodes,
                     "balanced_reward": (
                         round(sum(count_emas.values()) / len(count_emas), 4)
@@ -269,7 +269,7 @@ class DistributedTrainer:
                     f"[DDP] update {update_idx}/{num_updates} "
                     f'adv={getattr(self.agent, "last_advantage_mode", "gae")} | '
                     f"steps={rollout_steps} "
-                    f"reward={rollout_reward:.3f} coverage={summary['coverage_ratio']:.1%} "
+                    f"reward={rollout_reward:.3f} current_coverage={summary['coverage_ratio']:.1%} "
                     f"actor_loss={stats['actor_loss']:.5f} critic_loss={stats['critic_loss']:.5f}"
                     f"{episode_note}\n"
                     f"      entropy={stats['entropy']:.3f} policy_loss={stats['policy_loss']:+.5f} "
@@ -281,8 +281,8 @@ class DistributedTrainer:
                     flush=True,
                 )
                 self._append_log(row)
-                if self.checkpoint_dir and update_idx % self.checkpoint_every == 0:
-                    self._save_checkpoint(update_idx)
+            if self.checkpoint_dir and (update_idx % self.checkpoint_every == 0 or update_idx == num_updates):
+                self._save_checkpoint(update_idx)
 
 
     def _record_nn_baseline(self):
@@ -290,19 +290,9 @@ class DistributedTrainer:
         mode = str(self.agent.config.get("advantage_mode", "gae")).lower()
         if mode != "broadcast_nn":
             return
-        from copy import deepcopy as _deepcopy
-        from coverage_env.rl.evaluation.validation_suite import _nearest_field_choice
-
-        trial = _deepcopy(self.environment)
-        trial.reset()
-        total, steps, done = 0.0, 0, False
-        while not done and steps < 300:
-            action = _nearest_field_choice(trial, None)
-            if action is None:
-                break
-            _s, reward, done, _info = trial.step(action)
-            total += float(reward)
-            steps += 1
+        total, fingerprint = nearest_neighbor_return(
+            self.environment, self.config, self.agent.gamma)
+        self.last_baseline_fingerprint = fingerprint
         self.agent.nn_baselines.append(total)
 
 
@@ -324,19 +314,24 @@ class DistributedTrainer:
         """Save actor/critic/optimizer state without the DDP ``module.`` prefix."""
         if self.checkpoint_dir is None:
             return
-        from pathlib import Path
-
+        assert_rank_parameters_equal(self.agent.actor, self.agent.critic)
+        local = {"rng": capture_rng_state(), "environment": deepcopy(self.environment),
+                 "count_emas": deepcopy(self._count_emas)}
+        states = [None] * self.world_size
+        if dist.is_initialized():
+            dist.all_gather_object(states, local)
+        else:
+            states = [local]
+        if self.rank != 0:
+            return
         path = Path(self.checkpoint_dir) / f"ckpt_update_{update_idx}.pt"
         path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint = {
-            "actor": self.agent.actor.module.state_dict(),
-            "critic": self.agent.critic.module.state_dict(),
-            "actor_optimizer": self.agent.actor_optimizer.state_dict(),
-            "critic_optimizer": self.agent.critic_optimizer.state_dict(),
-            "update_count": self.agent.update_count,
-            "update_idx": update_idx,
-        }
-        torch.save(checkpoint, path)
+        checkpoint = self.agent.checkpoint_payload()
+        checkpoint.update(update_idx=update_idx, rank_runtime=states,
+                          training_metadata=deepcopy(self.run_metadata))
+        temporary = path.with_suffix(".tmp")
+        torch.save(checkpoint, temporary)
+        temporary.replace(path)
         print(f"[rank 0] saved checkpoint -> {path}", flush=True)
 
 
@@ -345,7 +340,64 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
     dist.init_process_group("nccl", init_method="env://", rank=rank, world_size=world_size)
     torch.cuda.set_device(rank)
 
-    config = load_config()
+    saved = torch.load(args.resume, map_location="cpu", weights_only=False) if args.resume else None
+    config = resolve_config(args, saved)
+    exact = bool(saved and args.resume_mode == "exact")
+    if exact:
+        validate_exact_resume(saved, config, args, world_size)
+
+    # Same model initialization; distinct process sampling streams are set below.
+    torch.manual_seed(args.seed)
+    environment = InstanceGenerator(config).generate(
+        seed=args.seed + rank,
+        randomize_uav=bool(config.get("ppo", {}).get("randomize_uav", True)),
+    )
+    if exact:
+        environment = saved["rank_runtime"][rank]["environment"]
+
+    actor = CoveragePolicy(environment, config=config).to(rank)
+    agent = PPOAgent(actor, config, device=rank)
+    start_update = 1
+    if saved:
+        last = agent.load_checkpoint(args.resume, restore_rng=False, load_optimizers=exact)
+        start_update = last + 1 if exact else 1
+        if not exact:
+            agent.update_count = 0
+        if rank == 0:
+            print(f"[rank 0] {args.resume_mode}: {args.resume} -> update {start_update}", flush=True)
+
+    agent.actor = DDP(agent.actor, device_ids=[rank])
+    agent.critic = DDP(agent.critic, device_ids=[rank])
+    trainer = DistributedTrainer(environment, agent, rank=rank, world_size=world_size,
+                                 checkpoint_dir=args.checkpoint_dir,
+                                 checkpoint_every=args.checkpoint_every, config=config)
+    trainer.run_metadata = {"seed": args.seed, "num_updates": args.num_updates,
+                            "rollout_steps": args.rollout_steps, "world_size": world_size}
+    if exact:
+        runtime = saved["rank_runtime"][rank]
+        trainer._count_emas = runtime["count_emas"]
+        restore_rng_state(runtime["rng"])
+    else:
+        random.seed(args.seed + rank)
+        np.random.seed(args.seed + rank)
+        torch.manual_seed(args.seed + rank)
+    if rank == 0 and args.checkpoint_dir:
+        directory = Path(args.checkpoint_dir)
+        directory.mkdir(parents=True, exist_ok=True)
+        metadata = {"resolved_config": config, "training_metadata": trainer.run_metadata,
+                    "resume": args.resume, "resume_mode": args.resume_mode}
+        (directory / f"resolved_config_update_{start_update}.json").write_text(
+            json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"Resolved PPO config: {json.dumps(config['ppo'])}", flush=True)
+    trainer.train(args.num_updates, args.rollout_steps, start_update=start_update)
+    assert_rank_parameters_equal(agent.actor, agent.critic)
+    dist.barrier()
+    dist.destroy_process_group()
+
+
+def resolve_config(args, saved=None):
+    """Defaults < checkpoint config < --set < explicitly supplied dedicated flags."""
+    config = deepcopy(saved["resolved_config"]) if saved and saved.get("resolved_config") else load_config()
     if getattr(args, "set", None):
         config = _apply_overrides(config, args.set)
     # A fixed count pins the configured range; otherwise the environment draws
@@ -366,42 +418,22 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
         ppo_overrides["gae_lambda"] = args.gae_lambda
     config["ppo"].update(ppo_overrides)
 
-    # Same model init seed on every rank so parameters start identical; the
-    # environment seed differs per rank so each rank samples different fields.
-    torch.manual_seed(args.seed)
-    environment = InstanceGenerator(config).generate(seed=args.seed + rank)
+    return config
 
-    actor = CoveragePolicy(environment, config=config).to(rank)
-    agent = PPOAgent(actor, config, device=rank)
 
-    start_update = 1
-    if args.resume:
-        # Every rank loads the same shared checkpoint, before DDP wrapping so the
-        # state-dict keys carry no ``module.`` prefix. Rank 0 wrote it, so the
-        # file already exists when the others read it.
-        start_update = agent.load_checkpoint(args.resume) + 1
-        if rank == 0:
-            print(f"[rank 0] resumed from {args.resume} -> next update {start_update}",
-                  flush=True)
-        dist.barrier()
-
-    agent.actor = DDP(agent.actor, device_ids=[rank])
-    agent.critic = DDP(agent.critic, device_ids=[rank])
-
-    trainer = DistributedTrainer(
-        environment, agent, rank=rank, world_size=world_size,
-        checkpoint_dir=args.checkpoint_dir, checkpoint_every=args.checkpoint_every,
-        config=config,
-    )
-    trainer.train(args.num_updates, args.rollout_steps, start_update=start_update)
-
-    # A single number that must match across ranks after all-reduce.
-    with torch.no_grad():
-        checksum = sum(float(param.sum()) for param in agent.actor.module.parameters())
-    print(f"[rank {rank}] actor param checksum = {checksum:.6f}", flush=True)
-
-    dist.barrier()
-    dist.destroy_process_group()
+def validate_exact_resume(saved, config, args, world_size):
+    """Refuse to call a weights-only restart an exact continuation."""
+    if not saved.get("rank_runtime") or not saved.get("resolved_config"):
+        raise ValueError("Legacy checkpoint cannot resume exactly; use --resume-mode finetune.")
+    if config != saved["resolved_config"]:
+        raise ValueError("Exact resume cannot change configuration; use --resume-mode finetune.")
+    meta = saved.get("training_metadata", {})
+    for key, value in {"world_size": world_size, "num_updates": args.num_updates,
+                       "rollout_steps": args.rollout_steps, "seed": args.seed}.items():
+        if meta.get(key) != value:
+            raise ValueError(f"Exact resume requires unchanged {key}; use --resume-mode finetune.")
+    if len(saved["rank_runtime"]) != world_size:
+        raise ValueError("Checkpoint is missing rank runtime states.")
 
 
 def _apply_overrides(config: dict, overrides) -> dict:
@@ -432,9 +464,9 @@ def main() -> None:
         help="Fixed field count for every episode; default samples the "
              "configured [min, max] range and resamples on each reset.",
     )
-    parser.add_argument("--num-updates", type=int, default=200)
-    parser.add_argument("--rollout-steps", type=int, default=128)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--num-updates", type=int, default=None)
+    parser.add_argument("--rollout-steps", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--ppo-epochs", type=int, default=None,
                         help="Override ppo.epochs. Default None keeps the config value.")
     parser.add_argument("--batch-size", type=int, default=None,
@@ -459,13 +491,24 @@ def main() -> None:
         help="Checkpoint file to resume from; training continues at the next "
              "update index and still targets --num-updates overall.",
     )
+    parser.add_argument("--resume-mode", choices=("exact", "finetune"), default="exact",
+                        help="exact restores rank RNG/environments/config; finetune starts a new optimizer/schedule.")
     args = parser.parse_args()
+    saved = torch.load(args.resume, map_location="cpu", weights_only=False) if args.resume else None
+    metadata = saved.get("training_metadata", {}) if saved and args.resume_mode == "exact" else {}
+    for key, default in {"num_updates": 200, "rollout_steps": 128, "seed": 42}.items():
+        if getattr(args, key) is None:
+            setattr(args, key, metadata.get(key, default))
 
     world_size = torch.cuda.device_count()
     if world_size < 1:
         raise SystemExit("No CUDA GPUs available.")
     if args.num_updates <= 0 or args.rollout_steps <= 0:
         raise SystemExit("num-updates and rollout-steps must be positive.")
+    if args.checkpoint_every <= 0:
+        raise SystemExit("checkpoint-every must be positive.")
+    if saved and args.resume_mode == "exact":
+        validate_exact_resume(saved, resolve_config(args, saved), args, world_size)
 
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = str(_free_port())

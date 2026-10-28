@@ -133,8 +133,9 @@ def main() -> None:
 
     config = load_config(DEFAULT_CONFIG_PATH)
     if args.checkpoint:
-        saved = torch.load(args.checkpoint, map_location="cpu")
-        config["rl"]["decoder"].update(checkpoint_decoder_flags(saved["actor"]))
+        from coverage_env.rl.checkpoint import evaluation_config
+        saved = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
+        config = evaluation_config(saved, config)
 
     print(
         f"{'seed':>6}{'下界m':>9}{'启发式m':>9}{'策略m':>9}"
@@ -160,7 +161,7 @@ def main() -> None:
         policy_distance = None
         if args.checkpoint:
             policy = CoveragePolicy(environment, config=config)
-            PPOAgent(policy, config).load_checkpoint(args.checkpoint, map_location="cpu")
+            policy.load_state_dict(saved["actor"])
             policy.eval()
 
             def choose(env, state):

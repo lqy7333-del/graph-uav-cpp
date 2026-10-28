@@ -34,6 +34,7 @@ class InstanceGenerator:
         num_fields: int | None = None,
         seed: int | None = None,
         randomize_each_reset: bool | None = None,
+        randomize_uav: bool | None = None,
     ) -> CoverageEnvironment:
         """Generate a fully initialized ``CoverageEnvironment``.
 
@@ -53,9 +54,13 @@ class InstanceGenerator:
         )
         if randomize_each_reset is None:
             randomize_each_reset = num_fields is None
+        # Capability sampling and whether reset replaces the instance are separate.
+        # Keep legacy callers' defaults; training entry points pass this explicitly.
+        if randomize_uav is None:
+            randomize_uav = bool(randomize_each_reset)
         count = self.sample_num_fields(rng, num_fields)
         fields, depot, uavs, resolution = self.sample_components(
-            rng, count, randomize_uav=bool(randomize_each_reset)
+            rng, count, randomize_uav=bool(randomize_uav)
         )
 
         environment = CoverageEnvironment(
@@ -66,6 +71,7 @@ class InstanceGenerator:
             config=self.config,
             rng=rng,
             randomize_each_reset=bool(randomize_each_reset),
+            randomize_uav=bool(randomize_uav),
         )
         for field in environment.fields:
             discretize_field(field, resolution)

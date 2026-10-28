@@ -30,12 +30,10 @@ class StructureDiffAccountingTests(unittest.TestCase):
             _s, _r, done, _i = plan_env.step(action)
         out = decompose(env, sequence)
         self.assertIsNotNone(out)
-        # coverage + transit already contain every executed leg, including the
-        # depot trips; resupply_steps and final_return are SUBSET LABELS, not extra
-        # buckets, so they must not be added on top.
-        parts = out["coverage"] + out["transit"]
+        # Four disjoint simulator buckets, not center-distance proxies or subsets.
+        parts = out["coverage"] + out["transit"] + out["resupply_steps"] + out["final_return"]
         self.assertAlmostEqual(parts, out["total"], delta=1e-3,
-                               msg="覆盖+转场 未闭合到 total")
+                               msg="四个互斥距离分项未闭合到 total")
         self.assertLessEqual(out["resupply_steps"] + out["final_return"], out["total"] + 1e-3)
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from copy import deepcopy
 
 import torch
 import torch.nn as nn
@@ -37,6 +38,7 @@ class PPOAgent:
 
     def __init__(self, actor, config: dict | None = None, *, device=None) -> None:
         config = config or {}
+        self.resolved_config = deepcopy(config)
         self.config = config.get("ppo", config)
         self.actor = actor
         # Per-episode nearest-neighbour returns for advantage_mode=broadcast_nn.
@@ -221,13 +223,10 @@ class PPOAgent:
         advantage: R_sample - R_baseline = C_baseline - C_sample.
         """
         advantages = torch.zeros(len(transitions), device=device)
-        start = 0
-        episode = 0
-        for index, row in enumerate(transitions):
-            last = index == len(transitions) - 1
-            if not (row.done or last):
+        for episode, (start, end, complete) in enumerate(self._episode_segments(transitions)):
+            if not complete:
                 continue
-            episode_return = float(returns[index])
+            episode_return = self._episode_return(transitions[start:end])
             if source == "critic":
                 baseline = float(transitions[start].value)
             else:
@@ -237,21 +236,41 @@ class PPOAgent:
                         "baseline per episode, recorded during sampling."
                     )
                 baseline = float(nn_baselines[episode])
-            advantages[start:index + 1] = episode_return - baseline
-            start = index + 1
-            episode += 1
+            advantages[start:end] = episode_return - baseline
         return advantages
 
     def _broadcast_episode_returns(self, transitions, returns, device):
         """Broadcast each episode's total return to all of its steps."""
         advantages = torch.zeros(len(transitions), device=device)
+        for start, end, complete in self._episode_segments(transitions):
+            if complete:
+                advantages[start:end] = self._episode_return(transitions[start:end])
+        return advantages
+
+    @staticmethod
+    def _episode_segments(transitions):
+        """Yield segments; a rollout tail/time limit is not a complete episode."""
         start = 0
         for index, row in enumerate(transitions):
-            last = index == len(transitions) - 1
-            if row.done or last:
-                advantages[start:index + 1] = returns[index]
+            truncated = getattr(row, "truncated", False)
+            if row.done or truncated or index == len(transitions) - 1:
+                yield start, index + 1, bool(row.done and not truncated)
                 start = index + 1
-        return advantages
+
+    def _episode_return(self, rows):
+        """Discount actual rewards from s0; never substitute a critic λ target."""
+        return sum((self.gamma ** index) * float(row.reward)
+                   for index, row in enumerate(rows))
+
+    def _actor_eligibility(self, transitions):
+        """Broadcast updates exclude incomplete tails, including their entropy."""
+        mode = str(self.config.get("advantage_mode", "gae")).lower()
+        mask = torch.ones(len(transitions), dtype=torch.bool, device=self.device)
+        if mode != "gae":
+            mask.zero_()
+            for start, end, complete in self._episode_segments(transitions):
+                mask[start:end] = complete
+        return mask
 
     def update(self, buffer: RolloutBuffer, *, batched: bool = False) -> dict:
         """Run clipped PPO policy and value updates on the collected rollout.
@@ -266,12 +285,17 @@ class PPOAgent:
         transitions = list(buffer.transitions)
         if not transitions:
             return self._empty_update_stats()
+        self.actor.eval()  # Deterministic replay; eval still permits gradients/DDP.
+        self.critic.eval()
+        if batched and isinstance(self.actor, torch.nn.parallel.DistributedDataParallel):
+            raise ValueError("batched=True bypasses DDP.forward; use the synchronized default path.")
         advantages, returns = compute_advantage(
             [row.reward for row in transitions],
             [row.value for row in transitions],
             [row.next_value for row in transitions],
             [row.done for row in transitions],
             self.gamma, self.gae_lambda, device=self.device,
+            truncated=[getattr(row, "truncated", False) for row in transitions],
         )
         # The advantage granularity is selected here, in one testable place. An
         # earlier revision only added the broadcast helper without wiring this
@@ -282,10 +306,12 @@ class PPOAgent:
             self.nn_baselines.clear()
         # Diagnostic only: the raw advantage scale, captured *before* the
         # per-update normalization that makes its magnitude uninformative.
-        advantage_std = self._tensor_std(advantages)
+        eligible = self._actor_eligibility(transitions)
+        advantage_std = self._tensor_std(advantages[eligible])
         self._warm_start_value_bias(returns)
-        if len(advantages) > 1:
-            advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
+        if eligible.sum() > 1:
+            selected = advantages[eligible]
+            advantages[eligible] = (selected - selected.mean()) / (selected.std(unbiased=False) + 1e-8)
 
         actor_losses, critic_losses, entropies = [], [], []
         policy_losses, ratio_stds, clip_fractions = [], [], []
@@ -297,11 +323,11 @@ class PPOAgent:
             for start in range(0, len(permutation), batch_size):
                 indices = permutation[start:start + batch_size]
                 if batched:
-                    current_log_probs, entropy, current_values = (
+                    current_log_probs, entropy_rows_batch, current_values = (
                         self._batched_minibatch_rows(transitions, indices)
                     )
                 else:
-                    current_log_probs, entropy, current_values = (
+                    current_log_probs, entropy_rows_batch, current_values = (
                         self._per_transition_minibatch_rows(transitions, indices)
                     )
 
@@ -312,13 +338,24 @@ class PPOAgent:
                 )
                 ratios = torch.exp(current_log_probs - old_log_probs)
                 batch_advantages = advantages[batch_indices]
+                weights = eligible[batch_indices].to(current_log_probs.dtype)
+                # All ranks run identical backward counts even if a rank has no
+                # completed broadcast episode. DDP averages rank gradients, so
+                # compensate for its world-size factor to average valid rows.
+                count = weights.sum().detach().clone()
+                world = 1
+                if torch.distributed.is_available() and torch.distributed.is_initialized():
+                    torch.distributed.all_reduce(count)
+                    world = torch.distributed.get_world_size()
+                scale = world / count.clamp_min(1.0)
                 unclipped = ratios * batch_advantages
                 clipped = torch.clamp(
                     ratios, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio
                 ) * batch_advantages
                 # Keep the advantage-weighted surrogate separate from the
                 # entropy bonus so the log can show which one drives the actor.
-                surrogate = torch.minimum(unclipped, clipped).mean()
+                surrogate = (torch.minimum(unclipped, clipped) * weights).sum() * scale
+                entropy = (entropy_rows_batch * weights).sum() * scale
                 actor_loss = -surrogate - self.entropy_coef * entropy
                 critic_loss = F.mse_loss(current_values, returns[batch_indices])
 
@@ -329,7 +366,10 @@ class PPOAgent:
                 total_norm = nn.utils.clip_grad_norm_(
                     self.actor.parameters(), self.max_grad_norm
                 )
-                self.actor_optimizer.step()
+                # Zero gradients still need backward for DDP, but an Adam step
+                # with no valid actor samples would move its momentum spuriously.
+                if count.item() > 0:
+                    self.actor_optimizer.step()
 
                 self.critic_optimizer.zero_grad(set_to_none=True)
                 (self.value_coef * critic_loss).backward()
@@ -374,6 +414,8 @@ class PPOAgent:
             "approx_kl": sum(approx_kls) / len(approx_kls),
             "actor_grad_norm": sum(grad_norms) / len(grad_norms),
             "updates": len(actor_losses),
+            "actor_samples": int(eligible.sum().item()),
+            "excluded_actor_samples": int((~eligible).sum().item()),
         }
 
     @staticmethod
@@ -385,7 +427,7 @@ class PPOAgent:
             "return_std": 0.0, "value_mean": 0.0, "value_std": 0.0,
             "explained_variance": 0.0, "ratio_std": 0.0,
             "clip_fraction": 0.0, "approx_kl": 0.0, "actor_grad_norm": 0.0,
-            "updates": 0,
+            "updates": 0, "actor_samples": 0, "excluded_actor_samples": 0,
         }
 
     def _critic_module(self):
@@ -486,7 +528,7 @@ class PPOAgent:
             values.append(self.value_from_output(output).reshape(()))
         return (
             torch.stack(log_probs),
-            torch.stack(entropy_rows).mean(),
+            torch.stack(entropy_rows),
             torch.stack(values),
         )
 
@@ -514,7 +556,7 @@ class PPOAgent:
         ).squeeze(-1)
         return (
             torch.stack(log_probs),
-            torch.stack(entropy_rows).mean(),
+            torch.stack(entropy_rows),
             values,
         )
 
@@ -533,17 +575,27 @@ class PPOAgent:
         """Save actor, critic, both optimizers, update count, and warm-start flag."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint = {
-            "actor": self.actor.state_dict(),
-            "critic": self.critic.state_dict(),
+        torch.save(self.checkpoint_payload(), path)
+
+    def checkpoint_payload(self) -> dict:
+        """Shared model/optimizer/provenance payload for single and DDP trainers."""
+        from coverage_env.rl.checkpoint import capture_rng_state, provenance
+        actor = self.actor.module if hasattr(self.actor, "module") else self.actor
+        return {
+            "format_version": 2,
+            "resolved_config": deepcopy(self.resolved_config),
+            "provenance": provenance(),
+            "rng_state": capture_rng_state(),
+            "actor": actor.state_dict(),
+            "critic": self._critic_module().state_dict(),
             "actor_optimizer": self.actor_optimizer.state_dict(),
             "critic_optimizer": self.critic_optimizer.state_dict(),
             "update_count": self.update_count,
             "value_bias_initialized": self._value_bias_initialized,
         }
-        torch.save(checkpoint, path)
 
-    def load_checkpoint(self, path: str | Path, *, map_location=None) -> int:
+    def load_checkpoint(self, path: str | Path, *, map_location=None,
+                        restore_rng=True, load_optimizers=True) -> int:
         """Restore a checkpoint and return the update index it was saved at.
 
         The index lets a trainer resume from the next update instead of
@@ -552,12 +604,16 @@ class PPOAgent:
         checkpoint = torch.load(path, map_location=map_location or self.device, weights_only=False)
         self.actor.load_state_dict(checkpoint["actor"])
         self.critic.load_state_dict(checkpoint["critic"])
-        self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
-        self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])
+        if load_optimizers:
+            self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
+            self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])
         self.update_count = int(checkpoint.get("update_count", 0))
         # Default to True for pre-existing checkpoints: re-running the warm start
         # on a trained critic would clobber its learned output bias.
         self._value_bias_initialized = bool(
             checkpoint.get("value_bias_initialized", True)
         )
+        if restore_rng and checkpoint.get("rng_state"):
+            from coverage_env.rl.checkpoint import restore_rng_state
+            restore_rng_state(checkpoint["rng_state"])
         return int(checkpoint.get("update_idx", self.update_count))

@@ -90,6 +90,7 @@ class CoverageEnvironment(FieldEnvironment):
         config: dict | None = None,
         rng: Optional[random.Random] = None,
         randomize_each_reset: bool = False,
+        randomize_uav: bool = True,
     ) -> None:
         """Create an environment with fields, a depot, and zero or more UAVs.
 
@@ -114,6 +115,7 @@ class CoverageEnvironment(FieldEnvironment):
         self._config = config
         self._rng = rng
         self._randomize_each_reset = bool(randomize_each_reset and config is not None)
+        self._randomize_uav = bool(randomize_uav)
         # The first reset keeps the constructor-provided instance; later resets
         # regenerate it when generalization is enabled.
         self._regenerate_next_reset = False
@@ -204,7 +206,7 @@ class CoverageEnvironment(FieldEnvironment):
             self._instance_generator = generator
         count = generator.sample_num_fields(self._rng)
         fields, depot, uavs, resolution = generator.sample_components(
-            self._rng, count, randomize_uav=True
+            self._rng, count, randomize_uav=self._randomize_uav
         )
         self._replace_instance(fields, depot, uavs, resolution)
 

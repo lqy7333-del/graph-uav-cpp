@@ -1,3 +1,13 @@
+## 2026-10-28
+
+### 100. 训练审查后续修复：回报、配对、截断与精确恢复
+- 修正广播回报累计与未完成轨迹处理；GAE critic 目标保持独立，截断允许 bootstrap。
+- NN 基线复制当前状态、不 reset；统一 reward shaping 和 UAV 随机化规则。
+- 增加完整配置、RNG、环境及各 rank 状态 checkpoint，区分 exact resume 与 finetune。
+- 评估读取 checkpoint 配置；完成局日志与部分轨迹分开；距离四项采用互斥统计并检查闭合。
+- 新增实际 update 分发、恢复等价性及两进程 Gloo 回归测试；未启动正式训练。
+- 详细说明及历史结果适用边界：`docs/training_audit_repairs.md`。回滚以本条对应 Git 提交为单位，保留历史 checkpoint。
+
 ## 2026-10-25
 
 ### 99. **训练流程审查的 P0/P1 修复与受影响记录更正**

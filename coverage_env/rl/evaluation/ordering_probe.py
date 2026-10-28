@@ -253,13 +253,14 @@ def main() -> None:
 
     config = load_config(DEFAULT_CONFIG_PATH)
     if args.checkpoint:
-        saved = torch.load(args.checkpoint, map_location="cpu")
-        config["rl"]["decoder"].update(checkpoint_decoder_flags(saved["actor"]))
+        from coverage_env.rl.checkpoint import evaluation_config
+        saved = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
+        config = evaluation_config(saved, config)
     torch.manual_seed(0)
     environment = InstanceGenerator(config).generate(num_fields=5, seed=args.seed)
     actor = CoveragePolicy(environment, config=config)
     if args.checkpoint:
-        PPOAgent(actor, config).load_checkpoint(args.checkpoint, map_location="cpu")
+        actor.load_state_dict(saved["actor"])
     actor.eval()
 
     data = collect(actor, config, args.episodes, args.seed)

@@ -68,7 +68,8 @@ def _assert_unit_gamma(ppo_config):
 
 def _build_instance(config, num_fields, seed):
     return InstanceGenerator(config).generate(
-        num_fields=num_fields, seed=seed, randomize_each_reset=False
+        num_fields=num_fields, seed=seed, randomize_each_reset=False,
+        randomize_uav=bool(config.get("ppo", {}).get("randomize_uav", True)),
     )
 
 

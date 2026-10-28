@@ -276,8 +276,9 @@ def main() -> None:
             checkpoint_decoder_flags,
         )
 
-        saved = torch.load(args.checkpoint, map_location="cpu")
-        config["rl"]["decoder"].update(checkpoint_decoder_flags(saved["actor"]))
+        from coverage_env.rl.checkpoint import evaluation_config
+        saved = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
+        config = evaluation_config(saved, config)
     header = (f"{'seed':>6}{'orders':>8}{'worst':>9}{'median':>9}{'best':>9}"
               f"{'policy':>9}{'nearest':>9}{'gap':>8}{'beats%':>9}")
     if args.two_opt:
@@ -296,8 +297,7 @@ def main() -> None:
         torch.manual_seed(0)
         actor = CoveragePolicy(environment, config=config)
         if args.checkpoint:
-            agent = PPOAgent(actor, config)
-            agent.load_checkpoint(args.checkpoint, map_location="cpu")
+            actor.load_state_dict(saved["actor"])
         actor.eval()
         policy = _policy_reward(actor, environment)
         nearest = _nearest_field_reward(environment)

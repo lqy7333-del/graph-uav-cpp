@@ -19,6 +19,7 @@ class RolloutTransition:
     log_prob: float
     value: float
     next_value: float = 0.0
+    truncated: bool = False
 
 
 class RolloutBuffer:
@@ -29,7 +30,7 @@ class RolloutBuffer:
 
     def add(
         self, state, action, reward, next_state, done, log_prob, value,
-        next_value=0.0,
+        next_value=0.0, *, truncated=False,
     ) -> None:
         """Append one transition, converting scalar values to plain Python types."""
         self.transitions.append(RolloutTransition(
@@ -41,6 +42,7 @@ class RolloutBuffer:
             log_prob=float(log_prob),
             value=float(value),
             next_value=float(next_value),
+            truncated=bool(truncated),
         ))
 
     def clear(self) -> None:

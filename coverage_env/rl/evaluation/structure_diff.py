@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import math
 import statistics
+from coverage_env.rl.evaluation.distance_accounting import step_distances
 
 
 def _distance(first, second) -> float:
@@ -47,19 +48,14 @@ def decompose(environment, sequence) -> dict | None:
         _state, _reward, done, info = environment.step(actions[match[0]])
         path = [tuple(point) for point in info.get("path", [])]
         length = sum(_distance(a, b) for a, b in zip(path[:-1], path[1:])) if len(path) > 1 else 0.0
-        moved = min(_distance(previous_end, entry), length) if entry else 0.0
+        covered, moved, replenishment, returned = step_distances(info)
         transit += moved
-        coverage += max(0.0, length - moved)
+        coverage += covered
+        resupply += replenishment
+        return_leg += returned
         hops.append(moved)
-        if info.get("final_return_distance"):
-            return_leg += float(info["final_return_distance"])
         if info.get("auto_resupply"):
             resupplies += 1
-            # Only the depot leg belongs to resupply; the executed coverage segment is
-            # already counted in ``coverage`` above. Using the whole step length here
-            # double-counted it and made the components exceed the mission total.
-            resupply += float(info.get("resupply_or_return_distance",
-                                       info.get("resupply_distance", 0.0)))
         visits.append(field_id)
         previous_end = path[-1] if path else previous_end
         if done:

@@ -141,18 +141,22 @@ def policy_visit_order(actor, environment) -> list[str]:
 def build_actor(config, environment, checkpoint):
     """Build the policy with the decoder switches the checkpoint was trained with."""
     if checkpoint is not None:
-        saved = torch.load(checkpoint, map_location="cpu")
-        config["rl"]["decoder"].update(checkpoint_decoder_flags(saved["actor"]))
+        from coverage_env.rl.checkpoint import evaluation_config
+        saved = torch.load(checkpoint, map_location="cpu", weights_only=False)
+        config = evaluation_config(saved, config)
     torch.manual_seed(0)
     actor = CoveragePolicy(environment, config=config)
     if checkpoint is not None:
-        PPOAgent(actor, config).load_checkpoint(checkpoint, map_location="cpu")
+        actor.load_state_dict(saved["actor"])
     actor.eval()
     return actor
 
 
 def evaluate(config, checkpoint, instances: int, seed: int) -> dict:
     """Return mean/SE of ``tour_ratio`` over ``instances`` fresh episodes."""
+    if checkpoint is not None:
+        from coverage_env.rl.checkpoint import evaluation_config
+        config = evaluation_config(torch.load(checkpoint, map_location="cpu", weights_only=False), config)
     torch.manual_seed(0)
     environment = InstanceGenerator(config).generate(num_fields=5, seed=seed)
     actor = build_actor(config, environment, checkpoint)

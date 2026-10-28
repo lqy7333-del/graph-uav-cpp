@@ -26,9 +26,11 @@ def _agent(mode=None):
 class _Row:
     """Minimal stand-in for a rollout transition."""
 
-    def __init__(self, value, done):
+    def __init__(self, value, done, reward=None, truncated=False):
         self.value = value
         self.done = done
+        self.reward = value if reward is None else reward
+        self.truncated = truncated
 
 
 class DispatchTests(unittest.TestCase):
@@ -49,7 +51,7 @@ class DispatchTests(unittest.TestCase):
         self.assertFalse(torch.equal(gae_out, broadcast_out),
                          "broadcast 与 gae 返回了相同的优势：分发没有生效")
         # Episode 1 covers rows 0-2, episode 2 covers rows 3-4.
-        self.assertEqual(broadcast_out[:3].tolist(), [15.0, 15.0, 15.0])
+        self.assertEqual(broadcast_out[:3].tolist(), [6.0, 6.0, 6.0])
         self.assertEqual(broadcast_out[3:].tolist(), [9.0, 9.0])
 
     def test_default_mode_is_gae(self):
@@ -107,8 +109,8 @@ class BaselineReplacementTests(unittest.TestCase):
         nn_agent.nn_baselines = [11.0, 8.0]
         a = critic._select_advantages(rows, returns, gae, torch.device("cpu"))
         b = nn_agent._select_advantages(rows, returns, gae, torch.device("cpu"))
-        self.assertEqual(a.tolist(), [11.0, 11.0, 6.0, 6.0])   # 12-1, 9-3
-        self.assertEqual(b.tolist(), [1.0, 1.0, 1.0, 1.0])     # 12-11, 9-8
+        self.assertEqual(a.tolist(), [2.0, 2.0, 4.0, 4.0])   # (1+2)-1, (3+4)-3
+        self.assertEqual(b.tolist(), [-8.0, -8.0, -1.0, -1.0])  # (1+2)-11, (3+4)-8
         self.assertFalse(torch.equal(a, b), "两种基线必须给出不同的优势")
 
     def test_missing_nn_baseline_raises(self):
