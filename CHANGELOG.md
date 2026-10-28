@@ -1,5 +1,44 @@
 ## 2026-10-28
 
+### 100. 修复后 DDP 短 smoke 验收（3 updates，4 卡）
+- **目的**：确认 `7dfebde` 的训练审查修复在**真实 4 卡 DDP** 上生效
+  （修复文档明确：CPU/Gloo 验证不等于多 GPU/NCCL ✓）
+- **运行**：`--num-updates 3 --seed 42 --rollout-steps 128`，每 update 存 checkpoint ✓
+
+  | update | reward | coverage | actor_loss | critic_loss | eps |
+  | --- | --- | --- | --- | --- | --- |
+  | 1 | −124.6 | 32.7% | −0.0689 | 16.13 | 5 |
+  | 2 | −117.7 | 89.4% | −0.0414 | 27.50 | 4 |
+  | 3 | −122.4 | 24.6% | −0.0120 | 21.89 | 5 |
+
+  `mean_ep_fields` 10.0 → 11.8 ✓（5–20 地块分布生效 ✓）
+- **checkpoint 内容验收** ✓：`actor` / `actor_optimizer` / `critic` / `critic_optimizer` /
+  **`format_version`** / **`provenance`** / **`resolved_config`** / **`rng_state`** /
+  **`rank_runtime`** / **`training_metadata`** 全部存在 ✓✓
+  ⇒ 审查项「checkpoint 不能精确恢复」已修复 ✓
+- **确定性重放** ✓：`test_train_mode_changes_log_probs_eval_mode_does_not` 断言
+  eval 模式重算概率差 < 1e-9 ✓ 且 train 模式确实改变概率 ✓
+  ⇒ **首 epoch 的 ratio = 1 由确定性保证** ✓
+- **广播数学** ✓：实测 `_broadcast_episode_returns` 输出 `[-6,-6,-6]` ✓
+  （此前是 `[-3,-3,-3]` ✗），截断尾段优势置零 ✓
+- **`RUN_DDP_TESTS=1` 两进程验收** ✓（`test_two_rank_runtime` OK）：
+  - critic 初始 bias 各 rank 统一为 −6.0 ✓
+  - `assert_rank_parameters_equal` 覆盖 actor / critic ✓
+  - **exact resume 后逐张量与原模型相等** ✓
+  - 跨 rank 有效样本数聚合正确（rank0=3 ✓, rank1=0 ✓）✓
+  - resume 后再验全 rank 参数一致 ✓
+- **ratio / clip 数据说明（口径）**：日志的 `ratio_std` = 0.2045 / 0.1268 / 0.0899，
+  `clip_frac` = 0.346 / 0.158 / 0.068 —— 这是**4 个 PPO epoch 的聚合值** ✓，
+  **不是「更新前」的值** ✗（首 epoch 后权重已变 ✓）；「更新前 ratio = 1」由上述
+  确定性测试保证 ✓，不应拿聚合值判断该验收项 ✓
+- **全量测试**：225 项，仅剩 2 个改动前即存在的失败 ✓
+- **边界（必须随结论引用）**：
+  1. 本次只跑 **3 updates** ✓ ⇒ **不构成训练有效性证据** ✗
+  2. 多 GPU/NCCL 的**长时间稳定性**未验证 ✓（只跑了几分钟 ✓）
+  3. **历史消融结论未恢复** ✗（优势粒度 / 基线替换仍需重跑 ✓）
+  4. **不能**声称修复后性能会提升 ✗
+- **回滚方法**：无代码改动（本条只记录验收 ✓）
+
 ### 100. 训练审查后续修复：回报、配对、截断与精确恢复
 - 修正广播回报累计与未完成轨迹处理；GAE critic 目标保持独立，截断允许 bootstrap。
 - NN 基线复制当前状态、不 reset；统一 reward shaping 和 UAV 随机化规则。
