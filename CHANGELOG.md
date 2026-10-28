@@ -1,5 +1,51 @@
 ## 2026-10-25
 
+### 97. **距离分项口径修复（含三处判断更正）**
+- **分支**：`codex/rollout-baseline`；提交 `fa1a8dc`、`505c7a0`
+- **文件**：`coverage_env/env/environment.py`（`info` 分项字段）、
+  `coverage_env/rl/evaluation/structure_diff.py`（`resupply_steps` 去重 + `final_return`）、
+  新增 `coverage_env/tests/test_distance_accounting.py`（3 项）、
+  `coverage_env/tests/test_structure_diff_accounting.py`（1 项）
+- **缺陷**：`info["path_length"]` / `info["path"]` **只含块内执行段** ✗，
+  补给往返与最终返航不计入 ✗ ⇒ 任何「把逐 step 距离相加」的分析都无法闭合到
+  `summary["total_distance"]`（实测差 **1,210–1,969 m** ✗）
+- **修复（不动 reward / total_distance）**：
+  1. 每步 `info` 新增 `coverage_only_distance` / `transit_distance` /
+     `resupply_or_return_distance`
+  2. 返航与补给分支把对应距离/路径并入 `info`
+  3. `structure_diff` 的 `resupply_steps` 只累加真正的 depot 段（此前用整步长度 ✗，
+     与 `coverage`/`transit` **重复计数** ✗）
+- **恒等式测试（4 项，全部通过）**：
+  `Σ path_length == total_distance` ✓；
+  `Σ coverage + transit + legs == total_distance` ✓；
+  `reward` 仍与 `total_distance` 一致（证明训练信号未被改动）✓；
+  `structure_diff` 的 `coverage + transit == total` ✓
+- **三处判断更正（如实记录）**：
+  1. ❌ 我说过「训练奖励漏掉 10.8% 的成本」✗ —— **错** ✗
+     代码在 `finalize_episode` 与 `_attempt_auto_resupply` 两处都对返航调用了
+     `calculate_reward` ✓；实测 `-reward*A/scale == total_distance`（差 +0.0）✓
+  2. ❌ 我说过「门选择遗憾审计不可靠、漏掉门的主要代价」✗ —— **错** ✗
+     `path_length` **本来就包含到入口的转场**（实测 452 m 已在内）✓ ⇒ **审计有效** ✓
+  3. ❌ 我说过「成本结构作废、要全部重测」✗ —— **过度** ✗
+     受影响的只有「把逐 step 距离相加」的口径 ✓；各分量本身在每个 step 上是正确的 ✓
+- **旧口径的另一处错误**：此前报告的「覆盖 58% / 转场 24% / 补给 11% / 返航 7%」✗
+  把**补给与返航当成了独立桶相加** ✗ —— 它们与覆盖/转场**有重叠** ✗
+- **重算后的成本结构（5 地块测试集，20 实例，四项**真正闭合** ✓）**：
+
+  | 项 | NN | PPO (ckpt42) |
+  | --- | --- | --- |
+  | 覆盖块内 | 114,801 m（51.7%）| 114,137 m（52.0%）|
+  | 到入口转场 | 68,057 m（30.7%）| 69,715 m（31.8%）|
+  | 补给往返 | 28,040 m（12.6%）| **25,816 m（11.8%）** |
+  | 最终返航 | 11,024 m（5.0%）| **9,759 m（4.4%）** |
+  | **四项之和** | **221,923 m（差 +0.0 ✓）** | **219,427 m（差 +0.0 ✓）** |
+  | 访问次数 | 9.05 | **8.80** |
+
+  ⇒ **PPO 的节省主要来自减少补给往返（−2,224 m）与返航（−1,265 m）** ✓，
+  覆盖与转场两项**略增** ✗（合计 +993 m）✓
+- **测试**：全套 201 项，仅剩 2 个改动前即存在的失败 ✓
+- **回滚方法**：`git revert fa1a8dc 505c7a0`
+
 ### 96. 优势基线替换实验：3 种子复验**不支持**替换默认基线
 - **问题**：同一 PPO 框架内，**贪心 rollout 基线能否替代 critic 基线**？
 - **设计（严格单变量）**：两组同用轨迹级广播 ✓、同 init ✓、同种子 ✓、同 rollout ✓、
