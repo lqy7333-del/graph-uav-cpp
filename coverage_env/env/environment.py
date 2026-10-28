@@ -506,6 +506,13 @@ class CoverageEnvironment(FieldEnvironment):
             "workload": configuration.workload_ratio,
             "estimated_workload": configuration.workload_ratio,
             "path_length": feedback["distance"],
+            # Diagnostic split. ``path_length`` covers only the executed coverage
+            # segment; the resupply and final-return legs are appended below so that
+            # sum(path_length) closes to summary["total_distance"]. The reward and
+            # total_distance are unchanged -- both already include those legs.
+            "coverage_only_distance": float(feedback.get("coverage_distance", 0.0)),
+            "transit_distance": float(feedback.get("transfer_distance", 0.0)),
+            "resupply_or_return_distance": 0.0,
             "energy": feedback["energy"],
             "coverage_gain": feedback["coverage"],
             "exit_point": feedback["exit_point"],
@@ -532,6 +539,12 @@ class CoverageEnvironment(FieldEnvironment):
                     return_feedback, self.rl_config, total_area=self.total_area
                 )
                 info["return_to_depot"] = return_feedback
+                _leg = float(return_feedback.get("distance", 0.0))
+                info["path_length"] = float(info.get("path_length", 0.0)) + _leg
+                info["resupply_or_return_distance"] += _leg
+                info["final_return_distance"] = _leg
+                if return_feedback.get("path"):
+                    info["path"] = list(info.get("path", [])) + list(return_feedback["path"])
         else:
             actions = self.get_action_candidates()
             feasible = bool(actions) and any(self.get_action_mask(actions))
@@ -544,7 +557,14 @@ class CoverageEnvironment(FieldEnvironment):
                         resupply["return_feedback"], self.rl_config,
                         total_area=self.total_area,
                     )
+                    _base_length = float(info.get("path_length", 0.0))
+                    _base_path = list(info.get("path", []))
+                    _leg = float(resupply["return_feedback"].get("distance", 0.0))
                     info.update(resupply["info"])
+                    info["path_length"] = _base_length + _leg
+                    info["resupply_or_return_distance"] = _leg
+                    info["resupply_distance"] = _leg
+                    info["path"] = _base_path + list(resupply["return_feedback"].get("path", []))
                     done = False
                 else:
                     done = True
