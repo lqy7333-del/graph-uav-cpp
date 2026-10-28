@@ -23,6 +23,7 @@ def decompose(environment, sequence) -> dict | None:
     """Replay a sequence and record how the distance splits."""
     environment.reset()
     transit = coverage = resupply = 0.0
+    return_leg = 0.0
     resupplies = 0
     visits = []
     hops = []
@@ -50,15 +51,22 @@ def decompose(environment, sequence) -> dict | None:
         transit += moved
         coverage += max(0.0, length - moved)
         hops.append(moved)
+        if info.get("final_return_distance"):
+            return_leg += float(info["final_return_distance"])
         if info.get("auto_resupply"):
             resupplies += 1
-            resupply += length
+            # Only the depot leg belongs to resupply; the executed coverage segment is
+            # already counted in ``coverage`` above. Using the whole step length here
+            # double-counted it and made the components exceed the mission total.
+            resupply += float(info.get("resupply_or_return_distance",
+                                       info.get("resupply_distance", 0.0)))
         visits.append(field_id)
         previous_end = path[-1] if path else previous_end
         if done:
             break
     summary = environment.get_summary()
     return {
+        "final_return": float(return_leg),
         "visits": len(visits),
         "resupplies": resupplies,
         "distinct_parcels": len(set(visits)),
