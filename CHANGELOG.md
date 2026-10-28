@@ -1,5 +1,34 @@
 ## 2026-10-25
 
+### 99. **训练流程审查的 P0/P1 修复与受影响记录更正**
+- **审查来源**：外部审查报告（本机路径不可达，结论已在本机独立复现 ✓）
+  五项 + 附项**全部确认成立** ✗：dropout 模式不一致、critic 多卡 bias 不一致、
+  广播优势取错值、NN 基线换了实例、`--set` 被 CLI 默认值覆盖、`main()` 重复两次
+- **本次修复（默认主线）**：
+  1. `distributed.py`：采样与 PPO 重放**统一使用确定性模式**（`actor.eval()` /
+     `critic.eval()`）✓ —— DDP 同步梯度与 `module.training` 无关 ✓，`eval()` 不关 autograd ✓
+  2. `ppo.py` `_warm_start_value_bias`：先 `all_reduce` 求 sum/count，再**各 rank 写同一值** ✓
+  3. `distributed.py`：`--ppo-epochs` / `--batch-size` 默认改为 **None** ✓，
+     `--set` 不再被静默覆盖 ✓
+  4. 去掉重复的 `__main__` guard ✓（此前直接 `python -m` 会训练两遍 ✓）
+- **新增回归测试 6 项**（`test_training_audit_fixes.py`）：
+  - eval 模式重算概率一致 ✓ / train 模式确实改变概率（证明 dropout 存在）✓
+  - `--set` 优先级（CLI 默认 None）✓
+  - **末端 GAE 目标 ≠ 整局回报**（固化正确语义）✗→✓
+  - 只有一个 `__main__` guard ✓
+  - critic warm start 跨 rank 归约 ✓ + 无 DDP 时写本地均值 ✓
+- **受影响记录（保留，标注作废）** ✗：
+  - 条目 **93/94**（优势粒度 broadcast vs GAE）：广播数学错误 ✗ ⇒ **作废**
+  - 条目 **95/96**（优势基线替换）：数学错误 ✗ **且 NN 基线换了实例** ✗ ⇒ **作废**
+  - 条目 **93 的 epochs 4→1 消融**：`--set` 被覆盖，**实际未生效** ✗ ⇒ **作废**
+  - **长训练（3 种子 × 600）**：受 dropout 重放不一致 + critic 不同步影响 ✗
+    ⇒ 「从随机初始化训练有效」的结论**需要重新验证** ✗
+- **不受影响的结论** ✓：冻结策略的**任务距离实测值** ✓（`total_distance` 与 reward 无关这条路径 ✓）、
+  覆盖率/完成率/能耗 ✓、距离分项修复（条目 97/98 ✓）
+- **尚待修复**：广播数学（用 reward 按 episode 累计 ✓）、NN 基线复用同一快照 ✓、
+  A/B 的 UAV 分布统一 ✓、checkpoint 保存完整配置/rng ✓
+- **回滚方法**：`git revert <本提交 SHA>`
+
 ### 98. **成本结构（修正口径）：PPO 的节省一致来自「补给往返」与「返航」**
 - **前提**：条目 97 修复了 `info` 的距离分项（四项真正闭合 ✓），本条目用**修正口径**重算
 - **数据**：三个规模，各取测试集实例 ✓，NN vs PPO（`long_train/seed42/ckpt_update_600.pt` ✓）

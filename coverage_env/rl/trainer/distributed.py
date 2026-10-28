@@ -190,10 +190,14 @@ class DistributedTrainer:
                         self.environment.total_area,
                     ) if env_done else potential_after_step
 
-            # Gradients are synchronized during backward, so the model must be
-            # in training mode here for DDP to register its reduce hooks.
-            self.agent.actor.train()
-            self.agent.critic.train()
+            # Keep the SAME deterministic network mode used for sampling. Calling
+            # ``train()`` here re-enabled dropout, so the recomputed log-probs differed
+            # from the sampled ones even before any weight update: the PPO ratio left 1
+            # (measured 0.56-1.70, 36% outside the clip band). DDP reduces gradients
+            # regardless of ``module.training``, and ``eval()`` does not disable
+            # autograd, so nothing about training requires ``train()`` here.
+            self.agent.actor.eval()
+            self.agent.critic.eval()
             # Advance entropy annealing before the update so the logged value is
             # the one actually used.
             progress = self.agent.set_training_progress(
@@ -350,7 +354,14 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
         config["environment"]["num_fields"] = {
             "min": args.num_fields, "max": args.num_fields,
         }
-    ppo_overrides = {"epochs": args.ppo_epochs, "batch_size": args.batch_size}
+    # Only override what the user actually passed. Non-None defaults used to
+    # overwrite ``--set ppo.epochs=...`` (requested 1, effective 4), silently
+    # invalidating ablations.
+    ppo_overrides = {}
+    if args.ppo_epochs is not None:
+        ppo_overrides["epochs"] = args.ppo_epochs
+    if args.batch_size is not None:
+        ppo_overrides["batch_size"] = args.batch_size
     if args.gae_lambda is not None:
         ppo_overrides["gae_lambda"] = args.gae_lambda
     config["ppo"].update(ppo_overrides)
@@ -424,8 +435,10 @@ def main() -> None:
     parser.add_argument("--num-updates", type=int, default=200)
     parser.add_argument("--rollout-steps", type=int, default=128)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--ppo-epochs", type=int, default=4)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--ppo-epochs", type=int, default=None,
+                        help="Override ppo.epochs. Default None keeps the config value.")
+    parser.add_argument("--batch-size", type=int, default=None,
+                        help="Override ppo.batch_size. Default None keeps the config value.")
     parser.add_argument(
         "--gae-lambda", type=float, default=None,
         help="Override ppo.gae_lambda. Lower trades advantage bias for much "
@@ -458,9 +471,6 @@ def main() -> None:
     os.environ["MASTER_PORT"] = str(_free_port())
     mp.spawn(_worker, args=(world_size, args), nprocs=world_size, join=True)
 
-
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()

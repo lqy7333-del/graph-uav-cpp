@@ -406,8 +406,22 @@ class PPOAgent:
         if self._value_bias_initialized or returns.numel() == 0:
             return
         final_layer = self._critic_module().network[-1]
+        # Each rank sampled its own instances, so their local means differ. Writing
+        # that local mean here (after DDP's initial parameter broadcast) left the
+        # ranks with permanently different critics: DDP averages gradients but never
+        # rewrites parameters. Reduce the sum and count first so every rank writes
+        # the same value.
+        total = float(returns.sum().item())
+        count = float(returns.numel())
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            reduced = torch.tensor([total, count], dtype=torch.float64,
+                                   device=returns.device)
+            torch.distributed.all_reduce(reduced, op=torch.distributed.ReduceOp.SUM)
+            total = float(reduced[0].item())
+            count = float(reduced[1].item())
+        mean = total / count if count > 0.0 else 0.0
         with torch.no_grad():
-            final_layer.bias.fill_(float(returns.mean().item()))
+            final_layer.bias.fill_(mean)
         self._value_bias_initialized = True
 
     @staticmethod
