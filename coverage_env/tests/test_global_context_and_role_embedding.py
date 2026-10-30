@@ -67,9 +67,9 @@ class GlobalContextAndRoleEmbeddingTests(unittest.TestCase):
             isinstance(module, torch.nn.Linear) for module in embedding.modules()
         ))
 
-    def test_uav_feature_is_13d(self):
+    def test_uav_feature_is_16d(self):
         x_uav = build_uav_feature(self.environment.uavs[0])
-        self.assertEqual(tuple(x_uav.shape), (13,))
+        self.assertEqual(tuple(x_uav.shape), (16,))
 
     def test_site_feature_is_12d_and_env_equals_state(self):
         environment = self.environment

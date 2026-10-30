@@ -105,3 +105,14 @@ def path_time(prev_dir, path, **params):
     for a, b in zip(dirs, dirs[1:]):
         extra += turn_cost(turn_angle(a, b), **params)
     return base, extra
+
+
+def heading_from_path(path):
+    """Unit direction of the last non-zero segment of ``path`` (None if absent)."""
+    points = [(float(p[0]), float(p[1])) for p in path or []]
+    for a, b in zip(reversed(points[:-1]), reversed(points[1:])) if False else \
+            list(zip(points[:-1], points[1:]))[::-1]:
+        d = direction(a, b)
+        if d is not None:
+            return d
+    return None

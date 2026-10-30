@@ -100,6 +100,7 @@ class CoverageEnvironment(FieldEnvironment):
         config using the environment-owned ``random.Random`` (so a seed
         reproduces the whole episode sequence).
         """
+        self._heading_valid: dict = {}
         super().__init__(fields)
         if not isinstance(depot, Depot):
             raise TypeError("depot must be a Depot instance.")
@@ -318,6 +319,14 @@ class CoverageEnvironment(FieldEnvironment):
             # made the rollout and replay encodings disagree.
             state["payload_per_area"] = uav.payload_per_area
             state["coverage_width"] = uav.coverage_width
+            # Flight direction from the flown trajectory's last segment. The maneuver
+            # proxy bills the junction "previous valid segment -> next segment", so
+            # the policy must observe it or the cost depends on hidden state.
+            from coverage_env.env.time_model import heading_from_path
+            heading = heading_from_path(self._mission_trajectories.get(uav.uav_id, []))
+            valid = bool(heading is not None and self._heading_valid.get(uav.uav_id, False))
+            state["heading"] = heading if valid else None
+            state["heading_valid"] = valid
             uav_states[uav.uav_id] = state
         return {
             "uavs": uav_states,
@@ -385,6 +394,7 @@ class CoverageEnvironment(FieldEnvironment):
             "orientation": result.orientation,
             "uav_id": result.uav_id,
         })
+        self._heading_valid[result.uav_id] = True
         trajectory = self._mission_trajectories.setdefault(result.uav_id, [])
         if result.total_path:
             if trajectory and trajectory[-1] == result.total_path[0]:
@@ -873,6 +883,7 @@ class CoverageEnvironment(FieldEnvironment):
         before_energy = uav.remaining_energy
         before_payload = uav.remaining_payload
         return_feedback = self.return_to_depot()
+        self._heading_valid[uav.uav_id] = False
         replenished = uav.replenish()
         self._resupply_count += 1
         info = {

@@ -79,6 +79,8 @@ def _uav_fields(uav_source) -> dict:
         alpha = float(uav_source.get("alpha", 0.0))
         beta = float(uav_source.get("beta", 0.0))
         payload_per_area = float(uav_source.get("payload_per_area", 0.0))
+        heading = uav_source.get("heading")
+        heading_valid = bool(uav_source.get("heading_valid", False)) and heading is not None
     else:
         position = getattr(uav_source, "current_position", None) or (0.0, 0.0)
         max_energy = float(getattr(uav_source, "max_energy", 0.0))
@@ -90,6 +92,8 @@ def _uav_fields(uav_source) -> dict:
         alpha = float(getattr(uav_source, "alpha", 0.0))
         beta = float(getattr(uav_source, "beta", 0.0))
         payload_per_area = float(getattr(uav_source, "payload_per_area", 0.0))
+        heading = getattr(uav_source, "heading", None)
+        heading_valid = bool(getattr(uav_source, "heading_valid", False)) and heading is not None
     energy_ratio = remaining_energy / max_energy if max_energy > 0.0 else 0.0
     payload_ratio = remaining_payload / max_payload if max_payload > 0.0 else 0.0
     return {
@@ -120,6 +124,13 @@ def build_uav_feature(uav_source, scales=None) -> torch.Tensor:
     """
     scales = {**DEFAULT_SCALES, **(scales or {})}
     fields = _uav_fields(uav_source)
+    if isinstance(uav_source, dict):
+        fields["heading"] = uav_source.get("heading")
+        fields["heading_valid"] = bool(uav_source.get("heading_valid", False))
+    else:
+        fields["heading"] = getattr(uav_source, "heading", None)
+        fields["heading_valid"] = bool(getattr(uav_source, "heading_valid", False))
+    fields["heading_valid"] = fields["heading_valid"] and fields["heading"] is not None
     x, y = fields["position"]
     return torch.tensor(
         [
@@ -138,6 +149,14 @@ def build_uav_feature(uav_source, scales=None) -> torch.Tensor:
             _norm(fields["alpha"], scales["alpha_scale"]),
             _norm(fields["beta"], scales["beta_scale"]),
             _norm(fields["payload_per_area"], scales["payload_per_area_scale"]),
+            # Flight direction. The maneuver proxy bills the junction between the
+            # previous valid segment and the next one, so the policy must see it;
+            # without these three inputs the cost would depend on hidden state.
+            torch.tensor(1.0 if fields.get("heading_valid") else 0.0),
+            torch.tensor(0.0 if not fields.get("heading_valid")
+                         else float(fields["heading"][0])),
+            torch.tensor(0.0 if not fields.get("heading_valid")
+                         else float(fields["heading"][1])),
         ],
         dtype=torch.float32,
     )
