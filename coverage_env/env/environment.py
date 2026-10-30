@@ -103,6 +103,7 @@ class CoverageEnvironment(FieldEnvironment):
         reproduces the whole episode sequence).
         """
         self._heading_valid: dict = {}
+        self._reset_time_ledger()
         # The flight-time model and the coverage credit use FIXED speed / width, so a
         # randomized UAV would silently make the reward inconsistent with the physical
         # model. Fail loudly instead of producing an uninterpretable training signal.
@@ -182,6 +183,8 @@ class CoverageEnvironment(FieldEnvironment):
         parameters before restoring the mission state. The cached
         ``total_area`` always reflects the current episode's instance.
         """
+        self._reset_time_ledger()
+        self._heading_valid = {}
         if self._regenerate_next_reset:
             self._resample_instance()
         self._regenerate_next_reset = self._randomize_each_reset
@@ -259,6 +262,11 @@ class CoverageEnvironment(FieldEnvironment):
         self._configuration_executor = None
         for field in self.fields:
             discretize_field(field, resolution)
+
+    def _reset_time_ledger(self) -> None:
+        """Zero the cumulative flight-time ledger (called from __init__ and reset)."""
+        self._time_totals = {"work": 0.0, "nonwork": 0.0, "maneuver": 0.0,
+                             "service": 0.0, "resupply_or_return": 0.0, "total": 0.0}
 
     def get_state(self) -> dict:
         """Return UAV, field, and depot state as an ordinary dictionary."""
@@ -603,6 +611,11 @@ class CoverageEnvironment(FieldEnvironment):
         if self._all_fields_complete():
             done = True
             info["termination_reason"] = "mission_complete"
+            # Capture the arriving direction BEFORE the return leg is flown and before
+            # any direction flag is cleared, so the junction into the depot is priced.
+            _uid_f = self.uavs[0].uav_id if self.uavs else None
+            _prev_f = (heading_from_path(self._mission_trajectories.get(_uid_f, []))
+                       if self._heading_valid.get(_uid_f, False) else None)
             try:
                 return_feedback = self.finalize_episode()
             except ValueError as exc:
@@ -613,9 +626,7 @@ class CoverageEnvironment(FieldEnvironment):
                 # The return leg is FLOWN: settle it with the same entry point as any
                 # other path so the turn from the last coverage segment toward the
                 # depot is charged too. A stop clears the direction only AFTER arrival.
-                _uid = self.uavs[0].uav_id if self.uavs else None
-                _prev = (heading_from_path(self._mission_trajectories.get(_uid, []))
-                         if self._heading_valid.get(_uid, False) else None)
+                _prev = _prev_f
                 _tparams = {k: self.rl_config.get("time", {})[k]
                             for k in ("cruise_speed", "tau_pi", "exponent")
                             if k in self.rl_config.get("time", {})}
@@ -634,6 +645,8 @@ class CoverageEnvironment(FieldEnvironment):
                 info["time_nonwork_base"] += return_feedback["time_nonwork_base"]
                 info["time_maneuver_extra"] += return_feedback["time_maneuver_extra"]
                 info["time_resupply_or_return"] += return_feedback["time_total"]
+                if self.uavs:
+                    self._heading_valid[self.uavs[0].uav_id] = False
                 info["resupply_or_return_distance"] += _leg
                 info["final_return_distance"] = _leg
                 if return_feedback.get("path"):
@@ -659,7 +672,10 @@ class CoverageEnvironment(FieldEnvironment):
                     _rpath2 = [tuple(pt) for pt in (_rf.get("path") or [])]
                     _b2, _x2 = (path_time(_prev2, _rpath2, **_tparams)
                                 if len(_rpath2) >= 2 else (float(_rf.get("distance", 0.0)) / _v, 0.0))
-                    _rf["time_total"] = _b2 + _x2
+                    _svc = float(self.rl_config.get("time", {}).get("service_time", 0.0))
+                    _rf["time_total"] = _b2 + _x2 + _svc
+                    if _svc:
+                        _rf["time_service"] = _svc
                     _rf["time_maneuver_extra"] = _x2
                     _rf["time_nonwork_base"] = _b2
                     _rf.setdefault("coverage", 0.0)
@@ -676,10 +692,8 @@ class CoverageEnvironment(FieldEnvironment):
                     info["time_nonwork_base"] = float(info.get("time_nonwork_base", 0.0)) + _rf["time_nonwork_base"]
                     info["time_maneuver_extra"] = float(info.get("time_maneuver_extra", 0.0)) + _rf["time_maneuver_extra"]
                     info["time_resupply_or_return"] = _rf["time_total"]
-                    _svc = float(self.rl_config.get("time", {}).get("service_time", 0.0))
-                    if _svc:
-                        info["time_service"] = _svc
-                        info["time_total"] = float(info.get("time_total", 0.0)) + _svc
+                    if _rf.get("time_service"):
+                        info["time_service"] = _rf["time_service"]
                     info["path_length"] = _base_length + _leg
                     info["resupply_or_return_distance"] = _leg
                     info["resupply_distance"] = _leg
