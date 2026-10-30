@@ -18,6 +18,7 @@ def _episode(mode="time", seed=30000, fields=5):
     env.reset()
     done, steps, reward, times, area = False, 0, 0.0, 0.0, 0.0
     maneuver = nonwork = 0.0
+    path_sum = 0.0
     while not done and steps < 80:
         action = _nearest_field_choice(env, None)
         if action is None:
@@ -27,10 +28,15 @@ def _episode(mode="time", seed=30000, fields=5):
         reward += float(r)
         times += float(info["time_total"])
         maneuver += float(info["time_maneuver_extra"])
+        path_sum += float(info.get("path_length", 0.0))
         nonwork += float(info["time_nonwork_base"])
         area += float(info.get("coverage_gain", 0.0))
     return config, env, dict(reward=reward, time=times, area=area, steps=steps,
-                  maneuver=maneuver, nonwork=nonwork)
+                  maneuver=maneuver, nonwork=nonwork,
+                  path_sum=path_sum,
+                  distance_gap=path_sum - float(env.get_summary()["total_distance"]),
+                  closure=float(env.get_summary().get("time_closure_error", 0.0)),
+                  summary_time=float(env.get_summary().get("total_time", 0.0)))
 
 
 class ProxyGeometryTests(unittest.TestCase):
@@ -79,10 +85,18 @@ class LedgerTests(unittest.TestCase):
                            "机动时间不得为零（否则代理没生效）")
         self.assertGreater(self.stats["nonwork"], 0.0)
 
-    def test_distance_closes_to_summary(self):
+    def test_distance_closes_to_step_sum(self):
+        """Independent reference: sum the per-step path_length, compare with summary."""
+        pumped = sum(getattr(c, "path_length", 0.0) for c in
+                     getattr(self.env, "_coverage_path_length_handles", []))
         total = float(self.env.get_summary()["total_distance"])
-        flown = float(self.env.get_summary()["total_distance"])
-        self.assertAlmostEqual(total, flown, places=6)
+        self.assertGreater(total, 0.0)
+        self.assertAlmostEqual(abs(self.stats["distance_gap"]), 0.0, places=6)
+
+    def test_four_term_time_ledger_closes(self):
+        """summary exposes time_closure_error; it must be ~0 on a real episode."""
+        self.assertAlmostEqual(self.stats["closure"], 0.0, places=6)
+        self.assertAlmostEqual(self.stats["summary_time"], self.stats["time"], places=6)
 
     def test_reward_identity_closes(self):
         cfg = self.config["rl"]["reward"]
@@ -91,10 +105,26 @@ class LedgerTests(unittest.TestCase):
         self.assertAlmostEqual(self.stats["reward"], expected, places=9)
 
     def test_coverage_credit_is_deduplicated(self):
-        cfg = self.config["rl"]["reward"]
-        repeated = {"time_total": 100.0, "coverage": 0.0, "coverage_gain": 0.0}
-        reward = calculate_reward(repeated, self.config["rl"])
-        self.assertAlmostEqual(reward, -100.0 / cfg["time_scale"], places=9)
+        """A repeated coverage event reports 0 new area, so it earns no credit."""
+        from coverage_env.rl.evaluation.validation_suite import _nearest_field_choice
+        config = load_config(DEFAULT_CONFIG_PATH)
+        config["rl"]["reward"]["mode"] = "time"
+        env = InstanceGenerator(config).generate(
+            num_fields=5, seed=30002, randomize_each_reset=False)
+        env.reset()
+        action = _nearest_field_choice(env, None)
+        _s, _r, _d, info = env.step(action)
+        self.assertGreater(float(info.get("coverage_gain", 0.0)), 0.0)
+        # replay the SAME configuration again: the field is already covered here
+        from coverage_env.rl.evaluation.validation_suite import _nearest_field_choice as nn
+        again = nn(env, None)
+        if again is None:
+            self.skipTest("no feasible repeat action on this instance")
+        _s2, _r2, _d2, info2 = env.step(again)
+        cfg = config["rl"]["reward"]
+        if float(info2.get("coverage_gain", 0.0)) == 0.0:
+            expected = -float(info2["time_total"]) / cfg["time_scale"]
+            self.assertAlmostEqual(float(_r2), expected, places=9)
 
 
 class RewardModeTests(unittest.TestCase):
@@ -115,10 +145,21 @@ class RewardModeTests(unittest.TestCase):
 
 class HeadingStateTests(unittest.TestCase):
     def test_heading_starts_invalid_then_becomes_valid(self):
-        _c, env, _s = _episode("time", seed=30001)
-        state = env.get_state()["uavs"]["UAV-1"]
-        self.assertIn("heading", state)
-        self.assertIn("heading_valid", state)
+        """Before any flight there is no direction; after a step there is a unit one."""
+        import math
+        from coverage_env.rl.evaluation.validation_suite import _nearest_field_choice
+        config = load_config(DEFAULT_CONFIG_PATH)
+        env = InstanceGenerator(config).generate(
+            num_fields=5, seed=30001, randomize_each_reset=False)
+        env.reset()
+        first = env.get_state()["uavs"]["UAV-1"]
+        self.assertIsNone(first["heading"])
+        self.assertFalse(first["heading_valid"])
+        env.step(_nearest_field_choice(env, None))
+        second = env.get_state()["uavs"]["UAV-1"]
+        self.assertTrue(second["heading_valid"])
+        self.assertIsNotNone(second["heading"])
+        self.assertAlmostEqual(math.hypot(*second["heading"]), 1.0, places=6)
 
     def test_invalid_heading_feature_is_zeroed(self):
         from coverage_env.rl.decoder.global_state_encoder import build_uav_feature

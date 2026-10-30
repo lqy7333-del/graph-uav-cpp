@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from coverage_env.env.time_model import heading_from_path, path_time
+
 import random
 from collections import deque
 from copy import deepcopy
@@ -101,6 +103,27 @@ class CoverageEnvironment(FieldEnvironment):
         reproduces the whole episode sequence).
         """
         self._heading_valid: dict = {}
+        # The flight-time model and the coverage credit use FIXED speed / width, so a
+        # randomized UAV would silently make the reward inconsistent with the physical
+        # model. Fail loudly instead of producing an uninterpretable training signal.
+        _time_cfg = (rl_config or {}).get("time", {}) if isinstance(rl_config, dict) else {}
+        _reward_cfg = (rl_config or {}).get("reward", {}) if isinstance(rl_config, dict) else {}
+        for _uav in uavs or ():
+            if _time_cfg.get("cruise_speed") is not None:
+                if abs(float(_uav.speed) - float(_time_cfg["cruise_speed"])) > 1e-9:
+                    raise ValueError(
+                        f"UAV speed {_uav.speed} != time.cruise_speed "
+                        f"{_time_cfg['cruise_speed']}; the time model assumes a fixed speed")
+            if _reward_cfg.get("coverage_width") is not None:
+                if abs(float(_uav.coverage_width) - float(_reward_cfg["coverage_width"])) > 1e-9:
+                    raise ValueError(
+                        f"UAV coverage_width {_uav.coverage_width} != reward.coverage_width "
+                        f"{_reward_cfg['coverage_width']}; the coverage credit assumes a fixed width")
+        # Cumulative flight-time ledger, filled on every step and reset with the
+        # episode. summary["total_time"] is this sum, so evaluation and checkpoint
+        # selection never have to re-add per-step fields.
+        self._time_totals = {"work": 0.0, "nonwork": 0.0, "maneuver": 0.0,
+                             "service": 0.0, "resupply_or_return": 0.0, "total": 0.0}
         super().__init__(fields)
         if not isinstance(depot, Depot):
             raise TypeError("depot must be a Depot instance.")
@@ -417,7 +440,10 @@ class CoverageEnvironment(FieldEnvironment):
         _full = [tuple(pt) for pt in result.total_path]
         _base, _extra = path_time(prev_dir, _full, **_params)
         _v = _params.get("cruise_speed", 8.0)
-        _service = float(_cfg.get("service_time", 0.0))
+        # Service time belongs to a SERVICE EVENT (resupply), not to every coverage
+        # configuration; charging it per configuration would make a non-zero value
+        # into "pay once per visit".
+        _service = 0.0
         feedback = {
             "configuration": configuration,
             "path": list(result.total_path),
@@ -579,17 +605,30 @@ class CoverageEnvironment(FieldEnvironment):
             if return_feedback is not None:
                 _leg = float(return_feedback.get("distance", 0.0))
                 _v = float(self.rl_config.get("time", {}).get("cruise_speed", 8.0))
-                # The return leg is flown too: give it a time and no coverage credit,
-                # otherwise the time reward would treat the final return as free.
-                return_feedback["time_total"] = _leg / _v
+                # The return leg is FLOWN: settle it with the same entry point as any
+                # other path so the turn from the last coverage segment toward the
+                # depot is charged too. A stop clears the direction only AFTER arrival.
+                _uid = self.uavs[0].uav_id if self.uavs else None
+                _prev = (heading_from_path(self._mission_trajectories.get(_uid, []))
+                         if self._heading_valid.get(_uid, False) else None)
+                _tparams = {k: self.rl_config.get("time", {})[k]
+                            for k in ("cruise_speed", "tau_pi", "exponent")
+                            if k in self.rl_config.get("time", {})}
+                _rpath = [tuple(pt) for pt in (return_feedback.get("path") or [])]
+                _rbase, _rextra = path_time(_prev, _rpath, **_tparams) if len(_rpath) >= 2 else (_leg / _v, 0.0)
+                return_feedback["time_total"] = _rbase + _rextra
+                return_feedback["time_maneuver_extra"] = _rextra
+                return_feedback["time_nonwork_base"] = _rbase
                 return_feedback.setdefault("coverage", 0.0)
                 reward += calculate_reward(
                     return_feedback, self.rl_config, total_area=self.total_area
                 )
                 info["return_to_depot"] = return_feedback
                 info["path_length"] = float(info.get("path_length", 0.0)) + _leg
-                info["time_total"] += _leg / _v
-                info["time_resupply_or_return"] += _leg / _v
+                info["time_total"] += return_feedback["time_total"]
+                info["time_nonwork_base"] += return_feedback["time_nonwork_base"]
+                info["time_maneuver_extra"] += return_feedback["time_maneuver_extra"]
+                info["time_resupply_or_return"] += return_feedback["time_total"]
                 info["resupply_or_return_distance"] += _leg
                 info["final_return_distance"] = _leg
                 if return_feedback.get("path"):
@@ -604,7 +643,20 @@ class CoverageEnvironment(FieldEnvironment):
                 if resupply is not None:
                     _v = float(self.rl_config.get("time", {}).get("cruise_speed", 8.0))
                     _rf = resupply["return_feedback"]
-                    _rf["time_total"] = float(_rf.get("distance", 0.0)) / _v
+                    _tparams = {k: self.rl_config.get("time", {})[k]
+                                for k in ("cruise_speed", "tau_pi", "exponent")
+                                if k in self.rl_config.get("time", {})}
+                    _prev2 = (heading_from_path(
+                        self._mission_trajectories.get(getattr(_rf, "uav_id", None) or
+                                                       (self.uavs[0].uav_id if self.uavs else None), []))
+                              if self._heading_valid.get(self.uavs[0].uav_id if self.uavs else None, False)
+                              else None)
+                    _rpath2 = [tuple(pt) for pt in (_rf.get("path") or [])]
+                    _b2, _x2 = (path_time(_prev2, _rpath2, **_tparams)
+                                if len(_rpath2) >= 2 else (float(_rf.get("distance", 0.0)) / _v, 0.0))
+                    _rf["time_total"] = _b2 + _x2
+                    _rf["time_maneuver_extra"] = _x2
+                    _rf["time_nonwork_base"] = _b2
                     _rf.setdefault("coverage", 0.0)
                     reward += calculate_reward(
                         _rf, self.rl_config, total_area=self.total_area,
@@ -615,8 +667,14 @@ class CoverageEnvironment(FieldEnvironment):
                     _v = float(self.rl_config.get("time", {}).get("cruise_speed", 8.0))
                     _leg_time = _leg / _v
                     info.update(resupply["info"])
-                    info["time_total"] = float(info.get("time_total", 0.0)) + _leg_time
-                    info["time_resupply_or_return"] = _leg_time
+                    info["time_total"] = float(info.get("time_total", 0.0)) + _rf["time_total"]
+                    info["time_nonwork_base"] = float(info.get("time_nonwork_base", 0.0)) + _rf["time_nonwork_base"]
+                    info["time_maneuver_extra"] = float(info.get("time_maneuver_extra", 0.0)) + _rf["time_maneuver_extra"]
+                    info["time_resupply_or_return"] = _rf["time_total"]
+                    _svc = float(self.rl_config.get("time", {}).get("service_time", 0.0))
+                    if _svc:
+                        info["time_service"] = _svc
+                        info["time_total"] = float(info.get("time_total", 0.0)) + _svc
                     info["path_length"] = _base_length + _leg
                     info["resupply_or_return_distance"] = _leg
                     info["resupply_distance"] = _leg
@@ -627,6 +685,12 @@ class CoverageEnvironment(FieldEnvironment):
                     info["termination_reason"] = self._termination_reason
 
         next_state = self.get_state()
+        self._time_totals["work"] += float(info.get("time_work_base", 0.0))
+        self._time_totals["nonwork"] += float(info.get("time_nonwork_base", 0.0))
+        self._time_totals["maneuver"] += float(info.get("time_maneuver_extra", 0.0))
+        self._time_totals["service"] += float(info.get("time_service", 0.0))
+        self._time_totals["resupply_or_return"] += float(info.get("time_resupply_or_return", 0.0))
+        self._time_totals["total"] += float(info.get("time_total", 0.0))
         return EnvironmentStep(next_state, reward, done, info)
 
     def _capture_physical_state(self) -> dict:
@@ -977,8 +1041,12 @@ class CoverageEnvironment(FieldEnvironment):
             }
             total_distance += feedback["path_length"]
             total_energy += feedback["energy_consumption"]
+        _leg_path = []
+        if per_uav:
+            first = next(iter(per_uav.values()))
+            _leg_path = [first.get("final_position") or depot_position]
         return {
-            "path": list(self.uavs[0].current_path) if self.uavs else [depot_position],
+            "path": _leg_path if _leg_path else [depot_position],
             "distance": total_distance,
             "energy": total_energy,
             "coverage": 0.0,
@@ -1012,6 +1080,7 @@ class CoverageEnvironment(FieldEnvironment):
         return not any(get_action_mask(actions, self))
 
     def get_summary(self) -> dict:
+        """Return mission summary; includes the cumulative flight-time ledger."""
         """Return cumulative mission costs, coverage, and UAV trajectories."""
         total_field_area = sum(field.area for field in self.fields)
         covered_area = sum(field.calculate_coverage_area() for field in self.fields)
@@ -1020,7 +1089,19 @@ class CoverageEnvironment(FieldEnvironment):
             remaining = field.get_uncovered_points()
             if field.grid_points and not remaining:
                 completed_fields.append(field.field_id)
+        _t = getattr(self, "_time_totals", None) or {}
+        _parts = (float(_t.get("work", 0.0)) + float(_t.get("nonwork", 0.0))
+                  + float(_t.get("maneuver", 0.0)) + float(_t.get("service", 0.0)))
         return {
+            # Cumulative flight time. ``total_time`` is the four-term sum, and
+            # ``time_closure_error`` exposes any accounting drift instead of hiding it.
+            "total_time": float(_t.get("total", 0.0)),
+            "time_work_base": float(_t.get("work", 0.0)),
+            "time_nonwork_base": float(_t.get("nonwork", 0.0)),
+            "time_maneuver_extra": float(_t.get("maneuver", 0.0)),
+            "time_service": float(_t.get("service", 0.0)),
+            "time_resupply_or_return": float(_t.get("resupply_or_return", 0.0)),
+            "time_closure_error": _parts - float(_t.get("total", 0.0)),
             "total_distance": sum(uav.total_distance for uav in self.uavs),
             "total_energy": sum(uav.total_energy_consumed for uav in self.uavs),
             "coverage_ratio": min(1.0, covered_area / total_field_area)

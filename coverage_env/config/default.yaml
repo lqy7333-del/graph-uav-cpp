@@ -249,7 +249,10 @@ ppo:
   advantage_mode: gae
   # Both PPO and rollout-baseline training sample capabilities from uav.ranges.
   # Independent of whether an instance is reused by reset (e.g. paired baselines).
-  randomize_uav: true
+  # Fixed control scenario for the maneuver-time experiment: the time model and the
+  # coverage credit assume ONE speed and ONE working width, so UAV capability must not
+  # be resampled. Enable again only for a separately designed cross-platform study.
+  randomize_uav: false
   learning_rate: 0.0003
   # Each optimizer gets its own rate. Adam moves a parameter by roughly lr per
   # step, so `lr x steps` bounds how far a network can travel in a whole run.
