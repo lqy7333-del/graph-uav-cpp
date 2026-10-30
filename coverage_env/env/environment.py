@@ -108,7 +108,12 @@ class CoverageEnvironment(FieldEnvironment):
         # model. Fail loudly instead of producing an uninterpretable training signal.
         _time_cfg = (rl_config or {}).get("time", {}) if isinstance(rl_config, dict) else {}
         _reward_cfg = (rl_config or {}).get("reward", {}) if isinstance(rl_config, dict) else {}
+        # Only the TIME reward depends on these being fixed; the distance objective is
+        # valid with randomized capability, so the check is scoped to that mode.
+        _time_mode = str((_reward_cfg.get("mode") or "distance")).lower() == "time"
         for _uav in uavs or ():
+            if not _time_mode:
+                break
             if _time_cfg.get("cruise_speed") is not None:
                 if abs(float(_uav.speed) - float(_time_cfg["cruise_speed"])) > 1e-9:
                     raise ValueError(

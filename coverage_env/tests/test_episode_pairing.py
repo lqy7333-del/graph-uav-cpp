@@ -37,6 +37,9 @@ class EpisodePairingTests(unittest.TestCase):
 
     def test_fixed_instance_can_have_random_capabilities(self):
         config = load_config()
+        # The project default is now a FIXED control scenario (randomize_uav=false);
+        # this test exercises the randomized path explicitly.
+        config["ppo"]["randomize_uav"] = True
         a = InstanceGenerator(config).generate(num_fields=5,seed=42,randomize_each_reset=False,randomize_uav=True)
         b = _build_instance(config,5,42)
         self.assertEqual(instance_fingerprint(a),instance_fingerprint(b))
