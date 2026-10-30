@@ -115,16 +115,16 @@ class LedgerTests(unittest.TestCase):
         action = _nearest_field_choice(env, None)
         _s, _r, _d, info = env.step(action)
         self.assertGreater(float(info.get("coverage_gain", 0.0)), 0.0)
-        # replay the SAME configuration again: the field is already covered here
-        from coverage_env.rl.evaluation.validation_suite import _nearest_field_choice as nn
-        again = nn(env, None)
-        if again is None:
-            self.skipTest("no feasible repeat action on this instance")
-        _s2, _r2, _d2, info2 = env.step(again)
-        cfg = config["rl"]["reward"]
-        if float(info2.get("coverage_gain", 0.0)) == 0.0:
-            expected = -float(info2["time_total"]) / cfg["time_scale"]
-            self.assertAlmostEqual(float(_r2), expected, places=9)
+        # Repeating a spatial action may cover MORE remaining area, not the old cells.
+        before = env.get_summary()["covered_area"]
+        _s2, r2, _d2, info2 = env.step(action)
+        gained = env.get_summary()["covered_area"] - before
+        self.assertAlmostEqual(float(info2.get("coverage_gain", 0.0)), gained)
+        if not info2.get("failed", False):
+            cfg = config["rl"]["reward"]
+            self.assertAlmostEqual(r2, -(info2["time_total"] - gained /
+                (cfg["coverage_width"] * cfg["nominal_work_speed"])) / cfg["time_scale"])
+        self.assertGreaterEqual(gained, 0.0)
 
 
 class RewardModeTests(unittest.TestCase):
@@ -171,6 +171,59 @@ class HeadingStateTests(unittest.TestCase):
         with_dir = dict(base, heading=(0.6, 0.8), heading_valid=True)
         self.assertEqual([round(float(x), 6) for x in build_uav_feature(with_dir)[-3:]],
                          [1.0, 0.6, 0.8])
+
+
+class ReturnTimeRegressionTests(unittest.TestCase):
+    """Independent pre-flight reference catches missing return junctions."""
+
+    def test_returns_service_reset_and_second_episode(self):
+        from coverage_env.env.time_model import path_time
+        config = load_config(DEFAULT_CONFIG_PATH)
+        config["rl"]["reward"]["mode"] = "time"
+        config["rl"]["time"]["service_time"] = 10.0
+        env = InstanceGenerator(config).generate(
+            num_fields=5, seed=30000, randomize_each_reset=False)
+        original = env.return_to_depot
+        returns = []
+
+        def checked_return():
+            uav = env.uavs[0]
+            before = env.get_state()["uavs"][uav.uav_id]
+            leg = [uav.current_position, env.depot.position]
+            base, extra = path_time(before["heading"], leg)
+            result = original()
+            self.assertEqual(result["path"], leg)
+            self.assertAlmostEqual(result["time_nonwork_base"], base)
+            self.assertAlmostEqual(result["time_maneuver_extra"], extra)
+            self.assertFalse(env.get_state()["uavs"][uav.uav_id]["heading_valid"])
+            returns.append(extra)
+            return result
+
+        env.return_to_depot = checked_return
+        for episode in range(2):
+            env.reset()
+            self.assertEqual(env.get_summary()["total_time"], 0.0)
+            self.assertFalse(env.get_state()["uavs"]["UAV-1"]["heading_valid"])
+            rewards = elapsed = area = 0.0
+            done = False
+            for _ in range(80):
+                action = _nearest_field_choice(env, None)
+                self.assertIsNotNone(action)
+                _, reward, done, info = env.step(action)
+                rewards += reward
+                elapsed += info["time_total"]
+                area += info.get("coverage_gain", 0.0)
+                if done:
+                    break
+            self.assertTrue(done)
+            summary = env.get_summary()
+            self.assertEqual(info["termination_reason"], "mission_complete")
+            self.assertAlmostEqual(summary["total_time"], elapsed)
+            self.assertAlmostEqual(summary["time_closure_error"], 0.0)
+            self.assertGreater(summary["resupply_count"], 0)
+            self.assertAlmostEqual(summary["time_service"], 10 * summary["resupply_count"])
+            self.assertAlmostEqual(rewards, -(elapsed - area / 80) / 100)
+        self.assertTrue(all(x > 0 for x in returns))
 
 
 if __name__ == "__main__":

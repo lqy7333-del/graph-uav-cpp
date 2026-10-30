@@ -611,31 +611,14 @@ class CoverageEnvironment(FieldEnvironment):
         if self._all_fields_complete():
             done = True
             info["termination_reason"] = "mission_complete"
-            # Capture the arriving direction BEFORE the return leg is flown and before
-            # any direction flag is cleared, so the junction into the depot is priced.
-            _uid_f = self.uavs[0].uav_id if self.uavs else None
-            _prev_f = (heading_from_path(self._mission_trajectories.get(_uid_f, []))
-                       if self._heading_valid.get(_uid_f, False) else None)
             try:
                 return_feedback = self.finalize_episode()
             except ValueError as exc:
                 return_feedback = {"completed": False, "reason": str(exc)}
             if return_feedback is not None:
                 _leg = float(return_feedback.get("distance", 0.0))
-                _v = float(self.rl_config.get("time", {}).get("cruise_speed", 8.0))
-                # The return leg is FLOWN: settle it with the same entry point as any
-                # other path so the turn from the last coverage segment toward the
-                # depot is charged too. A stop clears the direction only AFTER arrival.
-                _prev = _prev_f
-                _tparams = {k: self.rl_config.get("time", {})[k]
-                            for k in ("cruise_speed", "tau_pi", "exponent")
-                            if k in self.rl_config.get("time", {})}
-                _rpath = [tuple(pt) for pt in (return_feedback.get("path") or [])]
-                _rbase, _rextra = path_time(_prev, _rpath, **_tparams) if len(_rpath) >= 2 else (_leg / _v, 0.0)
-                return_feedback["time_total"] = _rbase + _rextra
-                return_feedback["time_maneuver_extra"] = _rextra
-                return_feedback["time_nonwork_base"] = _rbase
-                return_feedback.setdefault("coverage", 0.0)
+                for key in ("time_total", "time_maneuver_extra", "time_nonwork_base"):
+                    return_feedback.setdefault(key, 0.0)
                 reward += calculate_reward(
                     return_feedback, self.rl_config, total_area=self.total_area
                 )
@@ -659,26 +642,10 @@ class CoverageEnvironment(FieldEnvironment):
             else:
                 resupply = self._attempt_auto_resupply()
                 if resupply is not None:
-                    _v = float(self.rl_config.get("time", {}).get("cruise_speed", 8.0))
                     _rf = resupply["return_feedback"]
-                    _tparams = {k: self.rl_config.get("time", {})[k]
-                                for k in ("cruise_speed", "tau_pi", "exponent")
-                                if k in self.rl_config.get("time", {})}
-                    _prev2 = (heading_from_path(
-                        self._mission_trajectories.get(getattr(_rf, "uav_id", None) or
-                                                       (self.uavs[0].uav_id if self.uavs else None), []))
-                              if self._heading_valid.get(self.uavs[0].uav_id if self.uavs else None, False)
-                              else None)
-                    _rpath2 = [tuple(pt) for pt in (_rf.get("path") or [])]
-                    _b2, _x2 = (path_time(_prev2, _rpath2, **_tparams)
-                                if len(_rpath2) >= 2 else (float(_rf.get("distance", 0.0)) / _v, 0.0))
                     _svc = float(self.rl_config.get("time", {}).get("service_time", 0.0))
-                    _rf["time_total"] = _b2 + _x2 + _svc
-                    if _svc:
-                        _rf["time_service"] = _svc
-                    _rf["time_maneuver_extra"] = _x2
-                    _rf["time_nonwork_base"] = _b2
-                    _rf.setdefault("coverage", 0.0)
+                    _rf["time_service"] = _svc
+                    _rf["time_total"] += _svc
                     reward += calculate_reward(
                         _rf, self.rl_config, total_area=self.total_area,
                     )
@@ -1042,8 +1009,15 @@ class CoverageEnvironment(FieldEnvironment):
         per_uav = {}
         total_distance = 0.0
         total_energy = 0.0
+        total_base = total_extra = 0.0
+        params = {k: v for k, v in self.rl_config.get("time", {}).items()
+                  if k in ("cruise_speed", "tau_pi", "exponent")}
         for uav in self.uavs:
             start = uav.current_position or depot_position
+            leg = [start, depot_position]
+            prev = (heading_from_path(self._mission_trajectories.get(uav.uav_id, []))
+                    if self._heading_valid.get(uav.uav_id, False) else None)
+            base, extra = path_time(prev, leg, **params)
             feedback = uav.execute_path([depot_position], area=0.0)
             trajectory = self._mission_trajectories.setdefault(uav.uav_id, [])
             if start != depot_position:
@@ -1052,7 +1026,14 @@ class CoverageEnvironment(FieldEnvironment):
                     trajectory.extend(leg[1:])
                 else:
                     trajectory.extend(leg)
+            self._heading_valid[uav.uav_id] = False
+            total_base += base
+            total_extra += extra
             per_uav[uav.uav_id] = {
+                "path": leg,
+                "time_nonwork_base": base,
+                "time_maneuver_extra": extra,
+                "time_total": base + extra,
                 "distance": feedback["path_length"],
                 "energy": feedback["energy_consumption"],
                 "remaining_energy": feedback["remaining_energy"],
@@ -1063,8 +1044,11 @@ class CoverageEnvironment(FieldEnvironment):
         _leg_path = []
         if per_uav:
             first = next(iter(per_uav.values()))
-            _leg_path = [first.get("final_position") or depot_position]
+            _leg_path = first["path"]
         return {
+            "time_total": total_base + total_extra,
+            "time_nonwork_base": total_base,
+            "time_maneuver_extra": total_extra,
             "path": _leg_path if _leg_path else [depot_position],
             "distance": total_distance,
             "energy": total_energy,
