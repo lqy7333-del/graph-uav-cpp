@@ -394,6 +394,13 @@ class CoverageEnvironment(FieldEnvironment):
             "orientation": result.orientation,
             "uav_id": result.uav_id,
         })
+        from coverage_env.env.time_model import heading_from_path, path_time
+        # The junction "previous valid segment -> this action's first segment" is
+        # settled here, once, and charged to THIS step. A cleared flag (takeoff or a
+        # resupply stop) means no continuous-flight junction is billed.
+        prev_dir = None
+        if self._heading_valid.get(result.uav_id, False):
+            prev_dir = heading_from_path(self._mission_trajectories.get(result.uav_id, []))
         self._heading_valid[result.uav_id] = True
         trajectory = self._mission_trajectories.setdefault(result.uav_id, [])
         if result.total_path:
@@ -401,9 +408,24 @@ class CoverageEnvironment(FieldEnvironment):
                 trajectory.extend(result.total_path[1:])
             else:
                 trajectory.extend(result.total_path)
+        # Time ledger: base terms are length / cruise speed and are MUTUALLY
+        # EXCLUSIVE (work vs non-work), the maneuver term is only the EXTRA time at
+        # direction changes, so no segment is ever counted twice.
+        _cfg = self.rl_config.get("time", {})
+        _params = {k: _cfg[k] for k in ("cruise_speed", "tau_pi", "exponent")
+                   if k in _cfg}
+        _full = [tuple(pt) for pt in result.total_path]
+        _base, _extra = path_time(prev_dir, _full, **_params)
+        _v = _params.get("cruise_speed", 8.0)
+        _service = float(_cfg.get("service_time", 0.0))
         feedback = {
             "configuration": configuration,
             "path": list(result.total_path),
+            "time_work_base": float(result.coverage_distance) / _v,
+            "time_nonwork_base": max(0.0, _base - float(result.coverage_distance) / _v),
+            "time_maneuver_extra": float(_extra),
+            "time_service": _service,
+            "time_total": float(_base + _extra + _service),
             "distance": result.distance,
             "energy": result.energy,
             "payload": result.payload,
@@ -518,6 +540,14 @@ class CoverageEnvironment(FieldEnvironment):
             "workload": configuration.workload_ratio,
             "estimated_workload": configuration.workload_ratio,
             "path_length": feedback["distance"],
+            # Time ledger, mirrored from the execution feedback so step consumers do
+            # not have to reach into the result object.
+            "time_work_base": feedback["time_work_base"],
+            "time_nonwork_base": feedback["time_nonwork_base"],
+            "time_maneuver_extra": feedback["time_maneuver_extra"],
+            "time_service": feedback["time_service"],
+            "time_total": feedback["time_total"],
+            "time_resupply_or_return": 0.0,
             # Diagnostic split. ``path_length`` covers only the executed coverage
             # segment; the resupply and final-return legs are appended below so that
             # sum(path_length) closes to summary["total_distance"]. The reward and
@@ -547,12 +577,19 @@ class CoverageEnvironment(FieldEnvironment):
             except ValueError as exc:
                 return_feedback = {"completed": False, "reason": str(exc)}
             if return_feedback is not None:
+                _leg = float(return_feedback.get("distance", 0.0))
+                _v = float(self.rl_config.get("time", {}).get("cruise_speed", 8.0))
+                # The return leg is flown too: give it a time and no coverage credit,
+                # otherwise the time reward would treat the final return as free.
+                return_feedback["time_total"] = _leg / _v
+                return_feedback.setdefault("coverage", 0.0)
                 reward += calculate_reward(
                     return_feedback, self.rl_config, total_area=self.total_area
                 )
                 info["return_to_depot"] = return_feedback
-                _leg = float(return_feedback.get("distance", 0.0))
                 info["path_length"] = float(info.get("path_length", 0.0)) + _leg
+                info["time_total"] += _leg / _v
+                info["time_resupply_or_return"] += _leg / _v
                 info["resupply_or_return_distance"] += _leg
                 info["final_return_distance"] = _leg
                 if return_feedback.get("path"):
@@ -565,14 +602,21 @@ class CoverageEnvironment(FieldEnvironment):
             else:
                 resupply = self._attempt_auto_resupply()
                 if resupply is not None:
+                    _v = float(self.rl_config.get("time", {}).get("cruise_speed", 8.0))
+                    _rf = resupply["return_feedback"]
+                    _rf["time_total"] = float(_rf.get("distance", 0.0)) / _v
+                    _rf.setdefault("coverage", 0.0)
                     reward += calculate_reward(
-                        resupply["return_feedback"], self.rl_config,
-                        total_area=self.total_area,
+                        _rf, self.rl_config, total_area=self.total_area,
                     )
                     _base_length = float(info.get("path_length", 0.0))
                     _base_path = list(info.get("path", []))
                     _leg = float(resupply["return_feedback"].get("distance", 0.0))
+                    _v = float(self.rl_config.get("time", {}).get("cruise_speed", 8.0))
+                    _leg_time = _leg / _v
                     info.update(resupply["info"])
+                    info["time_total"] = float(info.get("time_total", 0.0)) + _leg_time
+                    info["time_resupply_or_return"] = _leg_time
                     info["path_length"] = _base_length + _leg
                     info["resupply_or_return_distance"] = _leg
                     info["resupply_distance"] = _leg

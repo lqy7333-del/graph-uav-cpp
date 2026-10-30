@@ -24,6 +24,32 @@ def calculate_reward(
     no longer contribute to the reward.
     """
     config = config or {}
+    reward_cfg = config.get("reward") if isinstance(config.get("reward"), dict) else {}
+    mode = str(reward_cfg.get("mode", "distance")).lower()
+
+    if mode == "time":
+        # r_t = -(dT - dA_unique / (width * nominal_speed)) / T_scale
+        #
+        # The credit is the ideal straight-line time for the NEWLY covered area at a
+        # fixed nominal speed, so it is identical for any policy that completes the
+        # same task. Repeated coverage earns nothing (dA_unique is 0), and T_scale is
+        # a single constant for the whole experiment -- never the instance area, the
+        # field count, or a reference policy's cost.
+        extra = float(result.get("time_total", result.get("time", 0.0)))
+        new_area = float(result.get("coverage", 0.0))
+        width = float(reward_cfg.get("coverage_width", 10.0))
+        nominal = float(reward_cfg.get("nominal_work_speed", 8.0))
+        time_scale = float(reward_cfg.get("time_scale", 100.0))
+        if width <= 0.0 or nominal <= 0.0:
+            raise ValueError("time reward needs positive coverage_width and nominal_work_speed")
+        if time_scale <= 0.0:
+            raise ValueError("time reward needs a positive time_scale")
+        credit = new_area / (width * nominal)
+        return -(extra - credit) / time_scale
+
+    if mode != "distance":
+        raise ValueError(f"unknown reward mode: {mode!r}")
+
     distance = float(result.get("distance", result.get("path_length", 0.0)))
     if total_area is None:
         total_area = float(config.get("total_area", 1.0))

@@ -130,6 +130,20 @@ rl:
   # on the clustered 20-parcel instances took 1.4-2.5 s, dominated by the
   # workload-feasibility previews that call it.
   grid_resolution: 10.0
+  reward:
+    # "distance" keeps the historical total-path objective; "time" uses the
+    # maneuver-aware flight-time ledger with the ideal-coverage credit:
+    #   r = -(dT - dA_unique / (coverage_width * nominal_work_speed)) / time_scale
+    mode: distance
+    coverage_width: 10.0
+    nominal_work_speed: 8.0
+    time_scale: 100.0
+  time:
+    # Flight-time model. Declared SIMULATION ASSUMPTIONS, not measured aircraft data.
+    cruise_speed: 8.0
+    tau_pi: 3.0        # reference extra seconds for a 180-degree reversal
+    exponent: 2.0      # small angles almost free
+    service_time: 0.0  # not modelled this round
   gamma: 1.0
   learning_rate: 0.0003
   batch_size: 64
