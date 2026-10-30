@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import hashlib
 from pathlib import Path
 import random
 import subprocess
@@ -9,6 +10,32 @@ import warnings
 
 import numpy as np
 import torch
+
+
+def state_dict_sha256(state_dict) -> str:
+    """Return a stable SHA-256 over tensor names and raw float32 bytes.
+
+    Used to prove that paired A/B runs start from identical initial weights.
+    Sorting the keys makes the digest independent of dict insertion order; the
+    tensors are detached and copied to CPU so CUDA state is not involved.
+    """
+    digest = hashlib.sha256()
+    for key in sorted(state_dict):
+        tensor = state_dict[key]
+        value = tensor.detach().cpu().contiguous()
+        if value.dtype != torch.float32:
+            value = value.float()
+        digest.update(key.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(value.numpy().tobytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def parameter_sha256(module) -> str:
+    """Return :func:`state_dict_sha256` for a module or DDP-wrapped module."""
+    module = module.module if hasattr(module, "module") else module
+    return state_dict_sha256(module.state_dict())
 
 
 def capture_rng_state():

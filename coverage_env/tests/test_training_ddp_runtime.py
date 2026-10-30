@@ -44,6 +44,10 @@ def _worker(rank, port, directory):
         trainer.run_metadata={'seed':42}
         torch.manual_seed(42+rank)
         trainer.train(2,4)
+        assert trainer._rank_stats["transitions"] == 8
+        assert trainer._rank_stats["updates"] == 2
+        if rank == 0:
+            assert (Path(directory)/'run_summary.json').exists()
         actor_end=deepcopy(agent.actor.module.state_dict())
         critic_end=deepcopy(agent.critic.module.state_dict())
         saved=torch.load(Path(directory)/'ckpt_update_1.pt',map_location='cpu',weights_only=False)

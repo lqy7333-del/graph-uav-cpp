@@ -18,6 +18,7 @@ import os
 import socket
 import json
 import random
+import time
 from copy import deepcopy
 from pathlib import Path
 import numpy as np
@@ -34,7 +35,12 @@ from coverage_env.rl.decoder.action_decoder import CoveragePolicy
 from coverage_env.rl.ppo.ppo import PPOAgent
 from coverage_env.rl.trainer.trainer import _clone_graph
 from coverage_env.rl.trainer.episode import nearest_neighbor_return, current_potential, learning_reward
-from coverage_env.rl.checkpoint import capture_rng_state, restore_rng_state, assert_rank_parameters_equal
+from coverage_env.rl.checkpoint import (
+    capture_rng_state,
+    parameter_sha256,
+    restore_rng_state,
+    assert_rank_parameters_equal,
+)
 
 
 def _free_port() -> int:
@@ -62,6 +68,86 @@ class DistributedTrainer:
         self.checkpoint_every = int(checkpoint_every)
         self._count_emas = {}
         self.run_metadata = {}
+        self._rank_stats = self._empty_rank_stats()
+        self._geometry_signatures: set = set()
+
+    @staticmethod
+    def _empty_rank_stats() -> dict:
+        """Per-rank counters used by the run summary and exact-resume payload."""
+        return {
+            "transitions": 0,
+            "episodes": 0,
+            "optimizer_steps": 0,
+            "updates": 0,
+            "wall_seconds": 0.0,
+            "instances_drawn": 0,
+            "distinct_geometries": 0,
+            "field_counts": {},
+        }
+
+    def _note_instance(self) -> None:
+        """Record the instance shape drawn by the latest reset.
+
+        Only the distribution of field counts and the number of distinct field
+        geometries are stored; this is provenance for the short-chain gate, not
+        a training signal.  A geometry signature uses field ids and rounded areas
+        so it is stable across deep copies and serialization.
+        """
+        signature = tuple(sorted(
+            (str(getattr(field, "field_id", index)),
+             round(float(getattr(field, "area", 0.0)), 3))
+            for index, field in enumerate(getattr(self.environment, "fields", []) or [])
+        ))
+        if signature not in self._geometry_signatures:
+            self._geometry_signatures.add(signature)
+            self._rank_stats["distinct_geometries"] = len(self._geometry_signatures)
+        self._rank_stats["instances_drawn"] = int(
+            self._rank_stats.get("instances_drawn", 0)
+        ) + 1
+
+    def write_run_summary(self) -> None:
+        """Gather per-rank throughput counters and write ``run_summary.json``."""
+        if self.checkpoint_dir is None:
+            return
+        local = deepcopy(self._rank_stats)
+        gathered = [None] * self.world_size
+        if dist.is_initialized():
+            dist.all_gather_object(gathered, local)
+        else:
+            gathered = [local]
+        if self.rank != 0:
+            return
+        merged_counts: dict = {}
+        for stats in gathered:
+            for count, number in (stats or {}).get("field_counts", {}).items():
+                merged_counts[str(count)] = merged_counts.get(str(count), 0) + int(number)
+        per_rank = [dict(stats or {}, rank=index) for index, stats in enumerate(gathered)]
+        global_stats = {
+            "transitions": sum(int(s.get("transitions", 0)) for s in gathered),
+            "episodes": sum(int(s.get("episodes", 0)) for s in gathered),
+            # All ranks issue the same number of synchronized optimizer steps.
+            "optimizer_steps_global_synchronous": max(
+                (int(s.get("optimizer_steps", 0)) for s in gathered), default=0
+            ),
+            "optimizer_steps_per_rank_sum": sum(
+                int(s.get("optimizer_steps", 0)) for s in gathered
+            ),
+            "wall_seconds_max": max(
+                (float(s.get("wall_seconds", 0.0)) for s in gathered), default=0.0
+            ),
+            "field_counts": merged_counts,
+        }
+        payload = {
+            "training_metadata": deepcopy(self.run_metadata),
+            "per_rank": per_rank,
+            "global": global_stats,
+        }
+        path = Path(self.checkpoint_dir) / "run_summary.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(path)
+        print(f"[rank 0] wrote run summary -> {path}", flush=True)
 
     def train(self, num_updates: int, rollout_steps: int, *, start_update: int = 1) -> None:
         """Run ``num_updates`` synchronized updates of ``rollout_steps`` steps each.
@@ -79,9 +165,11 @@ class DistributedTrainer:
                                  world_size=self.world_size)
 
         for update_idx in range(max(1, start_update), num_updates + 1):
+            update_started = time.perf_counter()
             # Sampling is stochastic and must not feed the autograd graph.
             self.agent.actor.eval()
             state = self.environment.reset()
+            self._note_instance()
             self._record_nn_baseline()
             rollout_reward = 0.0
             # Under field-count generalization a 128-step rollout spans several
@@ -107,6 +195,7 @@ class DistributedTrainer:
                         if retries > 16:
                             raise RuntimeError("Could not sample a feasible initial instance after 16 resets.")
                         state = self.environment.reset()
+                        self._note_instance()
                         self._record_nn_baseline()
                         output = self.agent.actor(state, environment=self.environment)
                         distribution = output["action_distribution"]
@@ -130,8 +219,11 @@ class DistributedTrainer:
                     # The environment still describes the episode that just
                     # finished, so its field count labels this episode.
                     completed_rewards.append(episode_reward)
+                    self._rank_stats["episodes"] += 1
                     count_here = len(self.environment.fields)
                     completed_fields.append(count_here)
+                    _counts = self._rank_stats["field_counts"]
+                    _counts[str(count_here)] = _counts.get(str(count_here), 0) + 1
                     completed_summaries.append(self.environment.get_summary())
                     previous = count_emas.get(count_here)
                     count_emas[count_here] = (
@@ -172,7 +264,10 @@ class DistributedTrainer:
                     value.detach().item(),
                     next_value,
                 )
+                self._rank_stats["transitions"] += 1
                 state = self.environment.reset() if env_done else next_state
+                if env_done:
+                    self._note_instance()
                 # Only a finished episode starts a new instance; recording on every
                 # step re-ran a full nearest-neighbour rollout per transition
                 # (18 min/update instead of ~3).
@@ -200,6 +295,9 @@ class DistributedTrainer:
             current_entropy_coef = progress["entropy_coef"]
             stats = self.agent.update(self.buffer)
             self.buffer.clear()
+            self._rank_stats["optimizer_steps"] += int(stats.get("updates", 0))
+            self._rank_stats["updates"] += 1
+            self._rank_stats["wall_seconds"] += time.perf_counter() - update_started
 
             if self.rank == 0:
                 summary = self.environment.get_summary()
@@ -229,6 +327,13 @@ class DistributedTrainer:
                     "current_partial_distance": round(summary["total_distance"], 1),
                     "current_partial_coverage": round(summary["coverage_ratio"], 4),
                     "episodes": episodes,
+                    "transitions_this_update": rollout_steps,
+                    "transitions_total_rank0": self._rank_stats["transitions"],
+                    "episodes_total_rank0": self._rank_stats["episodes"],
+                    "optimizer_steps_total": self._rank_stats["optimizer_steps"],
+                    "update_wall_seconds": round(
+                        float(self._rank_stats["wall_seconds"]), 3
+                    ),
                     "balanced_reward": (
                         round(sum(count_emas.values()) / len(count_emas), 4)
                         if count_emas else ""
@@ -284,6 +389,7 @@ class DistributedTrainer:
             if self.checkpoint_dir and (update_idx % self.checkpoint_every == 0 or update_idx == num_updates):
                 self._save_checkpoint(update_idx)
 
+        self.write_run_summary()
 
     def _record_nn_baseline(self):
         """Nearest-neighbour return for the current instance (baseline-replacement test)."""
@@ -316,7 +422,8 @@ class DistributedTrainer:
             return
         assert_rank_parameters_equal(self.agent.actor, self.agent.critic)
         local = {"rng": capture_rng_state(), "environment": deepcopy(self.environment),
-                 "count_emas": deepcopy(self._count_emas)}
+                 "count_emas": deepcopy(self._count_emas),
+                 "rank_stats": deepcopy(self._rank_stats)}
         states = [None] * self.world_size
         if dist.is_initialized():
             dist.all_gather_object(states, local)
@@ -366,16 +473,19 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
         if rank == 0:
             print(f"[rank 0] {args.resume_mode}: {args.resume} -> update {start_update}", flush=True)
 
+    initial_actor_sha256 = parameter_sha256(agent.actor)
     agent.actor = DDP(agent.actor, device_ids=[rank])
     agent.critic = DDP(agent.critic, device_ids=[rank])
     trainer = DistributedTrainer(environment, agent, rank=rank, world_size=world_size,
                                  checkpoint_dir=args.checkpoint_dir,
                                  checkpoint_every=args.checkpoint_every, config=config)
     trainer.run_metadata = {"seed": args.seed, "num_updates": args.num_updates,
-                            "rollout_steps": args.rollout_steps, "world_size": world_size}
+                            "rollout_steps": args.rollout_steps, "world_size": world_size,
+                            "initial_actor_sha256": initial_actor_sha256}
     if exact:
         runtime = saved["rank_runtime"][rank]
         trainer._count_emas = runtime["count_emas"]
+        trainer._rank_stats = deepcopy(runtime.get("rank_stats", trainer._empty_rank_stats()))
         restore_rng_state(runtime["rng"])
     else:
         random.seed(args.seed + rank)
@@ -385,7 +495,8 @@ def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
         directory = Path(args.checkpoint_dir)
         directory.mkdir(parents=True, exist_ok=True)
         metadata = {"resolved_config": config, "training_metadata": trainer.run_metadata,
-                    "resume": args.resume, "resume_mode": args.resume_mode}
+                    "resume": args.resume, "resume_mode": args.resume_mode,
+                    "initial_actor_sha256": initial_actor_sha256}
         (directory / f"resolved_config_update_{start_update}.json").write_text(
             json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"Resolved PPO config: {json.dumps(config['ppo'])}", flush=True)

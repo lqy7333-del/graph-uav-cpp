@@ -1,3 +1,42 @@
+## 2026-10-30
+
+### 106. **训练门槛：固定验证集选择、DDP 吞吐记录与真实 GPU exact-resume 验证**
+
+- **固定验证集实现**：新增 `coverage_env/rl/evaluation/maneuver_eval.py`，验证种子
+  `40000-40095`（每规模 5–20 各 6 个），最终测试 `50000-51599`（每规模各 100 个）。
+  选择规则按本提交的协议执行：**完成数量优先**；仅当候选完成全部 96 个实例时，才比较
+  规模等权平均 `total_time`；若无人全完成，报告可靠性门槛失败并取最高完成数中较早 update；
+  完成数相同但未全完成时**不比较**不同成功子集的平均时间。该逻辑有 12 项单元测试。
+- **DDP 统计**：`DistributedTrainer` 现在按卡/全局记录 transitions、episodes、同步优化步、
+  墙钟、规模直方图与几何刷新数；`run_summary.json` 随每次训练落盘。checkpoint 同时保存
+  rank 统计与 `initial_actor_sha256`，用于证明同 seed 的 A/B 从相同初始权重开始。
+- **真实 4×RTX 5090 DDP 短链路**（`scripts/maneuver_time/gate_ddp.py`，time 模式，
+  3 updates × 128 steps）：39 项专项测试之外，以下门槛全部通过：
+  - 参数确实更新；loss/KL/entropy/梯度有限；reset 后累计时间与闭合误差均为 0；
+  - 160 次 reset 覆盖 5–20 全部 16 个规模，160 个不同几何；
+  - 补给/最终返航机动费用非零，且每次返回的 base/extra 与执行前 `path_time` 独立参考
+    在 1e-9 内一致；非零服务时间下 reward 恒等式误差 < 1e-14；
+  - exact resume 的配置、update index、RNG/环境/优化器 payload、更新日志指标与未中断运行
+    一致；参数漂移不超过两个**完全相同全新任务**之间的漂移包络。
+  - 该 GPU 栈不逐位可复现：3 updates 后两个全新任务的 actor 最大差约 `6.4e-4`
+    （CUDA scatter/NCCL 顺序），因此不把逐位相等作为 exact-resume 判据，也不声称已获得
+    逐位可重复训练。
+  - 实测吞吐 **36.2 s/update**，400 updates 约 **4.0 h/任务**，6 任务串行约 **24 h**
+    （不含验证/最终测试）。
+- **全量测试**：256 项中 2 项失败，均为 `5490b97` 基线已存在的失败，已在独立 worktree
+  复现（`test_uav` 仍按旧 alpha 期待 40 Wh，实际 16 Wh；`test_nearest_neighbor_episode`
+  5 地块 0/10 完成，执行器 payload 比预检多 0.1）。新增协议测试 12 项全过。
+- **正式训练配置（冻结）**：A=distance / B=time，seed 42/43/44，400 updates，
+  rollout 128，每 20 updates 保存，`candidate_attention=false`，固定 UAV（speed 8、
+  width 10），4 GPU world_size=4，6 任务串行，顺序 A42/B42/A43/B43/A44/B44。
+  每个任务全局 transitions 204,800、同步优化步 3,200。
+- **启动脚本**：`scripts/maneuver_time/run_formal.py`；启动前写入 SHA、有效配置、命令、
+  数据划分、硬件、初始 hash、gate 摘要与预算，并在每个任务后校验 checkpoint 数量、
+  transition 总数与初始参数 hash。
+- **边界**：本轮 A/B 比较完整目标方案，不声称只隔离转弯项或面积抵扣项；时间指标仍为
+  「模型估计的飞行时间，含机动损耗，不含未建模的补给服务及起降耗时」，不是真实飞行测量。
+- **回滚**：删除新增评估/启动脚本并回退本提交；基线 `27625b6`（不含本门槛实现）。
+
 ## 2026-10-29
 
 ### 104. **机动时间目标：方向特征、时间账本、时间 reward 与协议（未启动训练）**
