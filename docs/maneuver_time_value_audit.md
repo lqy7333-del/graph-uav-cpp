@@ -46,7 +46,7 @@
 ## 2. 表一：逐 episode reward 闭合
 
 数据：`coverage_env/results/maneuver_time/diagnostics/episode_reward_closure.csv`
-（B43，update 381 精确 replay + update 387 replay；4 个 rank）。
+（B43，update 381 replay 与原始 381 日志接近；update 387 replay；4 个 rank）。
 
 公式（B 组，time 模式，`gamma=1`，`service_time=0`）：
 
@@ -119,14 +119,14 @@ expected = -(sum(time_total) - sum(coverage_gain)/(10*8)) / 100 + (-1)*failed_st
 - 但**没有 update 386 的 checkpoint**；从 380 replay 7 个 optimizer update 时，
   381/382 仍与原始日志几乎一致，383 起因 CUDA scatter/NCCL 非确定性逐步偏离；
   replay 的 387 `critic_loss=3,119`，不能声称逐位复现 44,326。
-- 因此“44,326 的精确 buffer”不可恢复；但**可精确复现的 update 381** 已经展示了同一机制：
+- 因此“44,326 的精确 buffer”不可恢复；但**可复现且与原始 381 日志接近的 update 381** 已经展示了同一机制：
   首步 return **−372.81** vs MC return **−39.45**，最大正 return **+8.64**。
 - 修复后同一 update 381，最大 return 变成 **−0.99**（终端步），不再出现正 return；
   `next_value` gap 降到 **9.2e-5**。
 
 **结论：大 target 的来源是错误 bootstrap（缺 heading 的 env-only V(s_{t+1})），
 不是失败惩罚、截断、GAE 公式或 reward 公式。** 44,326 是同一错误在后期
-value 误差放大后的极端表现；精确数值无法逐位重建，但机制已由可复现的 381 证实。
+value 误差放大后的极端表现；精确数值无法逐位重建，但机制已由 381 replay 证实。
 
 ## 5. 表四：规模与统计账本
 
