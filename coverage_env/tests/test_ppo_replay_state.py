@@ -202,15 +202,20 @@ class PpoReplayStateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             agent.value_for_graph(graph, environment, state=None)
 
-    def test_bootstrap_value_after_resupply_has_no_heading(self):
-        """After a depot stop both state and env must agree on heading_valid=False."""
+    def test_bootstrap_value_after_flight_and_depot_stop_has_no_heading(self):
+        """Fly first (heading valid), then stop at depot (heading cleared)."""
         environment = InstanceGenerator(self.config).generate(seed=20261017)
         actor = CoveragePolicy(environment, config=self.config).eval()
         agent = PPOAgent(actor, self.config)
-        environment.reset()
+        state = environment.reset()
+        with torch.no_grad():
+            output = actor(state, environment=environment)
+            action = CoveragePolicy.greedy_action(output)
+        state, _reward, _done, _info = environment.step(action)
+        uav_id = environment.uavs[0].uav_id
+        self.assertTrue(state["uavs"][uav_id]["heading_valid"])
         environment.return_to_depot()
         state = environment.get_state()
-        uav_id = environment.uavs[0].uav_id
         self.assertFalse(state["uavs"][uav_id]["heading_valid"])
         graph = actor.graph_builder.build_graph(environment)
         with torch.no_grad():
@@ -219,8 +224,8 @@ class PpoReplayStateTests(unittest.TestCase):
             value_graph_state = agent.value_for_graph(graph, environment, state=state)
         self.assertAlmostEqual(value_state, value_graph_state, places=5)
 
-    def test_rollout_tail_bootstrap_uses_next_state(self):
-        """The transition flagged truncated must bootstrap the real next state."""
+    def test_next_state_bootstrap_after_a_normal_step(self):
+        """One-step next-state encoding; trainer tail is covered by the real gate."""
         environment = InstanceGenerator(self.config).generate(seed=20261018)
         actor = CoveragePolicy(environment, config=self.config).eval()
         agent = PPOAgent(actor, self.config)
