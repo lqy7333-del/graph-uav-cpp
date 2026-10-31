@@ -1,6 +1,43 @@
 ## 2026-10-31
 
+### 109. **GAE bootstrap 实现错误：next_value 丢失 heading，6 个正式 A/B run 受影响**
+
+- **审计发现**：`next_value` 在 DDP/单进程 trainer 中只传 `environment`，未传
+  `next_state`；`CoveragePolicy._global_sources` 回退到环境 UAV 对象，后者没有
+  `heading`，导致 bootstrap 的 UAV 特征缺少方向三通道。下一步 actor 前向使用带
+  heading 的 state，因此 `next_value_t` 与 `value_{t+1}` 不是同一状态的值。
+- **量化**：同一状态 `V(state)` 与 `V(environment)` 在 heading 有效后差 3.65（5 地块）；
+  B43 update 381 的相邻 transition `next_value − 下一步 value` 最大 **149.56**、
+  p95 **102.68**；update 387 replay 最大 **174.17**、p95 **73.01**。B43 的
+  44,326 critic loss 与正 return（+8.64/+48.08）出现在这一错误之后。
+- **修复**：`PPOAgent.value_for_graph(..., state=None)` 显式接收 state 并传给
+  `encode_graph`；`DistributedTrainer` 与单进程 `Trainer` 均传 `state=next_state`。
+  新增回归测试 `test_bootstrap_value_uses_the_next_observation_heading`。
+  修复后同一 update 381 的相邻 gap 最大 **9.16e-5**。
+- **审计确认未受影响**：48 个 B43 episode 的 `Σreward` 与
+  `−(T−A/80)/100` 最大误差 **7.1e-15**（42 完成、6 尾片段、0 失败）；
+  独立 GAE 复算与 `compute_advantage` 最大差 **5.2e-5**（float32 舍入）。
+  错误在 bootstrap 输入，不在 reward 公式或 GAE 递推。
+- **统计账本**：6 个 run 的 `starts−completed` 均恰好 **1,600 = 400 updates × 4 ranks
+  × 1 个尾片段**；`field_counts`/`balanced_reward` 只统计完成 episode，且
+  `balanced_reward` 仅 rank0。完成 episode 的 5/20 占比不是 reset/transition 占比；
+  逐 transition 规模未记录，不能据此做平衡采样。
+- **受影响实验**：6 个正式 A/B run（`869bdd4`）全部受影响；DDP 门槛的 loss/GAE
+  目标也受影响（环境/时间/服务时间检查仍有效）；单进程 Trainer 同样受影响。
+  最终测试 `50000-51599` 的数值只描述旧权重，不能作为修正后方法结论；测试集已使用。
+- **下一步**：未重训。需在同一修复 SHA 上重跑 6 个正式 run，并在训练前重新约定
+  sealed 测试种子；先验证 GAE target 一致性、reward 闭合和规模账本，再讨论 critic/
+  greedy/采样。
+- **报告**：`docs/maneuver_time_value_audit.md`；旧报告已加审计后更正横幅。
+- **回滚**：回退 `c390951` 会把 heading 特征重新从 bootstrap 中丢失，不应回滚。
+
+## 2026-10-31
+
 ### 108. **正式 A/B 的有边界训练诊断：先升后降、B43 critic 发散、A43 greedy 解码失败**
+
+> **审计后状态（见 109）**：本条目关于 B43 “critic 发散”、5/6 后期退化、A43
+> “greedy 解码失败为主”和规模采样偏差的表述，已被 next-value 实现错误审计修正；
+> 保留原文用于对照，结论以 109 与 `docs/maneuver_time_value_audit.md` 为准。
 
 - **诊断范围**：只用固定验证集 `40000-40095`（96 实例，每规模 6 个），不训练、不改代码、
   不用最终测试集选择；对 6 个正式 run 的全部 20 个 checkpoint 导出逐规模时间、训练指标、
