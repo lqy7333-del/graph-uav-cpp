@@ -14,6 +14,7 @@ and reset the environment whenever an episode ends.
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import math
 import os
@@ -148,43 +149,72 @@ class DistributedTrainer:
         payload = json.dumps(observation, sort_keys=True, default=str)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def _normalized_error(error: float, left: float, right: float,
+                          abs_tol: float, rel_tol: float) -> float:
+        """Per-pair relative tolerance, rather than one global value scale."""
+        scale = max(abs(float(left)), abs(float(right)), 1.0)
+        return abs(float(error)) / (abs_tol + rel_tol * scale)
+
     def _local_gate_metrics(self, transitions, closure_error_max: float) -> dict:
         """Compute one rank's pre-update correctness metrics.
 
-        These checks use fixed parameters and eval mode, before ``PPOAgent.update``
-        changes anything.  They cover both ends of a rollout: every adjacent
-        nonterminal pair and the final truncated/terminal bootstrap, which has no
-        next transition to compare against.
+        All comparisons use the pair's own value scale.  A single large value
+        elsewhere in the rollout must not loosen the tolerance for a small one.
         """
         rewards = [float(t.reward) for t in transitions]
         values = [float(t.value) for t in transitions]
         next_values = [float(t.next_value) for t in transitions]
         finite = all(math.isfinite(x) for x in rewards + values + next_values)
-        gaps = [
-            abs(next_values[i] - values[i + 1])
-            for i in range(len(transitions) - 1)
-            if not transitions[i].done
-        ]
-        gap_scale = max([abs(v) for v in values] + [abs(v) for v in next_values] + [1.0])
+        pair_errors = []
+        pair_q = []
+        pair_indices = []
+        gap_index = 0
+        for i in range(len(transitions) - 1):
+            if transitions[i].done:
+                continue
+            error = abs(next_values[i] - values[i + 1])
+            pair_errors.append(error)
+            pair_indices.append(i)
+            pair_q.append(self._normalized_error(
+                error, next_values[i], values[i + 1],
+                VALUE_GAP_ABS, VALUE_GAP_REL))
+            if not math.isfinite(error):
+                finite = False
+        if pair_q:
+            gap_index = pair_indices[
+                max(range(len(pair_q)), key=lambda i: pair_q[i])]
+        gap_abs_index = pair_indices[
+            max(range(len(pair_errors)), key=lambda i: pair_errors[i])] \
+            if pair_errors else 0
         tail_error = 0.0
-        tail_scale = 1.0
+        tail_q = 0.0
+        tail_expected = 0.0
         if transitions:
             last = transitions[-1]
-            tail_scale = max(abs(float(last.value)), abs(float(last.next_value)), 1.0)
             if last.done:
                 tail_error = abs(float(last.next_value))
+                tail_q = self._normalized_error(
+                    tail_error, 0.0, float(last.next_value),
+                    TAIL_VALUE_ABS, TAIL_VALUE_REL)
             else:
-                actor = self.agent.actor.module
+                actor = (self.agent.actor.module
+                         if hasattr(self.agent.actor, "module")
+                         else self.agent.actor)
                 _embeddings, _embedding, critic_input = actor.encode_graph(
                     last.next_state["graph"], environment=self.environment,
                     state=last.next_state["observation"],
                 )
-                expected = float(self.agent.critic(critic_input).reshape(()).item())
-                tail_error = abs(expected - float(last.next_value))
-                if not math.isfinite(expected):
+                tail_expected = float(self.agent.critic(critic_input).reshape(()).item())
+                tail_error = abs(tail_expected - float(last.next_value))
+                tail_q = self._normalized_error(
+                    tail_error, tail_expected, float(last.next_value),
+                    TAIL_VALUE_ABS, TAIL_VALUE_REL)
+                if not math.isfinite(tail_expected):
                     finite = False
         replay_logprob_error = 0.0
         replay_value_error = 0.0
+        replay_bad_indices = []
         if transitions:
             indices = sorted(set([0, len(transitions) // 3,
                                    2 * len(transitions) // 3, len(transitions) - 1]))
@@ -193,119 +223,202 @@ class DistributedTrainer:
                     log_probs, _entropy, replay_values = (
                         self.agent._per_transition_minibatch_rows(transitions, indices)
                     )
-                replay_logprob_error = max(
-                    abs(float(log_probs[j]) - float(transitions[index].log_prob))
-                    for j, index in enumerate(indices)
-                )
-                replay_value_error = max(
-                    abs(float(replay_values[j]) - float(transitions[index].value))
-                    for j, index in enumerate(indices)
-                )
+                if not bool(torch.isfinite(log_probs).all().item()):
+                    finite = False
+                if not bool(torch.isfinite(replay_values).all().item()):
+                    finite = False
+                lp_errors = []
+                val_errors = []
+                for j, index in enumerate(indices):
+                    lp = float(log_probs[j].item())
+                    val = float(replay_values[j].item())
+                    lp_error = abs(lp - float(transitions[index].log_prob))
+                    val_error = abs(val - float(transitions[index].value))
+                    if (not math.isfinite(lp_error) or
+                            not math.isfinite(val_error) or
+                            lp_error > REPLAY_LOGPROB_ABS or
+                            val_error > REPLAY_VALUE_ABS):
+                        replay_bad_indices.append(index)
+                    lp_errors.append(lp_error)
+                    val_errors.append(val_error)
+                replay_logprob_error = max(lp_errors) if lp_errors else 0.0
+                replay_value_error = max(val_errors) if val_errors else 0.0
+                if not (math.isfinite(replay_logprob_error) and
+                        math.isfinite(replay_value_error)):
+                    finite = False
             except Exception:
                 # A replay failure is a correctness failure, not a training signal.
                 finite = False
-        return {
-            "value_state_gap_max": max(gaps) if gaps else 0.0,
-            "value_state_scale": gap_scale,
+                replay_logprob_error = float("inf")
+                replay_value_error = float("inf")
+        metrics = {
+            "value_state_gap_max": max(pair_errors) if pair_errors else 0.0,
+            "value_state_scale": max(
+                [abs(v) for v in values] + [abs(v) for v in next_values] + [1.0]),
+            "pair_q_max": max(pair_q) if pair_q else 0.0,
             "tail_value_error": tail_error,
-            "tail_value_scale": tail_scale,
+            "tail_value_scale": max(abs(float(transitions[-1].value)),
+                                    abs(float(transitions[-1].next_value)), 1.0)
+            if transitions else 1.0,
+            "tail_q": tail_q,
             "replay_logprob_error": replay_logprob_error,
             "replay_value_error": replay_value_error,
             "episode_closure_error_max": float(closure_error_max),
             "finite": bool(finite),
+            "gap_index": int(gap_index),
+            "gap_abs_index": int(gap_abs_index),
+            "replay_bad_indices": replay_bad_indices,
+            "tail_index": len(transitions) - 1 if transitions else 0,
         }
+        return metrics
 
     def _write_gate_failure(self, update_idx: int, reason: str, local: dict,
                             global_metrics: dict) -> None:
-        """Persist enough local state to reproduce a pre-update gate failure."""
-        if self.checkpoint_dir is None:
-            return
-        directory = Path(self.checkpoint_dir) / "gate_failures"
-        directory.mkdir(parents=True, exist_ok=True)
-        prefix = f"update_{update_idx}_rank_{self.rank}"
-        transitions = list(getattr(self, "buffer", []).transitions)[:3]
-        payload = {
-            "sha": provenance().get("revision"),
-            "rank": self.rank,
-            "update": update_idx,
-            "reason": reason,
-            "thresholds": {
-                "value_gap_abs": VALUE_GAP_ABS, "value_gap_rel": VALUE_GAP_REL,
-                "tail_abs": TAIL_VALUE_ABS, "tail_rel": TAIL_VALUE_REL,
-                "replay_logprob_abs": REPLAY_LOGPROB_ABS,
-                "replay_value_abs": REPLAY_VALUE_ABS,
-                "closure_abs": REWARD_CLOSURE_ABS,
-            },
-            "local": local,
-            "global": global_metrics,
-            "run_metadata": self.run_metadata,
-            "config": self.config,
-            "transitions": [
-                {
-                    "reward": float(t.reward), "value": float(t.value),
-                    "next_value": float(t.next_value), "done": bool(t.done),
-                    "truncated": bool(getattr(t, "truncated", False)),
-                    "state_digest": self._state_digest(t.state.get("observation")),
-                    "next_state_digest": self._state_digest(t.next_state.get("observation")),
-                }
-                for t in transitions
-            ],
-        }
-        (directory / f"{prefix}.json").write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False, default=str),
-            encoding="utf-8")
+        """Persist the samples that actually triggered each failed check.
+
+        Diagnostic writes must never prevent the all-rank barrier/abort path.
+        All writes are wrapped; the barrier is in ``finally``.
+        """
+        directory = None
         try:
-            tail = self.buffer.transitions[-1] if self.buffer.transitions else None
-            torch.save({
-                "last_state": tail.state if tail is not None else None,
-                "last_next_state": tail.next_state if tail is not None else None,
-                "last_transition": None if tail is None else {
-                    "reward": tail.reward, "value": tail.value,
-                    "next_value": tail.next_value, "done": tail.done,
-                    "truncated": getattr(tail, "truncated", False),
-                },
-            }, directory / f"{prefix}.pt")
+            if self.checkpoint_dir is not None:
+                directory = Path(self.checkpoint_dir) / "gate_failures"
+                directory.mkdir(parents=True, exist_ok=True)
+            transitions = list(getattr(self, "buffer", []).transitions)
+            bad = set()
+            for key in ("gap_index", "gap_abs_index"):
+                index = int(local.get(key, 0) or 0)
+                if transitions:
+                    bad.add(min(index, len(transitions) - 1))
+                    bad.add(min(index + 1, len(transitions) - 1))
+            for index in local.get("replay_bad_indices", []) or []:
+                if transitions:
+                    bad.add(min(int(index), len(transitions) - 1))
+            if transitions:
+                bad.add(min(int(local.get("tail_index", len(transitions) - 1)),
+                            len(transitions) - 1))
+            if not bad and transitions:
+                bad.add(0)
+                bad.add(len(transitions) - 1)
+            bad = sorted(bad)[:16]
+            samples = {}
+            for index in bad:
+                if not (0 <= index < len(transitions)):
+                    continue
+                transition = transitions[index]
+                samples[index] = {
+                    "state": transition.state,
+                    "next_state": transition.next_state,
+                    "action": transition.action,
+                    "reward": float(transition.reward),
+                    "value": float(transition.value),
+                    "next_value": float(transition.next_value),
+                    "done": bool(transition.done),
+                    "truncated": bool(getattr(transition, "truncated", False)),
+                }
+        except Exception:
+            transitions = []
+            bad = []
+            samples = {}
+        try:
+            if directory is not None:
+                prefix = f"update_{update_idx}_rank_{self.rank}"
+                payload = {
+                    "sha": provenance().get("revision"),
+                    "rank": self.rank,
+                    "update": update_idx,
+                    "reason": reason,
+                    "thresholds": {
+                        "value_gap_abs": VALUE_GAP_ABS,
+                        "value_gap_rel": VALUE_GAP_REL,
+                        "tail_abs": TAIL_VALUE_ABS,
+                        "tail_rel": TAIL_VALUE_REL,
+                        "replay_logprob_abs": REPLAY_LOGPROB_ABS,
+                        "replay_value_abs": REPLAY_VALUE_ABS,
+                        "closure_abs": REWARD_CLOSURE_ABS,
+                    },
+                    "local": local,
+                    "global": global_metrics,
+                    "run_metadata": self.run_metadata,
+                    "config": self.config,
+                    "bad_indices": bad,
+                    "transitions": [
+                        {
+                            "index": index,
+                            "reward": samples[index]["reward"],
+                            "value": samples[index]["value"],
+                            "next_value": samples[index]["next_value"],
+                            "done": samples[index]["done"],
+                            "truncated": samples[index]["truncated"],
+                            "state_digest": self._state_digest(
+                                samples[index]["state"].get("observation")),
+                            "next_state_digest": self._state_digest(
+                                samples[index]["next_state"].get("observation")),
+                        }
+                        for index in bad if index in samples
+                    ],
+                }
+                (directory / f"{prefix}.json").write_text(
+                    json.dumps(payload, indent=2, ensure_ascii=False, default=str),
+                    encoding="utf-8")
+                torch.save({"samples": samples},
+                           directory / f"{prefix}.pt")
         except Exception:
             pass
-        if dist.is_initialized():
-            dist.barrier()
-        if self.rank == 0:
-            summary = {
-                "sha": provenance().get("revision"),
-                "update": update_idx,
-                "reason": reason,
-                "thresholds": payload["thresholds"],
-                "local": local,
-                "global": global_metrics,
-                "files": sorted(p.name for p in directory.glob(f"update_{update_idx}_rank_*")),
-            }
-            (directory / f"update_{update_idx}_summary.json").write_text(
-                json.dumps(summary, indent=2, ensure_ascii=False, default=str),
-                encoding="utf-8")
+        finally:
+            if dist.is_initialized():
+                dist.barrier()
+        if self.rank == 0 and directory is not None:
+            try:
+                summary = {
+                    "sha": provenance().get("revision"),
+                    "update": update_idx,
+                    "reason": reason,
+                    "thresholds": {
+                        "value_gap_abs": VALUE_GAP_ABS,
+                        "value_gap_rel": VALUE_GAP_REL,
+                        "tail_abs": TAIL_VALUE_ABS,
+                        "tail_rel": TAIL_VALUE_REL,
+                        "replay_logprob_abs": REPLAY_LOGPROB_ABS,
+                        "replay_value_abs": REPLAY_VALUE_ABS,
+                        "closure_abs": REWARD_CLOSURE_ABS,
+                    },
+                    "local": local,
+                    "global": global_metrics,
+                    "files": sorted(p.name for p in directory.glob(
+                        f"update_{update_idx}_rank_*")),
+                }
+                (directory / f"update_{update_idx}_summary.json").write_text(
+                    json.dumps(summary, indent=2, ensure_ascii=False, default=str),
+                    encoding="utf-8")
+            except Exception:
+                pass
 
     def _gate_or_abort(self, local: dict, update_idx: int) -> dict:
         """All-reduce local correctness metrics and abort every rank on failure."""
         keys = (
-            "value_state_gap_max", "value_state_scale", "tail_value_error",
-            "tail_value_scale", "replay_logprob_error", "replay_value_error",
+            "value_state_gap_max", "value_state_scale", "pair_q_max",
+            "tail_value_error", "tail_value_scale", "tail_q",
+            "replay_logprob_error", "replay_value_error",
             "episode_closure_error_max",
         )
         global_metrics = {key: self._all_reduce_max(local.get(key, 0.0))
                           for key in keys}
-        all_finite = bool(self._all_reduce_min(1.0 if local.get("finite") else 0.0))
-        gap_allowed = VALUE_GAP_ABS + VALUE_GAP_REL * global_metrics["value_state_scale"]
-        tail_allowed = TAIL_VALUE_ABS + TAIL_VALUE_REL * global_metrics["tail_value_scale"]
+        metrics_finite = all(
+            math.isfinite(float(local.get(key, 0.0))) for key in keys)
+        all_finite = bool(self._all_reduce_min(
+            1.0 if (local.get("finite") and metrics_finite) else 0.0))
         failures = []
         if not all_finite:
             failures.append("nonfinite buffer/state/replay metric")
-        if global_metrics["value_state_gap_max"] > gap_allowed:
+        if global_metrics["pair_q_max"] > 1.0:
             failures.append(
-                f"value_state_gap_max {global_metrics['value_state_gap_max']:.3e} "
-                f"> {gap_allowed:.3e}")
-        if global_metrics["tail_value_error"] > tail_allowed:
+                f"pair_q_max {global_metrics['pair_q_max']:.3e} > 1 "
+                f"(abs gap {global_metrics['value_state_gap_max']:.3e})")
+        if global_metrics["tail_q"] > 1.0:
             failures.append(
-                f"tail_value_error {global_metrics['tail_value_error']:.3e} "
-                f"> {tail_allowed:.3e}")
+                f"tail_q {global_metrics['tail_q']:.3e} > 1 "
+                f"(abs tail error {global_metrics['tail_value_error']:.3e})")
         if global_metrics["replay_logprob_error"] > REPLAY_LOGPROB_ABS:
             failures.append(
                 f"replay_logprob_error {global_metrics['replay_logprob_error']:.3e}")
@@ -563,8 +676,10 @@ class DistributedTrainer:
                 "value_state_scale": max(
                     [abs(float(t.value)) for t in _transitions]
                     + [abs(float(t.next_value)) for t in _transitions] + [1.0]),
+                "pair_q_max": 0.0,
                 "tail_value_error": 0.0,
                 "tail_value_scale": 1.0,
+                "tail_q": 0.0,
                 "replay_logprob_error": 0.0,
                 "replay_value_error": 0.0,
                 "episode_closure_error_max": closure_error_max,
@@ -581,8 +696,10 @@ class DistributedTrainer:
                     local_gate = {
                         "value_state_gap_max": float("inf"),
                         "value_state_scale": 1.0,
+                        "pair_q_max": float("inf"),
                         "tail_value_error": float("inf"),
                         "tail_value_scale": 1.0,
+                        "tail_q": float("inf"),
                         "replay_logprob_error": float("inf"),
                         "replay_value_error": float("inf"),
                         "episode_closure_error_max": closure_error_max,
@@ -591,15 +708,21 @@ class DistributedTrainer:
                     }
                 gate_metrics = self._gate_or_abort(local_gate, update_idx)
                 value_state_gap_max = gate_metrics["value_state_gap_max"]
+                pair_q_max = gate_metrics["pair_q_max"]
                 tail_value_error = gate_metrics["tail_value_error"]
+                tail_q = gate_metrics["tail_q"]
                 replay_logprob_error = gate_metrics["replay_logprob_error"]
                 replay_value_error = gate_metrics["replay_value_error"]
+                episode_closure_global = gate_metrics["episode_closure_error_max"]
             else:
                 gate_metrics = local_gate
                 value_state_gap_max = local_gate["value_state_gap_max"]
+                pair_q_max = 0.0
                 tail_value_error = 0.0
+                tail_q = 0.0
                 replay_logprob_error = 0.0
                 replay_value_error = 0.0
+                episode_closure_global = closure_error_max
             # Advance entropy annealing before the update so the logged value is
             # the one actually used.
             progress = self.agent.set_training_progress(
@@ -680,11 +803,13 @@ class DistributedTrainer:
                     "approx_kl": round(stats["approx_kl"], 7),
                     "actor_grad_norm": round(stats["actor_grad_norm"], 5),
                     "value_state_gap_max": round(value_state_gap_max, 8),
+                    "pair_q_max": round(pair_q_max, 8),
                     "tail_value_error": round(tail_value_error, 8),
+                    "tail_q": round(tail_q, 8),
                     "replay_logprob_error": round(replay_logprob_error, 8),
                     "replay_value_error": round(replay_value_error, 8),
                     "episode_closure_error_max": round(
-                        closure_error_max, 12),
+                        episode_closure_global, 12),
                     "value_gate_passed": True,
                 }
                 episode_note = (
@@ -766,7 +891,10 @@ class DistributedTrainer:
 
 def _worker(rank: int, world_size: int, args: argparse.Namespace) -> None:
     """One distributed process bound to GPU ``rank``."""
-    dist.init_process_group("nccl", init_method="env://", rank=rank, world_size=world_size)
+    dist.init_process_group(
+        "nccl", init_method="env://", rank=rank, world_size=world_size,
+        timeout=datetime.timedelta(minutes=10),
+    )
     torch.cuda.set_device(rank)
 
     saved = torch.load(args.resume, map_location="cpu", weights_only=False) if args.resume else None

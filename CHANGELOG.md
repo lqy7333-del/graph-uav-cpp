@@ -1,5 +1,21 @@
 ## 2026-10-31
 
+### 112. **门禁补充 v2：回放 NaN、逐对容差、全局闭合日志、故障快照**
+
+- 修复审查发现的四个防护缺口（独立分支 `fix/gate-hardening-v2`，未在线覆盖运行中 v2）：
+  1. 回放输出/派生标量显式有限性检查；任何 rank 注入 NaN 都会让所有 rank abort；
+  2. CSV 闭合误差改为 all-rank 最大值，不再写本地值；
+  3. 相邻 value 改为逐对 \(q_i\) 相对容差再跨 rank MAX，避免一个大 value 放宽其他样本；
+  4. 失败快照记录实际最大误差/回放/尾部索引，保存对应 state/next_state/action；
+     诊断写入全部包 try/except，barrier 放 finally；NCCL/驱动增加超时与进程组清理。
+- 测试：全量 277 项，2 项仍为 `5490b97` 基线失败；2-rank Gloo 的 gap/NaN 注入均
+  2/2 abort；回放 NaN、快照索引、逐对容差单测通过。
+- 当前 v2 继续在 `e382df3` 运行；本分支在下一个安全 checkpoint 统一切入，保留
+  A42 20–140 checkpoint 并纳入验证选择。
+- 报告：`docs/maneuver_time_gate_hardening_v2.md`。
+
+## 2026-10-31
+
 ### 111. **正确性门禁硬化：all-rank 汇总、更新前 abort、尾部/回放/闭合检查**
 
 - **all-rank 汇总**：`value_state_gap_max` 不再只写 rank0；所有正确性指标在 PPO update 前

@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -292,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gpu-ids", default="0,1,2,3")
     parser.add_argument("--out-root", default=str(FORMAL_DIR))
     parser.add_argument("--gate-report", default=str(DEFAULT_GATE_REPORT))
+    parser.add_argument("--task-timeout", type=float, default=8 * 3600)
     args = parser.parse_args(argv)
     FORMAL_DIR = Path(args.out_root)
 
@@ -385,26 +387,42 @@ def main(argv: list[str] | None = None) -> int:
         started = time.time()
         print(f"[formal] starting {label} -> {out_dir} (resume={resume})", flush=True)
         with log_path.open("a", encoding="utf-8") as log:
-            completed = subprocess.run(
+            process = subprocess.Popen(
                 command, cwd=REPO, stdout=log, stderr=subprocess.STDOUT,
                 env={**os.environ, "PYTHONPATH": str(REPO)},
+                start_new_session=True,
             )
+            try:
+                returncode = process.wait(timeout=args.task_timeout)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                try:
+                    returncode = process.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    returncode = 124
         elapsed = time.time() - started
         record = {
             "command": command,
             "log": str(log_path),
             "started": started,
             "elapsed_seconds": elapsed,
-            "exit_code": completed.returncode,
+            "exit_code": returncode,
             "resumed_from": str(resume) if resume else None,
         }
-        if completed.returncode != 0:
+        if returncode != 0:
             record["status"] = "failed"
             status["runs"][label] = record
             status_path.write_text(json.dumps(status, indent=2, ensure_ascii=False),
                                    encoding="utf-8")
             raise SystemExit(
-                f"{label} failed with exit {completed.returncode}; see {log_path}")
+                f"{label} failed with exit {returncode}; see {log_path}")
         record.update(_validate_run(mode, seed, out_dir, preflight,
                                     resumed_from=resume))
         record["status"] = "complete"

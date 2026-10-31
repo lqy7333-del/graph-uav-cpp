@@ -2,6 +2,7 @@
 from copy import deepcopy
 import datetime
 import json
+import math
 import os
 from pathlib import Path
 import socket
@@ -93,23 +94,84 @@ def _gate_failure_worker(rank, port, directory):
                                    checkpoint_dir=directory)
         good={
             'value_state_gap_max':0.0,'value_state_scale':1.0,
-            'tail_value_error':0.0,'tail_value_scale':1.0,
-            'replay_logprob_error':0.0,'replay_value_error':0.0,
-            'episode_closure_error_max':0.0,'finite':True,
+            'pair_q_max':0.1,'tail_value_error':0.0,'tail_value_scale':1.0,
+            'tail_q':0.1,'replay_logprob_error':0.0,
+            'replay_value_error':0.0,'episode_closure_error_max':0.0,
+            'finite':True,
         }
         trainer._gate_or_abort(good, 1)
         bad=dict(good)
-        bad['value_state_gap_max']=1.0 if rank==1 else 0.0
-        saw_failure=False
+        bad['value_state_gap_max']=1.0
+        bad['pair_q_max']=2.0 if rank==1 else 0.0
+        saw_gap=False
         try:
             trainer._gate_or_abort(bad, 2)
         except RuntimeError:
-            saw_failure=True
+            saw_gap=True
+        nan_bad=dict(good)
+        # Keep finite=True: the explicit finite check on the metric itself
+        # (not the caller's flag) must catch the injected NaN.
+        nan_bad['replay_logprob_error']=float('nan') if rank==1 else 0.0
+        saw_nan=False
+        try:
+            trainer._gate_or_abort(nan_bad, 3)
+        except RuntimeError:
+            saw_nan=True
         Path(directory, f'rank{rank}_saw_failure.json').write_text(
-            json.dumps({'saw_failure':saw_failure,'rank':rank}))
-        assert saw_failure
+            json.dumps({'saw_gap':saw_gap,'saw_nan':saw_nan,'rank':rank}))
+        assert saw_gap and saw_nan
     finally:
         dist.destroy_process_group()
+
+
+class GateMetricTests(unittest.TestCase):
+    """Local replay output NaN must be a finite-flag failure, not a no-op max."""
+
+    def test_replay_nan_marks_local_gate_nonfinite(self):
+        config=toy_config()
+        agent=PPOAgent(ToyPolicy(),config)
+        agent.actor.eval(); agent.critic.eval()
+        buffer=toy_buffer(agent)
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            trainer=DistributedTrainer(ToyEnvironment(3),agent,rank=0,world_size=1,
+                                       config=config,checkpoint_dir=directory)
+            original=trainer.agent._per_transition_minibatch_rows
+            def poisoned(transitions,indices):
+                count=len(indices)
+                return (torch.full((count,),float('nan')),
+                        torch.zeros(count),
+                        torch.full((count,),float('nan')))
+            trainer.agent._per_transition_minibatch_rows=poisoned
+            try:
+                metrics=trainer._local_gate_metrics(buffer.transitions,0.0)
+            finally:
+                trainer.agent._per_transition_minibatch_rows=original
+            self.assertFalse(metrics['finite'])
+            self.assertTrue(metrics['replay_bad_indices'])
+            self.assertFalse(math.isfinite(metrics['replay_logprob_error']))
+
+    def test_failure_snapshot_uses_max_gap_index(self):
+        config=toy_config()
+        agent=PPOAgent(ToyPolicy(),config)
+        agent.actor.eval(); agent.critic.eval()
+        buffer=toy_buffer(agent)
+        buffer.transitions[1].next_value=100.0
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            trainer=DistributedTrainer(ToyEnvironment(4),agent,rank=0,world_size=1,
+                                       config=config,checkpoint_dir=directory)
+            trainer.buffer=buffer
+            metrics=trainer._local_gate_metrics(buffer.transitions,0.0)
+            self.assertEqual(metrics['gap_index'],1)
+            trainer._write_gate_failure(7,'test maximum gap',metrics,{})
+            payload=json.loads(
+                Path(directory,'gate_failures/update_7_rank_0.json').read_text())
+            self.assertIn(1,payload['bad_indices'])
+            self.assertIn(2,payload['bad_indices'])
+            saved=torch.load(
+                Path(directory,'gate_failures/update_7_rank_0.pt'),
+                map_location='cpu',weights_only=False)
+            self.assertIn(1,saved['samples'])
+            self.assertIn(2,saved['samples'])
 
 
 @unittest.skipUnless(os.environ.get('RUN_DDP_TESTS')=='1','Set RUN_DDP_TESTS=1 for local loopback/Gloo tests.')
@@ -124,8 +186,19 @@ class DistributedGateFailureTests(unittest.TestCase):
             mp.spawn(_gate_failure_worker,args=(port,directory),nprocs=2,join=True)
             for rank in (0,1):
                 payload=json.loads(Path(directory,f'rank{rank}_saw_failure.json').read_text())
-                self.assertTrue(payload['saw_failure'],payload)
+                self.assertTrue(payload['saw_gap'],payload)
+                self.assertTrue(payload['saw_nan'],payload)
             self.assertTrue(Path(directory,'gate_failures/update_2_summary.json').exists())
+            self.assertTrue(Path(directory,'gate_failures/update_3_summary.json').exists())
+
+    def test_pair_relative_tolerance_is_not_global(self):
+        from coverage_env.rl.trainer.distributed import VALUE_GAP_ABS, VALUE_GAP_REL
+        small = DistributedTrainer._normalized_error(
+            0.02, 1000.0, 1000.0, VALUE_GAP_ABS, VALUE_GAP_REL)
+        ordinary = DistributedTrainer._normalized_error(
+            0.02, 1.0, 1.0, VALUE_GAP_ABS, VALUE_GAP_REL)
+        self.assertLess(small, 1.0)
+        self.assertGreater(ordinary, 1.0)
 
 
 @unittest.skipUnless(os.environ.get('RUN_DDP_TESTS')=='1','Set RUN_DDP_TESTS=1 for local loopback/Gloo tests.')

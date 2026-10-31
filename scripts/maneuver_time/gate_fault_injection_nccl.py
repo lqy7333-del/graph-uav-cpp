@@ -25,17 +25,25 @@ def _worker(rank, world_size, directory, port):
         trainer=DistributedTrainer(None,agent,rank=rank,world_size=world_size,
                                    checkpoint_dir=directory,config=config)
         good={'value_state_gap_max':0.0,'value_state_scale':1.0,
-              'tail_value_error':0.0,'tail_value_scale':1.0,
-              'replay_logprob_error':0.0,'replay_value_error':0.0,
-              'episode_closure_error_max':0.0,'finite':True}
+              'pair_q_max':0.1,'tail_value_error':0.0,'tail_value_scale':1.0,
+              'tail_q':0.1,'replay_logprob_error':0.0,
+              'replay_value_error':0.0,'episode_closure_error_max':0.0,
+              'finite':True}
         trainer._gate_or_abort(good, 1)
-        bad=dict(good); bad['value_state_gap_max']=1.0 if rank==3 else 0.0
-        saw=False
+        bad=dict(good); bad['value_state_gap_max']=1.0
+        bad['pair_q_max']=2.0 if rank==3 else 0.0
+        saw_gap=False
         try: trainer._gate_or_abort(bad, 2)
-        except RuntimeError: saw=True
+        except RuntimeError: saw_gap=True
+        nan_bad=dict(good)
+        nan_bad['replay_logprob_error']=(
+            float('nan') if rank==3 else 0.0)
+        saw_nan=False
+        try: trainer._gate_or_abort(nan_bad, 3)
+        except RuntimeError: saw_nan=True
         Path(directory,f'rank{rank}_nccl_fault.json').write_text(
-            json.dumps({'rank':rank,'saw_failure':saw}))
-        assert saw
+            json.dumps({'rank':rank,'saw_gap':saw_gap,'saw_nan':saw_nan}))
+        assert saw_gap and saw_nan
     finally:
         dist.destroy_process_group()
 
@@ -53,7 +61,8 @@ def main():
     report={'world_size':world_size,'rank3_injected':True,
             'ranks':[json.loads((directory/f'rank{r}_nccl_fault.json').read_text())
                      for r in range(world_size)],
-            'summary_exists':(directory/'gate_failures/update_2_summary.json').exists()}
+            'summary_exists':(directory/'gate_failures/update_2_summary.json').exists(),
+            'nan_summary_exists':(directory/'gate_failures/update_3_summary.json').exists()}
     (directory/'report.json').write_text(json.dumps(report,indent=2))
     print(json.dumps(report,indent=1))
 
