@@ -72,7 +72,8 @@ class Trainer:
                 truncated = steps >= self.max_steps and not env_done
                 done = bool(env_done or truncated)
                 next_graph = self.agent.actor.graph_builder.build_graph(self.environment)
-                next_value = 0.0 if env_done else self.agent.value_for_graph(next_graph, self.environment)
+                next_value = 0.0 if env_done else self.agent.value_for_graph(
+                    next_graph, self.environment, state=next_state)
 
                 state_context = {
                     "observation": deepcopy(state),

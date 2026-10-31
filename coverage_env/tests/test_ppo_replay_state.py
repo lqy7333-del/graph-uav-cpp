@@ -173,6 +173,28 @@ class PpoReplayStateTests(unittest.TestCase):
         stored = torch.tensor([row.log_prob for row in self.transitions])
         self.assertTrue(torch.allclose(log_probs.detach(), stored, atol=1e-5))
 
+    def test_bootstrap_value_uses_the_next_observation_heading(self):
+        """V(s_{t+1}) must use the stored heading, not the env's missing one."""
+        environment = InstanceGenerator(self.config).generate(seed=20261016)
+        actor = CoveragePolicy(environment, config=self.config).eval()
+        agent = PPOAgent(actor, self.config)
+        state = environment.reset()
+        with torch.no_grad():
+            output = actor(state, environment=environment)
+            action = CoveragePolicy.greedy_action(output)
+        state, _reward, _done, _info = environment.step(action)
+        uav_id = environment.uavs[0].uav_id
+        self.assertTrue(state["uavs"][uav_id]["heading_valid"])
+        graph = actor.graph_builder.build_graph(environment)
+        with torch.no_grad():
+            value_state = float(agent.value_from_output(
+                actor(state, environment=environment)).item())
+            value_graph_state = agent.value_for_graph(
+                graph, environment, state=state)
+            value_graph_env = agent.value_for_graph(graph, environment)
+        self.assertAlmostEqual(value_state, value_graph_state, places=5)
+        self.assertGreater(abs(value_state - value_graph_env), 1e-3)
+
     def test_rollout_encoding_is_unchanged(self):
         """While the environment is current, both sources encode identically."""
         environment = InstanceGenerator(self.config).generate(seed=11)

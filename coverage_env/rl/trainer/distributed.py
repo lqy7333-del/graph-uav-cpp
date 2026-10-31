@@ -241,7 +241,8 @@ class DistributedTrainer:
                     else:
                         _embeddings, _global_embedding, critic_input = (
                             self.agent.actor.module.encode_graph(
-                                next_graph, environment=self.environment
+                                next_graph, environment=self.environment,
+                                state=next_state,
                             )
                         )
                         next_value = self.agent.critic(critic_input).reshape(()).item()
