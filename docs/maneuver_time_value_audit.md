@@ -94,12 +94,16 @@ expected = -(sum(time_total) - sum(coverage_gain)/(10*8)) / 100 + (-1)*failed_st
 
 ### 4.1 最大 return（修复前）
 
-| phase/update | rank | scale | episode/step | return | reward | value | next_value | next step value | done/trunc | MC episode return |
-|---|---:|---:|---|---:|---:|---:|---:|---:|---|---:|
-| 381 exact | 3 | 13 | 6 / 20 | **+8.64** | −0.959 | −4.47 | −5.05 | −8.70 | no/no | −39.45 |
-| 381 exact | 3 | 13 | 6 / 21 | +6.72 | −0.751 | −8.70 | −5.07 | −9.09 | no/no | −39.45 |
-| 387 replay | 3 | 12 | 44 / 15 | **+48.08** | −1.049 | −9.63 | −11.32 | −28.64 | no/no | −26.11 |
-| 387 replay | 0 | 19 | 42 / 31 | +46.31 | −0.782 | −40.56 | −38.51 | −53.95 | no/no | −43.14 |
+| phase/update | rank | scale | episode/step | return | remaining MC from step | reward | value | next_value | next step value | done/trunc |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---|
+| 381 replay | 3 | 13 | 6 / 20 | **+8.64** | **−10.33** | −0.959 | −4.47 | −5.05 | −8.70 | no/no |
+| 381 replay | 3 | 13 | 6 / 21 | +6.72 | −9.38 | −0.751 | −8.70 | −5.07 | −9.09 | no/no |
+| 387 replay | 3 | 12 | 44 / 15 | **+48.08** | **−8.12** | −1.049 | −9.63 | −11.32 | −28.64 | no/no |
+| 387 replay | 0 | 19 | 42 / 31 | +46.31 | −8.86 | −0.782 | −40.56 | −38.51 | −53.95 | no/no |
+
+中间步 `return` 不能与完整 episode 的 MC return 直接比较；这里对齐为**从该步起的
+剩余 MC return**。即使按这个口径，`return` 仍为正而剩余 MC 为负，说明 bootstrap
+值污染了该步的 return。
 
 这些“大 target”不是失败惩罚，也不是 rollout 截断：它们都是**非终止、非边界**的
 普通覆盖步；reward 为负，但 `return = advantage + value` 因 bootstrap 值不一致而变成正数。
@@ -120,13 +124,14 @@ expected = -(sum(time_total) - sum(coverage_gain)/(10*8)) / 100 + (-1)*failed_st
   381/382 仍与原始日志几乎一致，383 起因 CUDA scatter/NCCL 非确定性逐步偏离；
   replay 的 387 `critic_loss=3,119`，不能声称逐位复现 44,326。
 - 因此“44,326 的精确 buffer”不可恢复；但**可复现且与原始 381 日志接近的 update 381** 已经展示了同一机制：
-  首步 return **−372.81** vs MC return **−39.45**，最大正 return **+8.64**。
-- 修复后同一 update 381，最大 return 变成 **−0.99**（终端步），不再出现正 return；
-  `next_value` gap 降到 **9.2e-5**。
+  首步 return **−372.81** vs 完整 MC return **−39.45**（首步与完整 horizon 对齐），
+  最大正 return **+8.64** 对应的剩余 MC 为 **−10.33**。
+- 修复后同一 update 381，最大 return 变成 **−0.99**（终端步），`next_value` gap 降到
+  **9.2e-5**。符号变化只是描述；正确性判据是状态一致性与独立 GAE 递推，不是 return 正负。
 
 **结论：大 target 的来源是错误 bootstrap（缺 heading 的 env-only V(s_{t+1})），
-不是失败惩罚、截断、GAE 公式或 reward 公式。** 44,326 是同一错误在后期
-value 误差放大后的极端表现；精确数值无法逐位重建，但机制已由 381 replay 证实。
+不是失败惩罚、截断、GAE 公式或 reward 公式。** 44,326 与同一错误一致，但该峰值未能
+逐位复现，不能把该特定峰值完整归因于它。输入错误与异常 target 的机制已由 381 replay 证实。
 
 ## 5. 表四：规模与统计账本
 
