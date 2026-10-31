@@ -191,9 +191,16 @@ class PpoReplayStateTests(unittest.TestCase):
                 actor(state, environment=environment)).item())
             value_graph_state = agent.value_for_graph(
                 graph, environment, state=state)
-            value_graph_env = agent.value_for_graph(graph, environment)
         self.assertAlmostEqual(value_state, value_graph_state, places=5)
-        self.assertGreater(abs(value_state - value_graph_env), 1e-3)
+
+    def test_value_for_graph_rejects_missing_state(self):
+        environment = InstanceGenerator(self.config).generate(seed=20261019)
+        actor = CoveragePolicy(environment, config=self.config).eval()
+        agent = PPOAgent(actor, self.config)
+        state = environment.reset()
+        graph = actor.graph_builder.build_graph(environment)
+        with self.assertRaises(ValueError):
+            agent.value_for_graph(graph, environment, state=None)
 
     def test_bootstrap_value_after_resupply_has_no_heading(self):
         """After a depot stop both state and env must agree on heading_valid=False."""
@@ -210,9 +217,7 @@ class PpoReplayStateTests(unittest.TestCase):
             value_state = float(agent.value_from_output(
                 actor(state, environment=environment)).item())
             value_graph_state = agent.value_for_graph(graph, environment, state=state)
-            value_graph_env = agent.value_for_graph(graph, environment)
         self.assertAlmostEqual(value_state, value_graph_state, places=5)
-        self.assertAlmostEqual(value_state, value_graph_env, places=5)
 
     def test_rollout_tail_bootstrap_uses_next_state(self):
         """The transition flagged truncated must bootstrap the real next state."""

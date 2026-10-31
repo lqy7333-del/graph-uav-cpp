@@ -31,7 +31,7 @@ if str(REPO) not in sys.path:
 
 from coverage_env.config import DEFAULT_CONFIG_PATH, load_config
 from coverage_env.env.instance_generator import InstanceGenerator
-from coverage_env.rl.checkpoint import parameter_sha256
+from coverage_env.rl.checkpoint import parameter_sha256, state_dict_sha256
 from coverage_env.rl.decoder.action_decoder import CoveragePolicy
 from coverage_env.rl.decoder.global_state_encoder import build_uav_feature
 from coverage_env.rl.trainer.distributed import resolve_config
@@ -237,14 +237,22 @@ def _latest_checkpoint(directory: Path) -> Path | None:
 
 
 def _validate_run(mode: str, seed: int, directory: Path,
-                  preflight: dict) -> dict:
+                  preflight: dict, resumed_from: Path | None = None) -> dict:
     summary = json.loads((directory / "run_summary.json").read_text(encoding="utf-8"))
     metadata = summary["training_metadata"]
     expected_hash = preflight["runs"][f"{mode}_seed{seed}"]["initial_actor_sha256"]
-    if metadata.get("initial_actor_sha256") != expected_hash:
-        raise SystemExit(
-            f"{mode}_seed{seed}: run initial hash {metadata.get('initial_actor_sha256')} "
-            f"!= preflight {expected_hash}")
+    if resumed_from is None:
+        if metadata.get("initial_actor_sha256") != expected_hash:
+            raise SystemExit(
+                f"{mode}_seed{seed}: run initial hash "
+                f"{metadata.get('initial_actor_sha256')} != preflight {expected_hash}")
+    else:
+        saved = torch.load(resumed_from, map_location="cpu", weights_only=False)
+        resume_hash = state_dict_sha256(saved["actor"])
+        if metadata.get("initial_actor_sha256") != resume_hash:
+            raise SystemExit(
+                f"{mode}_seed{seed}: resumed initial hash "
+                f"{metadata.get('initial_actor_sha256')} != checkpoint {resume_hash}")
     if metadata.get("num_updates") != UPDATES:
         raise SystemExit(f"{mode}_seed{seed}: run summary target is not {UPDATES}")
     global_stats = summary["global"]
@@ -397,7 +405,8 @@ def main(argv: list[str] | None = None) -> int:
                                    encoding="utf-8")
             raise SystemExit(
                 f"{label} failed with exit {completed.returncode}; see {log_path}")
-        record.update(_validate_run(mode, seed, out_dir, preflight))
+        record.update(_validate_run(mode, seed, out_dir, preflight,
+                                    resumed_from=resume))
         record["status"] = "complete"
         status["runs"][label] = record
         status_path.write_text(json.dumps(status, indent=2, ensure_ascii=False),

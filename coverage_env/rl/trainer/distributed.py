@@ -14,6 +14,8 @@ and reset the environment whenever an episode ends.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import math
 import os
 import socket
 import json
@@ -38,9 +40,23 @@ from coverage_env.rl.trainer.episode import nearest_neighbor_return, current_pot
 from coverage_env.rl.checkpoint import (
     capture_rng_state,
     parameter_sha256,
+    provenance,
     restore_rng_state,
     assert_rank_parameters_equal,
 )
+
+
+# Correctness-gate tolerances.  The absolute term dominates near zero; the
+# relative term scales with the value magnitude.  They are deliberately tight
+# enough to catch the heading/next-state class of error (observed gap 150+)
+# while leaving float32 and CUDA-reduction noise (observed ~1e-6) untouched.
+VALUE_GAP_ABS = 1e-2
+VALUE_GAP_REL = 1e-4
+TAIL_VALUE_ABS = 1e-2
+TAIL_VALUE_REL = 1e-4
+REPLAY_LOGPROB_ABS = 1e-4
+REPLAY_VALUE_ABS = 1e-2
+REWARD_CLOSURE_ABS = 1e-6
 
 
 def _free_port() -> int:
@@ -70,6 +86,12 @@ class DistributedTrainer:
         self.run_metadata = {}
         self._rank_stats = self._empty_rank_stats()
         self._geometry_signatures: set = set()
+        # Toy environments in unit tests do not expose UAV/field state; the
+        # correctness gate is for the real training environment.
+        self.value_gate_enabled = (
+            bool(self.config.get("ppo", {}).get("value_gate", True))
+            and bool(getattr(environment, "uavs", None))
+        )
 
     @staticmethod
     def _empty_rank_stats() -> dict:
@@ -104,6 +126,220 @@ class DistributedTrainer:
         self._rank_stats["instances_drawn"] = int(
             self._rank_stats.get("instances_drawn", 0)
         ) + 1
+
+    def _all_reduce_max(self, value: float) -> float:
+        """Return the maximum scalar across ranks (no-op when not distributed)."""
+        tensor = torch.tensor([float(value)], dtype=torch.float64,
+                              device=self.agent.device)
+        if dist.is_initialized():
+            dist.all_reduce(tensor, op=dist.ReduceOp.MAX)
+        return float(tensor.item())
+
+    def _all_reduce_min(self, value: float) -> float:
+        """Return the minimum scalar across ranks (no-op when not distributed)."""
+        tensor = torch.tensor([float(value)], dtype=torch.float64,
+                              device=self.agent.device)
+        if dist.is_initialized():
+            dist.all_reduce(tensor, op=dist.ReduceOp.MIN)
+        return float(tensor.item())
+
+    @staticmethod
+    def _state_digest(observation) -> str:
+        payload = json.dumps(observation, sort_keys=True, default=str)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _local_gate_metrics(self, transitions, closure_error_max: float) -> dict:
+        """Compute one rank's pre-update correctness metrics.
+
+        These checks use fixed parameters and eval mode, before ``PPOAgent.update``
+        changes anything.  They cover both ends of a rollout: every adjacent
+        nonterminal pair and the final truncated/terminal bootstrap, which has no
+        next transition to compare against.
+        """
+        rewards = [float(t.reward) for t in transitions]
+        values = [float(t.value) for t in transitions]
+        next_values = [float(t.next_value) for t in transitions]
+        finite = all(math.isfinite(x) for x in rewards + values + next_values)
+        gaps = [
+            abs(next_values[i] - values[i + 1])
+            for i in range(len(transitions) - 1)
+            if not transitions[i].done
+        ]
+        gap_scale = max([abs(v) for v in values] + [abs(v) for v in next_values] + [1.0])
+        tail_error = 0.0
+        tail_scale = 1.0
+        if transitions:
+            last = transitions[-1]
+            tail_scale = max(abs(float(last.value)), abs(float(last.next_value)), 1.0)
+            if last.done:
+                tail_error = abs(float(last.next_value))
+            else:
+                actor = self.agent.actor.module
+                _embeddings, _embedding, critic_input = actor.encode_graph(
+                    last.next_state["graph"], environment=self.environment,
+                    state=last.next_state["observation"],
+                )
+                expected = float(self.agent.critic(critic_input).reshape(()).item())
+                tail_error = abs(expected - float(last.next_value))
+                if not math.isfinite(expected):
+                    finite = False
+        replay_logprob_error = 0.0
+        replay_value_error = 0.0
+        if transitions:
+            indices = sorted(set([0, len(transitions) // 3,
+                                   2 * len(transitions) // 3, len(transitions) - 1]))
+            try:
+                with torch.no_grad():
+                    log_probs, _entropy, replay_values = (
+                        self.agent._per_transition_minibatch_rows(transitions, indices)
+                    )
+                replay_logprob_error = max(
+                    abs(float(log_probs[j]) - float(transitions[index].log_prob))
+                    for j, index in enumerate(indices)
+                )
+                replay_value_error = max(
+                    abs(float(replay_values[j]) - float(transitions[index].value))
+                    for j, index in enumerate(indices)
+                )
+            except Exception:
+                # A replay failure is a correctness failure, not a training signal.
+                finite = False
+        return {
+            "value_state_gap_max": max(gaps) if gaps else 0.0,
+            "value_state_scale": gap_scale,
+            "tail_value_error": tail_error,
+            "tail_value_scale": tail_scale,
+            "replay_logprob_error": replay_logprob_error,
+            "replay_value_error": replay_value_error,
+            "episode_closure_error_max": float(closure_error_max),
+            "finite": bool(finite),
+        }
+
+    def _write_gate_failure(self, update_idx: int, reason: str, local: dict,
+                            global_metrics: dict) -> None:
+        """Persist enough local state to reproduce a pre-update gate failure."""
+        if self.checkpoint_dir is None:
+            return
+        directory = Path(self.checkpoint_dir) / "gate_failures"
+        directory.mkdir(parents=True, exist_ok=True)
+        prefix = f"update_{update_idx}_rank_{self.rank}"
+        transitions = list(getattr(self, "buffer", []).transitions)[:3]
+        payload = {
+            "sha": provenance().get("revision"),
+            "rank": self.rank,
+            "update": update_idx,
+            "reason": reason,
+            "thresholds": {
+                "value_gap_abs": VALUE_GAP_ABS, "value_gap_rel": VALUE_GAP_REL,
+                "tail_abs": TAIL_VALUE_ABS, "tail_rel": TAIL_VALUE_REL,
+                "replay_logprob_abs": REPLAY_LOGPROB_ABS,
+                "replay_value_abs": REPLAY_VALUE_ABS,
+                "closure_abs": REWARD_CLOSURE_ABS,
+            },
+            "local": local,
+            "global": global_metrics,
+            "run_metadata": self.run_metadata,
+            "config": self.config,
+            "transitions": [
+                {
+                    "reward": float(t.reward), "value": float(t.value),
+                    "next_value": float(t.next_value), "done": bool(t.done),
+                    "truncated": bool(getattr(t, "truncated", False)),
+                    "state_digest": self._state_digest(t.state.get("observation")),
+                    "next_state_digest": self._state_digest(t.next_state.get("observation")),
+                }
+                for t in transitions
+            ],
+        }
+        (directory / f"{prefix}.json").write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False, default=str),
+            encoding="utf-8")
+        try:
+            tail = self.buffer.transitions[-1] if self.buffer.transitions else None
+            torch.save({
+                "last_state": tail.state if tail is not None else None,
+                "last_next_state": tail.next_state if tail is not None else None,
+                "last_transition": None if tail is None else {
+                    "reward": tail.reward, "value": tail.value,
+                    "next_value": tail.next_value, "done": tail.done,
+                    "truncated": getattr(tail, "truncated", False),
+                },
+            }, directory / f"{prefix}.pt")
+        except Exception:
+            pass
+        if dist.is_initialized():
+            dist.barrier()
+        if self.rank == 0:
+            summary = {
+                "sha": provenance().get("revision"),
+                "update": update_idx,
+                "reason": reason,
+                "thresholds": payload["thresholds"],
+                "local": local,
+                "global": global_metrics,
+                "files": sorted(p.name for p in directory.glob(f"update_{update_idx}_rank_*")),
+            }
+            (directory / f"update_{update_idx}_summary.json").write_text(
+                json.dumps(summary, indent=2, ensure_ascii=False, default=str),
+                encoding="utf-8")
+
+    def _gate_or_abort(self, local: dict, update_idx: int) -> dict:
+        """All-reduce local correctness metrics and abort every rank on failure."""
+        keys = (
+            "value_state_gap_max", "value_state_scale", "tail_value_error",
+            "tail_value_scale", "replay_logprob_error", "replay_value_error",
+            "episode_closure_error_max",
+        )
+        global_metrics = {key: self._all_reduce_max(local.get(key, 0.0))
+                          for key in keys}
+        all_finite = bool(self._all_reduce_min(1.0 if local.get("finite") else 0.0))
+        gap_allowed = VALUE_GAP_ABS + VALUE_GAP_REL * global_metrics["value_state_scale"]
+        tail_allowed = TAIL_VALUE_ABS + TAIL_VALUE_REL * global_metrics["tail_value_scale"]
+        failures = []
+        if not all_finite:
+            failures.append("nonfinite buffer/state/replay metric")
+        if global_metrics["value_state_gap_max"] > gap_allowed:
+            failures.append(
+                f"value_state_gap_max {global_metrics['value_state_gap_max']:.3e} "
+                f"> {gap_allowed:.3e}")
+        if global_metrics["tail_value_error"] > tail_allowed:
+            failures.append(
+                f"tail_value_error {global_metrics['tail_value_error']:.3e} "
+                f"> {tail_allowed:.3e}")
+        if global_metrics["replay_logprob_error"] > REPLAY_LOGPROB_ABS:
+            failures.append(
+                f"replay_logprob_error {global_metrics['replay_logprob_error']:.3e}")
+        if global_metrics["replay_value_error"] > REPLAY_VALUE_ABS:
+            failures.append(
+                f"replay_value_error {global_metrics['replay_value_error']:.3e}")
+        if global_metrics["episode_closure_error_max"] > REWARD_CLOSURE_ABS:
+            failures.append(
+                f"episode_closure_error_max {global_metrics['episode_closure_error_max']:.3e}")
+        if failures:
+            reason = "; ".join(failures)
+            self._write_gate_failure(update_idx, reason, local, global_metrics)
+            raise RuntimeError(f"pre-update correctness gate failed at update "
+                               f"{update_idx} on rank {self.rank}: {reason}")
+        return global_metrics
+
+    def _post_update_gate(self, stats: dict, update_idx: int) -> None:
+        """Reject NaN/Inf produced by the optimizer before saving a checkpoint."""
+        keys = ("actor_loss", "critic_loss", "entropy", "policy_loss",
+                "actor_grad_norm", "approx_kl")
+        finite = all(math.isfinite(float(stats.get(key, 0.0))) for key in keys)
+        for module in (self.agent.actor, self.agent.critic):
+            source = module.module if hasattr(module, "module") else module
+            for parameter in source.parameters():
+                if not bool(torch.isfinite(parameter).all().item()):
+                    finite = False
+                    break
+        if not self._all_reduce_min(1.0 if finite else 0.0):
+            local = {"finite": False, "stats": stats, "update": update_idx}
+            self._write_gate_failure(update_idx, "nonfinite post-update parameters/stats",
+                                     local, {})
+            raise RuntimeError(
+                f"post-update numerical gate failed at update {update_idx} "
+                f"on rank {self.rank}")
 
     def write_run_summary(self) -> None:
         """Gather per-rank throughput counters and write ``run_summary.json``."""
@@ -178,6 +414,12 @@ class DistributedTrainer:
             # label each with the episode's own field count so the log can show
             # a trend and compare magnitudes across field counts.
             episode_reward = 0.0
+            episode_time = 0.0
+            episode_area = 0.0
+            episode_failed = 0
+            closure_error_max = 0.0
+            reward_mode = str(self.config.get("rl", {}).get(
+                "reward", {}).get("mode", "distance")).lower()
             shaped_rollout_reward = 0.0
             completed_rewards: list[float] = []
             completed_fields: list[int] = []
@@ -215,7 +457,24 @@ class DistributedTrainer:
                 shaped_rollout_reward += float(shaped)
                 rollout_reward += float(reward)
                 episode_reward += float(reward)
+                episode_time += float(_info.get("time_total", 0.0) or 0.0)
+                episode_area += float(_info.get("coverage_gain", 0.0) or 0.0)
+                episode_failed += int(bool(_info.get("failed")))
                 if env_done:
+                    if reward_mode == "time":
+                        reward_cfg = self.config.get("rl", {}).get("reward", {})
+                        width = float(reward_cfg.get("coverage_width", 10.0))
+                        nominal = float(reward_cfg.get("nominal_work_speed", 8.0))
+                        time_scale = float(reward_cfg.get("time_scale", 100.0))
+                        failure_penalty = float(self.config.get("rl", {}).get(
+                            "failure_penalty", -1.0))
+                        expected = -(
+                            episode_time - episode_area / (width * nominal)
+                        ) / time_scale + failure_penalty * episode_failed
+                        closure_error_max = max(
+                            closure_error_max, abs(episode_reward - expected))
+                    episode_time = episode_area = 0.0
+                    episode_failed = 0
                     # The environment still describes the episode that just
                     # finished, so its field count labels this episode.
                     completed_rewards.append(episode_reward)
@@ -299,7 +558,48 @@ class DistributedTrainer:
                 for i, t in enumerate(_transitions[:-1])
                 if not t.done
             ]
-            value_state_gap_max = max(_gaps) if _gaps else 0.0
+            local_gate = {
+                "value_state_gap_max": max(_gaps) if _gaps else 0.0,
+                "value_state_scale": max(
+                    [abs(float(t.value)) for t in _transitions]
+                    + [abs(float(t.next_value)) for t in _transitions] + [1.0]),
+                "tail_value_error": 0.0,
+                "tail_value_scale": 1.0,
+                "replay_logprob_error": 0.0,
+                "replay_value_error": 0.0,
+                "episode_closure_error_max": closure_error_max,
+                "finite": all(math.isfinite(float(t.reward))
+                              and math.isfinite(float(t.value))
+                              and math.isfinite(float(t.next_value))
+                              for t in _transitions),
+            }
+            if self.value_gate_enabled:
+                try:
+                    local_gate = self._local_gate_metrics(
+                        _transitions, closure_error_max)
+                except Exception as exc:
+                    local_gate = {
+                        "value_state_gap_max": float("inf"),
+                        "value_state_scale": 1.0,
+                        "tail_value_error": float("inf"),
+                        "tail_value_scale": 1.0,
+                        "replay_logprob_error": float("inf"),
+                        "replay_value_error": float("inf"),
+                        "episode_closure_error_max": closure_error_max,
+                        "finite": False,
+                        "error": repr(exc),
+                    }
+                gate_metrics = self._gate_or_abort(local_gate, update_idx)
+                value_state_gap_max = gate_metrics["value_state_gap_max"]
+                tail_value_error = gate_metrics["tail_value_error"]
+                replay_logprob_error = gate_metrics["replay_logprob_error"]
+                replay_value_error = gate_metrics["replay_value_error"]
+            else:
+                gate_metrics = local_gate
+                value_state_gap_max = local_gate["value_state_gap_max"]
+                tail_value_error = 0.0
+                replay_logprob_error = 0.0
+                replay_value_error = 0.0
             # Advance entropy annealing before the update so the logged value is
             # the one actually used.
             progress = self.agent.set_training_progress(
@@ -307,6 +607,8 @@ class DistributedTrainer:
             )
             current_entropy_coef = progress["entropy_coef"]
             stats = self.agent.update(self.buffer)
+            if self.value_gate_enabled:
+                self._post_update_gate(stats, update_idx)
             self.buffer.clear()
             self._rank_stats["optimizer_steps"] += int(stats.get("updates", 0))
             self._rank_stats["updates"] += 1
@@ -378,6 +680,12 @@ class DistributedTrainer:
                     "approx_kl": round(stats["approx_kl"], 7),
                     "actor_grad_norm": round(stats["actor_grad_norm"], 5),
                     "value_state_gap_max": round(value_state_gap_max, 8),
+                    "tail_value_error": round(tail_value_error, 8),
+                    "replay_logprob_error": round(replay_logprob_error, 8),
+                    "replay_value_error": round(replay_value_error, 8),
+                    "episode_closure_error_max": round(
+                        closure_error_max, 12),
+                    "value_gate_passed": True,
                 }
                 episode_note = (
                     f" | eps={episodes} mean_ep_reward={mean_episode_reward:.2f} "

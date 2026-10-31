@@ -1,6 +1,7 @@
 """Opt-in two-process CPU/Gloo regression tests; no UAV training is started."""
 from copy import deepcopy
 import datetime
+import json
 import os
 from pathlib import Path
 import socket
@@ -76,6 +77,55 @@ def _worker(rank, port, directory):
         assert_rank_parameters_equal(resumed.actor,resumed.critic)
     finally:
         dist.destroy_process_group()
+
+
+def _gate_failure_worker(rank, port, directory):
+    torch.set_num_threads(1)
+    dist.init_process_group('gloo', init_method=f'tcp://127.0.0.1:{port}',
+                            rank=rank, world_size=2,
+                            timeout=datetime.timedelta(seconds=60))
+    try:
+        config=toy_config()
+        torch.manual_seed(42)
+        agent=PPOAgent(ToyPolicy(),config)
+        trainer=DistributedTrainer(ToyEnvironment(42+rank),agent,rank=rank,
+                                   world_size=2,config=config,
+                                   checkpoint_dir=directory)
+        good={
+            'value_state_gap_max':0.0,'value_state_scale':1.0,
+            'tail_value_error':0.0,'tail_value_scale':1.0,
+            'replay_logprob_error':0.0,'replay_value_error':0.0,
+            'episode_closure_error_max':0.0,'finite':True,
+        }
+        trainer._gate_or_abort(good, 1)
+        bad=dict(good)
+        bad['value_state_gap_max']=1.0 if rank==1 else 0.0
+        saw_failure=False
+        try:
+            trainer._gate_or_abort(bad, 2)
+        except RuntimeError:
+            saw_failure=True
+        Path(directory, f'rank{rank}_saw_failure.json').write_text(
+            json.dumps({'saw_failure':saw_failure,'rank':rank}))
+        assert saw_failure
+    finally:
+        dist.destroy_process_group()
+
+
+@unittest.skipUnless(os.environ.get('RUN_DDP_TESTS')=='1','Set RUN_DDP_TESTS=1 for local loopback/Gloo tests.')
+class DistributedGateFailureTests(unittest.TestCase):
+    """One rank's bad metric must make every rank reject the update."""
+
+    def test_one_bad_rank_aborts_all_ranks(self):
+        with socket.socket() as connection:
+            connection.bind(('127.0.0.1',0))
+            port=connection.getsockname()[1]
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            mp.spawn(_gate_failure_worker,args=(port,directory),nprocs=2,join=True)
+            for rank in (0,1):
+                payload=json.loads(Path(directory,f'rank{rank}_saw_failure.json').read_text())
+                self.assertTrue(payload['saw_failure'],payload)
+            self.assertTrue(Path(directory,'gate_failures/update_2_summary.json').exists())
 
 
 @unittest.skipUnless(os.environ.get('RUN_DDP_TESTS')=='1','Set RUN_DDP_TESTS=1 for local loopback/Gloo tests.')

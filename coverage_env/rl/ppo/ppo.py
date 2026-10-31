@@ -129,15 +129,18 @@ class PPOAgent:
         return self.critic(self._critic_features(output).detach()).squeeze(-1)
 
     @torch.no_grad()
-    def value_for_graph(self, graph, environment=None, state=None) -> float:
+    def value_for_graph(self, graph, environment=None, *, state) -> float:
         """Estimate V(s) for a saved graph without generating actions or masks.
 
-        ``state`` must be the observation belonging to ``graph``.  Passing only
-        the live environment drops the heading channels (the environment's UAV
-        object does not carry them), so the bootstrap value would be evaluated
-        on a different feature vector from the one used by the next rollout
-        step.  Callers must pass the stored next observation.
+        ``state`` is required and must be the observation belonging to
+        ``graph``.  The live environment's UAV object has no heading channels,
+        so an env-only fallback silently evaluates a different feature vector.
+        There is intentionally no default: callers must either pass the stored
+        next observation or materialise a complete observation first.
         """
+        if state is None:
+            raise ValueError(
+                "value_for_graph requires the observation belonging to graph")
         was_training = self.actor.training
         self.actor.eval()
         _embeddings, _global_embedding, critic_input = self.actor.encode_graph(
