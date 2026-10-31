@@ -21,9 +21,9 @@ class SeedBlockTests(unittest.TestCase):
     def test_test_block_is_one_hundred_per_scale_and_contiguous(self):
         seeds = protocol.test_seeds()
         flat = [seed for count in protocol.FIELD_COUNTS for seed in seeds[count]]
-        self.assertEqual(flat, list(range(50000, 51600)))
+        self.assertEqual(flat, list(range(60000, 61600)))
         self.assertTrue(all(len(seeds[count]) == 100 for count in protocol.FIELD_COUNTS))
-        self.assertEqual(seeds[20][-1], 51599)
+        self.assertEqual(seeds[20][-1], 61599)
 
     def test_checkpoint_updates_are_twenty_to_four_hundred(self):
         self.assertEqual(protocol.expected_checkpoint_updates(),

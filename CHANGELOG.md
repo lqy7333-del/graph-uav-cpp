@@ -1,5 +1,27 @@
 ## 2026-10-31
 
+### 110. **修复验收通过：新 value gate 与 60000-61599 最终测试集登记，准备重跑 A/B**
+
+- **修复验收**：`c390951` 后，配对短训练 A/B（seed 123，5 updates × 128 steps）通过：
+  - DDP `value_state_gap_max`：A/B **2.86e-6**，exact resume 2→5 **3.34e-6**；
+  - B 组逐 episode reward 闭合最大误差 **2.13e-14**；
+  - 独立 GAE 复算最大差 A **4.31e-6**、B **1.12e-6**；terminal 12 次/128 步，
+    rollout 尾片段截断正确；保存/resume 配置一致。
+  - 报告：`coverage_env/results/maneuver_time/value_gate/value_gate_report.md`。
+- **新测试集**：v2 使用 **`60000-61599`**（每规模 100，共 1,600），在选择完成前不使用；
+  旧 `50000-51599` 标为已使用的历史确认集。验证集仍为 `40000-40095`，已反复使用，
+  不再称 sealed；选择规则不变。
+- **v1 无效**：`869bdd4` 的 6 个 A/B run 全部受 next-value bug 影响；不续训旧 checkpoint。
+  v2 从随机初始化重跑，网络/reward/预算/U{5..20}/固定 UAV 均不变，不新增 clipping/
+  PopArt/平衡采样/解码策略。输出改到 `formal_fixed/`。
+- **测试**：全量 272 项，2 项仍为 `5490b97` 基线失败；新 value/rollout 边界测试通过。
+- **启动脚本**：`scripts/maneuver_time/value_gate.py`、更新后的
+  `scripts/maneuver_time/run_formal.py`（新 out-root / gate-report）。
+- **状态**：本提交后启动 v2 六个正式 run；启动清单和 SHA 记录在
+  `coverage_env/results/maneuver_time/formal_fixed/preflight_and_manifest.json`。
+
+## 2026-10-31
+
 ### 109. **GAE bootstrap 实现错误：next_value 丢失 heading，6 个正式 A/B run 受影响**
 
 - **审计发现**：`next_value` 在 DDP/单进程 trainer 中只传 `environment`，未传

@@ -45,7 +45,7 @@ from coverage_env.rl.evaluation.validation_suite import _nearest_field_choice
 FIELD_COUNTS = tuple(range(5, 21))
 VALIDATION_BASE = 40000
 VALIDATION_PER_COUNT = 6
-TEST_BASE = 50000
+TEST_BASE = 60000
 TEST_PER_COUNT = 100
 CHECKPOINT_EVERY = 20
 TOTAL_UPDATES = 400

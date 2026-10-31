@@ -36,8 +36,8 @@ from coverage_env.rl.decoder.action_decoder import CoveragePolicy
 from coverage_env.rl.decoder.global_state_encoder import build_uav_feature
 from coverage_env.rl.trainer.distributed import resolve_config
 
-FORMAL_DIR = REPO / "coverage_env/results/maneuver_time/formal"
-GATE_REPORT = REPO / "coverage_env/results/maneuver_time/gate/gate_report.json"
+FORMAL_DIR = REPO / "coverage_env/results/maneuver_time/formal_fixed"
+DEFAULT_GATE_REPORT = REPO / "coverage_env/results/maneuver_time/value_gate/value_gate_report.json"
 PYTHON = sys.executable
 SEEDS = (42, 43, 44)
 UPDATES = 400
@@ -275,13 +275,17 @@ def _validate_run(mode: str, seed: int, directory: Path,
 
 
 def main(argv: list[str] | None = None) -> int:
+    global FORMAL_DIR
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--expected-sha", default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--only", action="append", default=None,
                         choices=[f"{mode}_seed{seed}" for mode, seed in RUN_ORDER])
     parser.add_argument("--gpu-ids", default="0,1,2,3")
+    parser.add_argument("--out-root", default=str(FORMAL_DIR))
+    parser.add_argument("--gate-report", default=str(DEFAULT_GATE_REPORT))
     args = parser.parse_args(argv)
+    FORMAL_DIR = Path(args.out_root)
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ids
     gpu_count = len([item for item in args.gpu_ids.split(",") if item.strip()])
@@ -291,17 +295,17 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("working tree is dirty; freeze and commit the code before launching")
     if args.expected_sha and not sha.startswith(args.expected_sha):
         raise SystemExit(f"HEAD {sha} does not match expected {args.expected_sha}")
-    if not GATE_REPORT.exists():
-        raise SystemExit(f"missing real-DDP gate report: {GATE_REPORT}")
-    gate = json.loads(GATE_REPORT.read_text(encoding="utf-8"))
-    if not gate.get("gate_passed"):
-        raise SystemExit("the real-DDP gate did not pass; refusing to start formal training")
+    gate_path = Path(args.gate_report)
+    if not gate_path.exists():
+        raise SystemExit(f"missing fixed-code value gate report: {gate_path}")
+    gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    if not (gate.get("gate_passed") or gate.get("passed")):
+        raise SystemExit("the fixed-code value gate did not pass; refusing to start formal training")
     preflight = _preflight(gpu_count)
     preflight["git_sha"] = sha
     preflight["git_branch"] = _git("rev-parse", "--abbrev-ref", "HEAD")
-    preflight["gate_report"] = str(GATE_REPORT)
-    preflight["gate_projected_400_update_hours"] = gate["checks"]["throughput"][
-        "projected_400_update_hours"]
+    preflight["gate_report"] = str(gate_path)
+    preflight["value_gate"] = gate
     preflight["hardware"] = {
         "gpu_names": [torch.cuda.get_device_name(index) for index in range(gpu_count)],
         "torch": torch.__version__,
@@ -309,8 +313,9 @@ def main(argv: list[str] | None = None) -> int:
         "visible_devices": args.gpu_ids,
     }
     preflight["data_split"] = {
-        "validation_seeds": "40000-40095 (6 per scale 5-20)",
-        "test_seeds": "50000-51599 (100 per scale 5-20)",
+        "validation_seeds": "40000-40095 (6 per scale 5-20; reused for development/selection)",
+        "test_seeds": "60000-61599 (100 per scale 5-20; new sealed block for the corrected rerun)",
+        "historical_used_test": "50000-51599 (already used by the invalidated 869bdd4 run; not for the rerun)",
         "training_instance_sources": "continuous uniform resampling of 5-20 fields; no validation/test seed is reused",
     }
     preflight["budget"] = {
@@ -340,8 +345,8 @@ def main(argv: list[str] | None = None) -> int:
             key: value["initial_actor_sha256"]
             for key, value in preflight["runs"].items()
         },
-        "gate_projected_400_update_hours": preflight[
-            "gate_projected_400_update_hours"],
+        "gate_passed": True,
+        "out_root": str(FORMAL_DIR),
     }, indent=1))
     if args.dry_run:
         return 0

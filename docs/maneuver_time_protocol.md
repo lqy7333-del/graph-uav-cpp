@@ -131,3 +131,34 @@ time 模式:     r = -(ΔT - ΔA_unique/(coverage_width·nominal_work_speed)) / 
   - exact resume 的配置、update index、RNG/环境/优化器 payload 与日志指标一致。
 - GPU 短链路实测 **36.2 s/update**，按 400 updates 预计 **4.0 h/任务**、6 任务约 **24 h**（不含验证/最终测试）。
 - 该 GPU 栈不是逐位可复现：两个完全相同的全新任务在 3 updates 后已有约 `6.4e-4` 的参数差（CUDA scatter/NCCL 顺序）；因此 exact resume 不把逐位相等作为判据，而以配置/状态/日志一致且漂移不超过重复运行包络为准。正式 A/B 仍使用 3 个独立种子。
+
+## 11. 审计后修正与正式重跑（v2，2026-10-31）
+
+**v1（`869bdd4`）的 6 个 A/B run 已因 GAE bootstrap 实现错误被判定无效：**
+`next_value` 未传 `next_state`，heading 三通道丢失；修复为 `c390951`，审计见
+`docs/maneuver_time_value_audit.md`。v1 的最终测试 `50000-51599` 只描述旧权重，
+不能再作为修正后方法的确认集。
+
+### 11.1 修复验收（先于正式重跑）
+
+- 单进程与真实 4-GPU DDP 均验证：正常飞行有效方向、补给后无效方向、
+  rollout 截断前下一状态、真正终止 bootstrap=0、保存/恢复继续采样。
+- 相邻 value 一致性在参数未更新、eval 模式下检查；修复后 DDP 短训练
+  `value_state_gap_max` 为 `2.86e-6`（A/B），resume 为 `3.34e-6`。
+- 配对短训练 A/B（seed 123，5 updates × 128 steps）通过：B 组 reward 闭合
+  （最大误差 `2.13e-14`）、独立 GAE 复算最大差 `<5e-6`、保存/resume 正常。
+- 详细报告：`coverage_env/results/maneuver_time/value_gate/value_gate_report.md`。
+  短训练不要求胜 NN；它只验证实现。
+
+### 11.2 重跑协议（与 v1 的差异仅限已发现的实现错误和测试集登记）
+
+- 从随机初始化重新训练 A/B × 42/43/44；**不续训任何 v1 checkpoint**。
+- 保持 v1 的网络、reward、预算（400 updates × 128 rollout）、U{5..20} 实例分布、
+  固定 UAV 参数、`candidate_attention=false`；不新增 PopArt、value clipping、
+  平衡采样或新解码策略。
+- 输出目录：`coverage_env/results/maneuver_time/formal_fixed/`；旧 `formal/` 保留为历史。
+- 验证集仍为 `40000-40095`（已反复用于开发/选择，不再称为 sealed）；选择规则不变。
+- **新最终测试集：`60000-61599`，每个规模 100 个，共 1,600 个**；在 checkpoint 选择完成前
+  不使用。旧 `50000-51599` 标为已使用的历史确认集，不参与 v2 选择或确认。
+- 正式启动前重新记录 SHA、有效配置、硬件、初始 hash、value gate 报告与预算；
+  训练期间代码冻结。
