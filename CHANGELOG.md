@@ -1,5 +1,38 @@
 ## 2026-10-31
 
+### 108. **正式 A/B 的有边界训练诊断：先升后降、B43 critic 发散、A43 greedy 解码失败**
+
+- **诊断范围**：只用固定验证集 `40000-40095`（96 实例，每规模 6 个），不训练、不改代码、
+  不用最终测试集选择；对 6 个正式 run 的全部 20 个 checkpoint 导出逐规模时间、训练指标、
+  规模采样占比，并对 20/最佳/400 三个 checkpoint 做 sampled-vs-greedy 对照。
+- **不是单纯验证集噪声**：6/6 个 run 的最佳 update 都在 20–380；5/6 个 run 的
+  “最佳 − update 400”配对差 95% CI 不含 0（仅 B42 不显著）。最佳 update：
+  A42=380、B42=380、A43=100、B43=20、A44=80、B44=240。
+- **种子分类**：
+  - 持续学习：A42（20→380 改善 302 s）、B42（161 s），400 仍显著好于 20；
+  - 先升后降：A43（100→400 慢 212 s）、A44（80→400 慢 196 s）、B44（240→400 慢 151 s）；
+  - 基本未学：B43 最佳就是 update 20，400 慢 316 s，critic loss 在 update 387 达
+    **44,326**，update 400 的 explained variance 为 **−0.0015**。
+- **greedy vs sampled**：A43 最佳→400 的 greedy 慢 212.5 s，但单次采样只慢 35.8 s
+  （CI 含 0），greedy−sampled 差从 183 s 缩到 6 s ⇒ 主要是 argmax 解码失败；
+  B43 为 316 s vs 64 s（critic 发散为主）；A44/B44 的 sampled 也显著退化
+  （109 s/101 s）⇒ 分布层问题。A42/B42 两者同步改善。
+- **训练指标**：balanced reward 在 6/6 run 后期都变好或持平，但 A43/B43/A44/B44
+  验证时间变差；A43/A44 后期验证态熵明显下降（4.97→4.08、5.00→3.75），B44 反而上升
+  （3.59→4.64）。B43 的 return_std/advantage_std 达 253.8/186.9，远高于 A42/B42。
+- **规模采样**：逐 reset 仍是 `U{5..20}` 均匀；但完成 episode 占比为 5 地块 7.19%、
+  20 地块 5.45%，是固定 128 步 rollout 的副产物。A42/B42 同样受影响且仍在学习，
+  所以它是候选因素，不是已证实的唯一原因；逐 transition 占比未记录。
+- **结论/建议**：保留 NN 为可部署基准；不要直接提高转弯权重或延长全部训练。
+  先处理 critic 稳定性、A43 类 greedy 解码、峰值早停；per-scale 平衡 rollout 和
+  A/B reward 组件拆分应作为后续有边界对照，不在本轮追加。
+- **产物**：`docs/maneuver_time_diagnostic.md`；曲线/指标/采样 CSV 在
+  `coverage_env/results/maneuver_time/diagnostics/`（gitignore）；图在
+  `docs/maneuver_time_diagnostics/`。
+- **回滚**：仅删除本诊断报告/图/CHANGELOG 条目；训练产物与 SHA `869bdd4` 不受影响。
+
+## 2026-10-31
+
 ### 107. **机动时间正式 A/B 完成：统一模型未超过 NN，time 目标未降低总时间**
 
 - 训练/评估代码仍为 **`869bdd432e092752df308cc4042356d11066c4f9`**；本提交只新增最终报告，
