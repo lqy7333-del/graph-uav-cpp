@@ -195,6 +195,59 @@ class PpoReplayStateTests(unittest.TestCase):
         self.assertAlmostEqual(value_state, value_graph_state, places=5)
         self.assertGreater(abs(value_state - value_graph_env), 1e-3)
 
+    def test_bootstrap_value_after_resupply_has_no_heading(self):
+        """After a depot stop both state and env must agree on heading_valid=False."""
+        environment = InstanceGenerator(self.config).generate(seed=20261017)
+        actor = CoveragePolicy(environment, config=self.config).eval()
+        agent = PPOAgent(actor, self.config)
+        environment.reset()
+        environment.return_to_depot()
+        state = environment.get_state()
+        uav_id = environment.uavs[0].uav_id
+        self.assertFalse(state["uavs"][uav_id]["heading_valid"])
+        graph = actor.graph_builder.build_graph(environment)
+        with torch.no_grad():
+            value_state = float(agent.value_from_output(
+                actor(state, environment=environment)).item())
+            value_graph_state = agent.value_for_graph(graph, environment, state=state)
+            value_graph_env = agent.value_for_graph(graph, environment)
+        self.assertAlmostEqual(value_state, value_graph_state, places=5)
+        self.assertAlmostEqual(value_state, value_graph_env, places=5)
+
+    def test_rollout_tail_bootstrap_uses_next_state(self):
+        """The transition flagged truncated must bootstrap the real next state."""
+        environment = InstanceGenerator(self.config).generate(seed=20261018)
+        actor = CoveragePolicy(environment, config=self.config).eval()
+        agent = PPOAgent(actor, self.config)
+        state = environment.reset()
+        with torch.no_grad():
+            output = actor(state, environment=environment)
+            action = CoveragePolicy.greedy_action(output)
+        next_state, _reward, done, _info = environment.step(action)
+        if done:
+            self.skipTest("seed completed in one step")
+        graph = actor.graph_builder.build_graph(environment)
+        with torch.no_grad():
+            value_state = float(agent.value_from_output(
+                actor(next_state, environment=environment)).item())
+            value_bootstrap = agent.value_for_graph(graph, environment, state=next_state)
+        self.assertAlmostEqual(value_state, value_bootstrap, places=5)
+
+    def test_terminal_and_truncated_gae_boundaries(self):
+        from coverage_env.rl.ppo.loss import compute_advantage
+        # Terminal: next_value=999 must be ignored for delta and return.
+        adv, ret = compute_advantage(
+            [-2.0], [-1.0], [999.0], [True], 1.0, 0.95,
+            device="cpu", truncated=[False])
+        self.assertAlmostEqual(float(adv[0]), -1.0, places=6)
+        self.assertAlmostEqual(float(ret[0]), -2.0, places=6)
+        # Truncated tail: bootstrap V(next)=-3, but do not leak GAE across boundary.
+        adv, ret = compute_advantage(
+            [-2.0], [-1.0], [-3.0], [False], 1.0, 0.95,
+            device="cpu", truncated=[True])
+        self.assertAlmostEqual(float(adv[0]), -4.0, places=6)
+        self.assertAlmostEqual(float(ret[0]), -5.0, places=6)
+
     def test_rollout_encoding_is_unchanged(self):
         """While the environment is current, both sources encode identically."""
         environment = InstanceGenerator(self.config).generate(seed=11)

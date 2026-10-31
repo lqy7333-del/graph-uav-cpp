@@ -288,6 +288,18 @@ class DistributedTrainer:
             # autograd, so nothing about training requires ``train()`` here.
             self.agent.actor.eval()
             self.agent.critic.eval()
+            # With a fixed parameter set and eval mode, the stored bootstrap value
+            # for a nonterminal transition must equal the next transition's value
+            # under the same state features.  This is a target-correctness metric,
+            # not a reward; a large value means the next-state observation was not
+            # encoded consistently.
+            _transitions = self.buffer.transitions
+            _gaps = [
+                abs(float(t.next_value) - float(_transitions[i + 1].value))
+                for i, t in enumerate(_transitions[:-1])
+                if not t.done
+            ]
+            value_state_gap_max = max(_gaps) if _gaps else 0.0
             # Advance entropy annealing before the update so the logged value is
             # the one actually used.
             progress = self.agent.set_training_progress(
@@ -365,6 +377,7 @@ class DistributedTrainer:
                     "clip_fraction": round(stats["clip_fraction"], 5),
                     "approx_kl": round(stats["approx_kl"], 7),
                     "actor_grad_norm": round(stats["actor_grad_norm"], 5),
+                    "value_state_gap_max": round(value_state_gap_max, 8),
                 }
                 episode_note = (
                     f" | eps={episodes} mean_ep_reward={mean_episode_reward:.2f} "
