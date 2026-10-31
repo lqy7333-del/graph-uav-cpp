@@ -10,8 +10,9 @@
      诊断写入全部包 try/except，barrier 放 finally；NCCL/驱动增加超时与进程组清理。
 - 测试：全量 277 项，2 项仍为 `5490b97` 基线失败；2-rank Gloo 的 gap/NaN 注入均
   2/2 abort；回放 NaN、快照索引、逐对容差单测通过。
-- 当前 v2 继续在 `e382df3` 运行；本分支在下一个安全 checkpoint 统一切入，保留
-  A42 20–140 checkpoint 并纳入验证选择。
+- 当前 v2 已在 A42 ckpt200 停止后切入 `8b00c59`，从 200 exact resume，输出
+  `formal_fixed_gate_v2/`；update201/202 gate 通过。A42 20–200 checkpoint 保留，
+  与 220–400 一起纳入验证选择。
 - 报告：`docs/maneuver_time_gate_hardening_v2.md`。
 
 ## 2026-10-31

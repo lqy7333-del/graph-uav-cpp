@@ -179,8 +179,8 @@ time 模式:     r = -(ΔT - ΔA_unique/(coverage_width·nominal_work_speed)) / 
 
 - 独立分支 `fix/gate-hardening-v2` 修正：回放 NaN、逐对相对容差、全局闭合日志、
   故障快照索引与写入保护、NCCL/驱动超时与进程组清理。
-- 当前运行中的 v2 不切换到该分支；在下一个安全 checkpoint 停止队列、切入、
-  用真实一 update 检查后从该 checkpoint exact resume，并记录监控版本边界。
-- A42 的 20–140 checkpoint 保留，必须与 160–400 一起纳入验证选择。
+- 已在 A42 ckpt200 停止队列、切入 `8b00c59`、用真实四卡一 update 检查后
+  exact resume 到 `formal_fixed_gate_v2/`；监控版本边界为 update 200/201。
+- A42 的 20–200 checkpoint 保留，必须与 220–400 一起纳入验证选择。
 - ckpt140 的一 update 只证明该 checkpoint 的状态编码一致，不能追溯证明 1–140
   每一步都正确；门禁通过不等于策略性能更好。
