@@ -162,3 +162,14 @@ time 模式:     r = -(ΔT - ΔA_unique/(coverage_width·nominal_work_speed)) / 
   不使用。旧 `50000-51599` 标为已使用的历史确认集，不参与 v2 选择或确认。
 - 正式启动前重新记录 SHA、有效配置、硬件、初始 hash、value gate 报告与预算；
   训练期间代码冻结。
+
+### 11.3 训练中防护版本变更（2026-10-31）
+
+- v2 A42 在 `ckpt_update_140` 正常保存后暂停，后续队列停止；`formal_fixed/` 保留 1–140
+  历史。新增 all-rank 正确性门禁 `e382df3` 后，1–140 checkpoint 复制到
+  `formal_fixed_gate/A_seed42/`，从 140 exact resume；B42–B44 从随机初始化重新开始。
+- 门禁只增加 eval/no-grad 检查与 all-reduce，不改变 reward、网络、采样或优化公式；
+  真实 ckpt140 一 update 的 gate on/off 日志一致，参数差在同任务重复运行包络内。
+- `value_state_gap_max` 为 **all-rank max**；失败时所有 rank 共同 abort 并写诊断，
+  驱动停止后续任务。阈值与失败记录见 `docs/maneuver_time_gate_hardening.md`。
+- `3.34e-6`/`2.86e-6` 是 `value_state_gap_max`，不是参数差。

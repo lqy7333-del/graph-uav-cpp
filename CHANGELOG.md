@@ -1,5 +1,29 @@
 ## 2026-10-31
 
+### 111. **正确性门禁硬化：all-rank 汇总、更新前 abort、尾部/回放/闭合检查**
+
+- **all-rank 汇总**：`value_state_gap_max` 不再只写 rank0；所有正确性指标在 PPO update 前
+  `all_reduce MAX`，有限性 `all_reduce MIN`。日志中的 gap 是四卡最大值。
+- **更新前硬门禁**：任一 rank 的相邻 value、尾部 bootstrap、回放 log-prob/value、
+  episode reward 闭合、NaN/Inf 或参数有限性失败，所有 rank 在 barrier 后共同 abort；
+  驱动队列停止。失败写 `gate_failures/update_N_rank_R.json` + state `.pt` + summary。
+- **尾部检查**：用保存的 `next_state` 独立重算 rollout 最后一步 bootstrap；终止要求 0。
+- **回放检查**：每 update 抽 4 个 transition，用保存的 state/action 重算 log-prob/value。
+- **API**：`value_for_graph(..., *, state)` 强制要求 observation；缺失直接报错。
+- **故障注入**：2-rank Gloo rank1 注入、4-GPU NCCL rank3 注入，均 4/4 或 2/2 rank
+  共同 abort；真实 ckpt140 一 update 的 all-rank gate：gap 4.77e-6、tail 9.5e-7、
+  replay log-prob 4.8e-7、closure 0.0。gate on/off 日志一致，actor 差 5.0e-5，
+  小于同任务重复运行 6.7e-5。
+- **暂停/恢复**：v2 A42 在 ckpt140 暂停，队列停止；1–140 历史保留在 `formal_fixed/`，
+  新监控版本输出 `formal_fixed_gate/`，从 140 exact resume；B42–B44 重新初始化。
+  既有 rank0 日志最大 gap 1.9e-5；ckpt140 all-rank 一 update gate 通过。
+- **语义澄清**：`3.34e-6`/`2.86e-6` 是 `value_state_gap_max`，不是参数差。
+- **测试**：全量 274 项，2 项仍为 `5490b97` 基线失败；新增 gate/API/故障注入测试通过。
+- **报告**：`docs/maneuver_time_gate_hardening.md`。
+- **回滚**：回退本提交会移除 all-rank abort 与 required-state API；不应回滚。
+
+## 2026-10-31
+
 ### 110. **修复验收通过：新 value gate 与 60000-61599 最终测试集登记，准备重跑 A/B**
 
 - **修复验收**：`c390951` 后，配对短训练 A/B（seed 123，5 updates × 128 steps）通过：
