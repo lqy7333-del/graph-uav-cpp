@@ -63,6 +63,9 @@ rank0 写 `update_N_summary.json`。所有 rank 在 barrier 后共同抛错，�
 
 ## 5. 状态
 
-- 代码：`e382df3`；训练尚未在新 gate 下继续（等待本次提交/预检）。
+- 代码：`e382df3`；训练启动 SHA：`9fbae8b`（含 gate + docs）。
+- A42 已从 ckpt140 resume；update 141/142 的 all-rank gate 通过：
+  gap `4.77e-6/5.72e-6`、tail `1.43e-6/9.5e-7`、replay `9.5e-7/3.81e-6`、closure 0。
+- B42–B44 从随机初始化重新开始；训练队列继续运行。
 - 旧最终测试 `50000-51599` 是历史；v2 新 sealed 为 `60000-61599`。
 - 阈值写在 `distributed.py` 常量中，失败时随 JSON 保存。

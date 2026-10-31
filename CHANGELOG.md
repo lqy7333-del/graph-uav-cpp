@@ -17,6 +17,7 @@
 - **暂停/恢复**：v2 A42 在 ckpt140 暂停，队列停止；1–140 历史保留在 `formal_fixed/`，
   新监控版本输出 `formal_fixed_gate/`，从 140 exact resume；B42–B44 重新初始化。
   既有 rank0 日志最大 gap 1.9e-5；ckpt140 all-rank 一 update gate 通过。
+  启动 SHA `9fbae8b`；A42 update141/142 gate 通过（gap 4.77e-6/5.72e-6）。
 - **语义澄清**：`3.34e-6`/`2.86e-6` 是 `value_state_gap_max`，不是参数差。
 - **测试**：全量 274 项，2 项仍为 `5490b97` 基线失败；新增 gate/API/故障注入测试通过。
 - **报告**：`docs/maneuver_time_gate_hardening.md`。

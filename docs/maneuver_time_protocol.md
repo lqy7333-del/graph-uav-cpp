@@ -173,3 +173,4 @@ time 模式:     r = -(ΔT - ΔA_unique/(coverage_width·nominal_work_speed)) / 
 - `value_state_gap_max` 为 **all-rank max**；失败时所有 rank 共同 abort 并写诊断，
   驱动停止后续任务。阈值与失败记录见 `docs/maneuver_time_gate_hardening.md`。
 - `3.34e-6`/`2.86e-6` 是 `value_state_gap_max`，不是参数差。
+- 启动 SHA `9fbae8b`；A42 从 140 resume 后 update141/142 gate 通过，B42–B44 重新初始化。
