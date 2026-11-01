@@ -3,7 +3,7 @@
 The protocol fixes two disjoint seed blocks:
 
 * validation ``40000-40095`` -- 96 instances, six per field count 5..20;
-* final test ``50000-51599`` -- 1600 instances, 100 per field count.
+* final test ``60000-61599`` -- 1600 instances, 100 per field count (v2 sealed set).
 
 Every number in this module is produced from those fixed seeds.  The final
 block is never read by ``validate`` and must only be evaluated once, after the

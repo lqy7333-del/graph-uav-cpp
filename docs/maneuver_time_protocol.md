@@ -184,3 +184,14 @@ time 模式:     r = -(ΔT - ΔA_unique/(coverage_width·nominal_work_speed)) / 
 - A42 的 20–200 checkpoint 保留，必须与 220–400 一起纳入验证选择。
 - ckpt140 的一 update 只证明该 checkpoint 的状态编码一致，不能追溯证明 1–140
   每一步都正确；门禁通过不等于策略性能更好。
+
+### 11.5 v2 最终测试结果（2026-11-01）
+
+- 新 sealed `60000-61599` 已使用一次；1,600 实例 × 7 策略 = 11,200 episodes，全部 100% 完成。
+- 选择：A42 380、B42 240、A43 240、B43 280、A44 360、B44 380（验证均 96/96）。
+- 总体配对差（baseline−candidate，正值 candidate 更好）：NN−A42 +49.6、NN−B42 +36.3、
+  NN−A43 +84.8、NN−B43 +2.0（CI 跨 0）、NN−A44 −70.2、NN−B44 +52.0 s；
+  A42−B42 −13.3、A43−B43 −82.8、A44−B44 +122.2 s。
+- 结论：time 目标没有稳定优于 distance，种子间方向不一致；完成率无差异。
+- 本轮测试集已使用，不再用于调参或二次 checkpoint 选择。详见
+  `docs/maneuver_time_final_report_v2.md`。
