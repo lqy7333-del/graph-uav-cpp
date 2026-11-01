@@ -124,7 +124,12 @@ final − initial：
 
 > 在固定 10×20 任务上，现有架构/更新**能找到一个更好的策略**，但收益集中在少数实例，且**没有在训练结束时保持**；best 与 final 的差异足以主导“是否超过原模型”的结论。
 
-## 7. 文件
+## 7. 后续有界诊断
+
+greedy vs 采样平均（0/460/580/600/780/1000，每实例 16 次）：
+[fixed_instance_overfit_sampled_diagnostic.md](fixed_instance_overfit_sampled_diagnostic.md)。
+
+## 8. 文件
 
 - 运行目录（本工作站）：`/tmp/fixed-instance-overfit/coverage_env/results/overfit20/run_seed42`
 - [best.json](/tmp/fixed-instance-overfit/coverage_env/results/overfit20/run_seed42/best.json)
