@@ -1,3 +1,19 @@
+## 2026-11-02
+
+### 116. **固定 10×20 有界诊断：greedy 与采样平均分离**
+
+- 检查 0/460/580/600/780/1000 六个 checkpoint，每实例 16 次采样，共 960 episodes，全部完成；
+  不做 best-of-16。
+- greedy 与采样平均都显示阶段改善和 580→600 的回退：
+  - 780→1000 greedy +130.7 s，sampled +67.8 s [21.0,119.8]；
+  - initial→final sampled **−144.7 s** [−183.3,−101.0]，greedy **+1.8 s**。
+- 因此 final 的退化不是单一 greedy 问题，也不是纯随机噪声；greedy 相对采样分布的
+  优势从 201 s 缩到 55 s，且 70006 的 final greedy 比采样平均慢 186.5 s。
+- 实际 LR 恒为 3e-4；KL 0.018–0.027、clip 0.15–0.17、EV 0.93–0.98，没有 v1 式 critic
+  失效；600 回退时 critic/EV 反而略好。
+- 每个实例 starts 约 1600；transitions 47,264–55,117，fixed bank 不等权。
+- 不扩网络、不延长训练；下一步只做动作排名/top-k/温度与 greedy 的有界诊断。
+- 报告：`docs/fixed_instance_overfit_sampled_diagnostic.md`。
 ## 2026-11-01
 
 ### 115. **固定 10×20 in-sample 微调完成：best 改善、final 回到起点**
