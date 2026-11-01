@@ -1,5 +1,17 @@
 ## 2026-11-01
 
+### 115. **固定 10×20 in-sample 微调完成：best 改善、final 回到起点**
+
+- 从 B42 update 240 微调 1000 updates；51 个评估点全部 10/10 完成。
+- best update 780：6960.4 s，比 initial 快 128.9 s、比 NN 快 144.0 s；9/10、10/10 胜。
+- final update 1000：7091.1 s，比 initial 慢 1.8 s、比 NN 快 13.3 s；5/5、6/4 胜。
+- best 改善集中在 top-3 实例（70.3%），其中 70002 贡献 453.0 s；70003 变差 134.3 s。
+- 分项：best 的收益几乎全部来自 nonwork 下降（−134.2 s），work +13.1 s、maneuver −7.8 s；
+  final 三项几乎回到初始。
+- best 是 51 个 in-sample 点的选择最大值，存在选择偏差；本轮不访问 sealed 集，不报告泛化。
+- 报告：`docs/fixed_instance_overfit_results.md`。
+## 2026-11-01
+
 ### 114. 固定实例过拟合诊断入口（已有模型微调，未启动长训练）
 
 - 新增 `env/fixed_instance_pool.py`：保存固定几何/网格/资源快照及哈希，每轮无放回轮换；

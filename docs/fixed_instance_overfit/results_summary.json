@@ -1,0 +1,38 @@
+{
+  "initial": 7089.264913111205,
+  "nn": 7104.342453055188,
+  "best": 6960.351997816231,
+  "final": 7091.064307599236,
+  "best_update": 780,
+  "best_initial_gain": 128.9129152949741,
+  "best_nn_gain": 143.9904552389582,
+  "final_initial_gain": -1.7993944880308845,
+  "final_nn_gain": 13.278145455952654,
+  "best_initial_wins": 9,
+  "best_initial_losses": 1,
+  "best_nn_wins": 10,
+  "best_nn_losses": 0,
+  "final_initial_wins": 5,
+  "final_initial_losses": 5,
+  "final_nn_wins": 6,
+  "final_nn_losses": 4,
+  "best_gain_sum": 1289.1291529497412,
+  "top3_gain": 906.0748277424082,
+  "best_gain_max": 452.9760085237531,
+  "best_gain_max_index": 2,
+  "components_initial": {
+    "time_work_base": 2911.8448697849694,
+    "time_nonwork_base": 3561.8042726902922,
+    "time_maneuver_extra": 615.6157706359429
+  },
+  "components_best": {
+    "time_work_base": 2924.914037325124,
+    "time_nonwork_base": 3427.584690996829,
+    "time_maneuver_extra": 607.8532694942782
+  },
+  "components_final": {
+    "time_work_base": 2915.8840413392363,
+    "time_nonwork_base": 3552.1205774560876,
+    "time_maneuver_extra": 623.0596888039106
+  }
+}
