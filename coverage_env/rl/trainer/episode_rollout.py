@@ -348,3 +348,10 @@ class EpisodeRolloutTrainer(OverfitTrainer):
             if self.checkpoint_dir and (update_idx % self.checkpoint_every == 0 or update_idx == num_updates):
                 self._save_checkpoint(update_idx)
         self.write_run_summary()
+        if self.rank == 0 and self.checkpoint_dir is not None:
+            path = Path(self.checkpoint_dir) / "run_summary.json"
+            if path.exists():
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                payload["bank_usage"] = self.environment.usage()
+                path.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
+                                encoding="utf-8")
