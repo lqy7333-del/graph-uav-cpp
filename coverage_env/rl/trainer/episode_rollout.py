@@ -292,6 +292,7 @@ class EpisodeRolloutTrainer(OverfitTrainer):
         if self.checkpoint_dir and start_update == 1:
             self._save_checkpoint(0)
         for update_idx in range(max(1, start_update), last_update + 1):
+            self._current_update = update_idx
             started = time.perf_counter()
             before_stats = (self._stats_completed, self._stats_failed, self._stats_truncated)
             collect_error = None
@@ -404,6 +405,7 @@ class EpisodeRolloutTrainer(OverfitTrainer):
             path = Path(self.checkpoint_dir) / "run_summary.json"
             if path.exists():
                 payload = json.loads(path.read_text(encoding="utf-8"))
-                payload["bank_usage"] = self.environment.usage()
+                if hasattr(self.environment, "usage"):
+                    payload["bank_usage"] = self.environment.usage()
                 path.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
                                 encoding="utf-8")

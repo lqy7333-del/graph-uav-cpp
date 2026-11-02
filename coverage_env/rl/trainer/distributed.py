@@ -873,6 +873,8 @@ class DistributedTrainer:
         local = {"rng": capture_rng_state(), "environment": deepcopy(self.environment),
                  "count_emas": deepcopy(self._count_emas),
                  "rank_stats": deepcopy(self._rank_stats)}
+        if hasattr(self, "extra_rank_runtime"):
+            local.update(self.extra_rank_runtime())
         states = [None] * self.world_size
         if dist.is_initialized():
             dist.all_gather_object(states, local)

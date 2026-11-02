@@ -1,0 +1,85 @@
+{
+  "training_metadata": {
+    "seed": 42,
+    "num_updates": 3,
+    "world_size": 4,
+    "collection_mode": "complete_episodes",
+    "instance_mode": "random_instances",
+    "num_fields": 10,
+    "episodes_per_rank": 4,
+    "max_episode_steps": 500,
+    "instance_seed_base": 900000000,
+    "generator_config_sha": "eb4bcf6c509eca74612c89d69f53afc68f18cecc5efdde96b9ede25577fe5ced",
+    "diagnostic_bank_sha": "8dfceb8778d48c6033855b9f4a186268ff8f9b2faf14c83565dd89e57c07ba04",
+    "validation_bank_sha": "8dfceb8778d48c6033855b9f4a186268ff8f9b2faf14c83565dd89e57c07ba04",
+    "initial_actor_sha256": "fe5771ddc9cc9158518b54fa8541fa7bfe1cdeef184b500edc328fea53ec06f9",
+    "initialization": null,
+    "purpose": "random_instance_fixed_10field_generalization",
+    "diagnostic_bank": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/smoke_bank",
+    "validation_bank": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/smoke_bank"
+  },
+  "per_rank": [
+    {
+      "transitions": 234,
+      "episodes": 12,
+      "optimizer_steps": 24,
+      "updates": 3,
+      "wall_seconds": 83.87167920600041,
+      "instances_drawn": 12,
+      "distinct_geometries": 12,
+      "field_counts": {
+        "10": 12
+      },
+      "rank": 0
+    },
+    {
+      "transitions": 241,
+      "episodes": 12,
+      "optimizer_steps": 24,
+      "updates": 3,
+      "wall_seconds": 83.88136123100412,
+      "instances_drawn": 12,
+      "distinct_geometries": 12,
+      "field_counts": {
+        "10": 12
+      },
+      "rank": 1
+    },
+    {
+      "transitions": 239,
+      "episodes": 12,
+      "optimizer_steps": 24,
+      "updates": 3,
+      "wall_seconds": 83.88552566600265,
+      "instances_drawn": 12,
+      "distinct_geometries": 12,
+      "field_counts": {
+        "10": 12
+      },
+      "rank": 2
+    },
+    {
+      "transitions": 240,
+      "episodes": 12,
+      "optimizer_steps": 24,
+      "updates": 3,
+      "wall_seconds": 83.88563093800622,
+      "instances_drawn": 12,
+      "distinct_geometries": 12,
+      "field_counts": {
+        "10": 12
+      },
+      "rank": 3
+    }
+  ],
+  "global": {
+    "transitions": 954,
+    "episodes": 48,
+    "optimizer_steps_global_synchronous": 24,
+    "optimizer_steps_per_rank_sum": 96,
+    "wall_seconds_max": 83.88563093800622,
+    "field_counts": {
+      "10": 48
+    }
+  }
+}
