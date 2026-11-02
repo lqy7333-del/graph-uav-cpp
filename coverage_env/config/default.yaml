@@ -290,3 +290,11 @@ ppo:
   epochs: 4
   batch_size: 64
   max_grad_norm: 0.5
+  # Sampling semantics. "fixed_steps" is the legacy DDP rollout and keeps its
+  # historical reset-at-update-start behaviour. "complete_episodes" is used by
+  # the fixed-bank episode trainer: it samples exactly episodes_per_rank episodes
+  # to true termination per rank, never resets to fill a step budget, and pads
+  # only for synchronized DDP updates.
+  collection_mode: fixed_steps
+  episodes_per_rank: 4
+  max_episode_steps: 500

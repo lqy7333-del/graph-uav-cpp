@@ -428,6 +428,125 @@ class PPOAgent:
             "excluded_actor_samples": int((~eligible).sum().item()),
         }
 
+    def update_masked(self, transitions, valid_mask, *, global_valid_count,
+                      global_steps, advantages, returns) -> dict:
+        """PPO update for unequal complete-episode buffers.
+
+        ``transitions`` are this rank's real transitions; ``valid_mask`` aligns
+        with them and marks real rows.  ``global_steps`` is the all-reduced
+        maximum local length, so every rank performs exactly the same number of
+        backward/optimizer steps.  Padding rows are structurally valid repeats
+        of the last local transition but have mask 0 and never contribute to a
+        loss, entropy, statistic, or gradient.  ``global_valid_count`` is the
+        all-reduced number of real rows; loss scaling compensates for DDP's
+        world-size averaging.
+        """
+        local = list(transitions)
+        if global_steps <= 0 or global_valid_count <= 0:
+            return self._empty_update_stats()
+        if not local:
+            # A rank with no local data still needs a structurally valid forward
+            # for DDP.  The caller must pass such a rank only in a test that
+            # supplies global data on other ranks; production collection has at
+            # least one episode per rank.
+            raise ValueError("update_masked needs at least one local transition for padding")
+        if len(valid_mask) != len(local):
+            raise ValueError("valid_mask length does not match local transitions")
+        self.actor.eval()
+        self.critic.eval()
+        if len(local) < global_steps:
+            pad = local[-1]
+            local.extend([pad] * (global_steps - len(local)))
+        elif len(local) > global_steps:
+            raise ValueError("local buffer is longer than global_steps")
+        mask = torch.tensor(list(valid_mask) + [False] * (global_steps - len(valid_mask)),
+                            dtype=torch.bool, device=self.device)
+        adv = torch.as_tensor(advantages, dtype=torch.float32, device=self.device)
+        ret = torch.as_tensor(returns, dtype=torch.float32, device=self.device)
+        if adv.numel() < global_steps:
+            adv = torch.cat([adv, torch.zeros(global_steps - adv.numel(), device=self.device)])
+        if ret.numel() < global_steps:
+            ret = torch.cat([ret, torch.zeros(global_steps - ret.numel(), device=self.device)])
+        world = 1
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            world = torch.distributed.get_world_size()
+        scale = float(world) / float(global_valid_count)
+        batch_size = max(1, self.batch_size)
+        actor_losses, critic_losses, entropies, policy_losses = [], [], [], []
+        ratio_stds, clip_fractions, approx_kls, grad_norms = [], [], [], []
+        preds, targets = [], []
+        valid_adv = adv[mask]
+        advantage_std = self._tensor_std(valid_adv)
+        for _epoch in range(max(1, self.epochs)):
+            permutation = torch.randperm(global_steps).tolist()
+            for start in range(0, global_steps, batch_size):
+                indices = permutation[start:start + batch_size]
+                current_log_probs, entropy_rows, current_values = (
+                    self._per_transition_minibatch_rows(local, indices)
+                )
+                batch_indices = torch.as_tensor(indices, dtype=torch.long, device=self.device)
+                old_log_probs = torch.as_tensor(
+                    [local[index].log_prob for index in indices],
+                    dtype=torch.float32, device=self.device,
+                )
+                ratios = torch.exp(current_log_probs - old_log_probs)
+                weights = mask[batch_indices].to(current_log_probs.dtype)
+                batch_advantages = adv[batch_indices]
+                unclipped = ratios * batch_advantages
+                clipped = torch.clamp(ratios, 1.0 - self.clip_ratio,
+                                      1.0 + self.clip_ratio) * batch_advantages
+                surrogate = (torch.minimum(unclipped, clipped) * weights).sum() * scale
+                entropy = (entropy_rows * weights).sum() * scale
+                actor_loss = -surrogate - self.entropy_coef * entropy
+                critic_loss = (((current_values - ret[batch_indices]) ** 2) * weights).sum() * scale
+
+                self.actor_optimizer.zero_grad(set_to_none=True)
+                actor_loss.backward()
+                total_norm = nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
+                self.actor_optimizer.step()
+                self.critic_optimizer.zero_grad(set_to_none=True)
+                (self.value_coef * critic_loss).backward()
+                nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
+                self.critic_optimizer.step()
+
+                valid = mask[batch_indices]
+                if bool(valid.any().item()):
+                    actor_losses.append(float(actor_loss.detach().item()))
+                    critic_losses.append(float(critic_loss.detach().item()))
+                    entropies.append(float(entropy.detach().item()))
+                    policy_losses.append(float(-surrogate.detach().item()))
+                    ratio_stds.append(self._tensor_std(ratios[valid]))
+                    clip_fractions.append(self._tensor_mean(
+                        (torch.abs(ratios.detach() - 1.0) > self.clip_ratio).float()[valid]))
+                    approx_kls.append(self._tensor_mean(
+                        (old_log_probs - current_log_probs)[valid]))
+                    grad_norms.append(float(total_norm.detach().item())
+                                        if torch.is_tensor(total_norm) else float(total_norm))
+                    preds.append(current_values.detach()[valid])
+                    targets.append(ret[batch_indices].detach()[valid])
+        self.update_count += 1
+        prediction = torch.cat(preds) if preds else torch.zeros(0, device=self.device)
+        target = torch.cat(targets) if targets else torch.zeros(0, device=self.device)
+        return {
+            "actor_loss": sum(actor_losses) / len(actor_losses) if actor_losses else 0.0,
+            "critic_loss": sum(critic_losses) / len(critic_losses) if critic_losses else 0.0,
+            "entropy": sum(entropies) / len(entropies) if entropies else 0.0,
+            "policy_loss": sum(policy_losses) / len(policy_losses) if policy_losses else 0.0,
+            "advantage_std": advantage_std,
+            "return_mean": self._tensor_mean(ret[mask]),
+            "return_std": self._tensor_std(ret[mask]),
+            "value_mean": self._tensor_mean(prediction),
+            "value_std": self._tensor_std(prediction),
+            "explained_variance": self._explained_variance(prediction, target),
+            "ratio_std": sum(ratio_stds) / len(ratio_stds) if ratio_stds else 0.0,
+            "clip_fraction": sum(clip_fractions) / len(clip_fractions) if clip_fractions else 0.0,
+            "approx_kl": sum(approx_kls) / len(approx_kls) if approx_kls else 0.0,
+            "actor_grad_norm": sum(grad_norms) / len(grad_norms) if grad_norms else 0.0,
+            "updates": len(actor_losses),
+            "actor_samples": int(mask.sum().item()),
+            "excluded_actor_samples": int((~mask).sum().item()),
+        }
+
     @staticmethod
     def _empty_update_stats() -> dict:
         """Return zeroed statistics so the log schema is stable."""

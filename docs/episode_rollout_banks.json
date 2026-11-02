@@ -1,0 +1,122 @@
+{
+  "baseline_sha": "911da56",
+  "branch": "codex/episode-rollout-10fields",
+  "initial_checkpoint": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/initial_B42_240.pt",
+  "initial_sha256": "71cfda4f20805e553888854ebd12ba47b6244fbe25ce7ae0a62f7cdf8faa7560",
+  "banks": {
+    "train10": {
+      "path": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/train10",
+      "manifest_sha256": "a46c00d5ee50ca8ed63eaa6cd240c9115b0c0f05c39898d6465ee4d9581a1338",
+      "instances_sha256": "4bd18aff19c649d92fed664de181c943b2286ca7638bd192aed0ee1f9bddaf81",
+      "instances": 10,
+      "seeds": [
+        81000,
+        81001,
+        81002,
+        81003,
+        81004,
+        81005,
+        81006,
+        81007,
+        81008,
+        81009
+      ],
+      "fingerprints": [
+        "c4336829318b6d7191f7d4b8ff94c3402059934c26e50236338c4a69d9ef0cbd",
+        "2166a57bc2d7c310569cebf00e65068ac40983546cf231877fa3039819b7e741",
+        "5e9858099e47bcecb07d4c4bf5aca2b5c281addf04a1cac318da658f2a69e744",
+        "83de9c94a23dc006e2ccca0f5dfd9cafd2d75e33d4a8fe256c6105775e3cbeb8",
+        "39e6d178c2c65e74abe6812875113142de1e2012eed1abb40911b01f927ac1d8",
+        "f3053b0484cbea6e938381ffbf117359d071e42bfd1b5a7e5a24c5768d3ade89",
+        "b2f5a1a7f2a5e13a84e846a9e7e8c4c7ff7325d122b716b47173b42f7e80bea4",
+        "d8374ae1489efbb392d5e95201e34b4172a0d7814c5b2d9f1b5effd5b10f829b",
+        "8bee5feb227ffe742d4f53f5e23a572432c9f21fce9b335965023ab7988af366",
+        "01b71a7378b632e25b12b0bd443f4f37d2f12f48bc66664f56f786e8806aa2d0"
+      ]
+    },
+    "valid30": {
+      "path": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/valid30",
+      "manifest_sha256": "72d1ae92c73a8fc394c47a2e66d9d889c5a3ffcdb0624e811c32023ffddb2a29",
+      "instances_sha256": "3c7b5ed5663f879865a74cac7a9235817010039c87ea3da8804d570be563199c",
+      "instances": 30,
+      "seeds": [
+        82000,
+        82001,
+        82002,
+        82003,
+        82004,
+        82005,
+        82006,
+        82007,
+        82008,
+        82009,
+        82010,
+        82011,
+        82012,
+        82013,
+        82014,
+        82015,
+        82016,
+        82017,
+        82018,
+        82019,
+        82020,
+        82021,
+        82022,
+        82023,
+        82024,
+        82025,
+        82026,
+        82027,
+        82028,
+        82029
+      ],
+      "fingerprints": [
+        "67aacb7a6d0a6df8f75d514aa8d1bda16344e52caac9b748ffe568f66536b4fd",
+        "9bc030ca5201337d6e10735865514ca6752f9327d8d950bd8ede7daa3ec35d5d",
+        "e85f1ffcb2a4a165dd7a85d9dd4bea5a4ccb2977457ffd67ec56a670ccc79227",
+        "72be46bc10ebf2c4633a95d317d421348656f7e2a1f791565abdfe92d1234b63",
+        "d23d47c63fa0b32ce141756125de60080d0f7c9477e074542345a47fcfd2513f",
+        "33935dec28a0ebf99769d606690b37ca21066374235cdcc29b89052f258daee7",
+        "d22795b89dd5a424471d1606fbfb48512617b8686c7131cfcc1c6da55d21a5c0",
+        "9a24f3986789adb41e96881cc9a60804cf5cf494612492bed834853cda8107b5",
+        "ce6d60bcc39fb9988bc2f9a6c4f535a768da1aa0085737e8007f8868e18f2879",
+        "1969b4909e14986fb5795810eacf01211526d92f97440568996eaec2f5baea5b",
+        "cb1bfdd8f1eaf87406fac114e2bf76178a27a043f81e40290126af2a90cdd50a",
+        "5b737fe627d6040a6a8ecc3dda34af163b3b2033429a54b8f489cf75fba6f29b",
+        "8f5434a92a7cd72152131863ff8cb123eb6248975950345f991ab7583c608648",
+        "346e923de5b89456b461bae4642f88d9e7d1c660789423e069541d88023e9c2a",
+        "0418a93f0a10e49c02314534d4569af39bf3401956088d85b7ae929b37d568ec",
+        "b84b7ca49d086ecaa41353f4849d9461959af0cbc5b16bfba6c06bb1298e3a0d",
+        "0fbefdbb6837adac38dd470e0fa3f29d63d23a5a046e25ac3311e69eabf9e2ce",
+        "570bb5fb4347810d0654d76fc07f0d105fdc2780f6497b2baed6829551ee8f36",
+        "13275cc800528df6c40c89565598373f31c5938d611802900a1232fa633fdf82",
+        "af8c371ab9ac9bba7790705791cde947530f2d2ed0061d895876ebe1a6a2a645",
+        "97f94ff4b22773f4e2ce7b58e106018fe18d579eb00de8435e4ec88f765e4613",
+        "951fd179c6aa0d43984749b9c48556de727b0191a918dfae2b65690b95e1daf5",
+        "835f23b2e46e9a820fb36d19c91f4b60e4ad3b26cc8e8fac06f31f9c125f3790",
+        "26e7cd257fe534bfe785287e853510a696607f428081fdc39bbc4b2c2ad7fd84",
+        "52c0cc46a26b93781aa99b095939a7dd9e26a09db06b90158a18ce24b8805b96",
+        "edfbf227695b64386abd4cba95d7df437da692e399ec5251d2d0bbc1691c61ee",
+        "1e4fa01959dde584b5a1cc7b9386e002d05829010f443906f50bc1c39bffbc4a",
+        "8d5b2cdcc9784527da380d532509486404eab57b58389112408946f3917c6192",
+        "3785a37a8e38af6d123be8f07da817d9f33f7b89598a9a7f9d8e54dff5851e3a",
+        "7aa5d010b0aa9bde2bf8894d9b352708e4b4ca143247d0360f5cd104afa63c79"
+      ]
+    },
+    "smoke_bank": {
+      "path": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/smoke_bank",
+      "manifest_sha256": "8dfceb8778d48c6033855b9f4a186268ff8f9b2faf14c83565dd89e57c07ba04",
+      "instances_sha256": "8b085aa3947623b436d00d4a6c6ee9e217123bfbabe13e87590a4d720f7c9ff0",
+      "instances": 2,
+      "seeds": [
+        83000,
+        83001
+      ],
+      "fingerprints": [
+        "34bf7e0a42ece60473f6044b5e317cd58ce2e9772e83d6c87aeec582d852e104",
+        "4aeb11ad8d68838e59dd9db79ff2f8b606109d2187a7b547586b78bbace8322c"
+      ]
+    }
+  }
+}

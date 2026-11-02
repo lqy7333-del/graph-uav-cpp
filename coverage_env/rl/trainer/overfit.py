@@ -32,7 +32,7 @@ from coverage_env.env.instance_generator import InstanceGenerator
 from coverage_env.rl.checkpoint import capture_rng_state, restore_rng_state, parameter_sha256
 from coverage_env.rl.decoder.action_decoder import CoveragePolicy
 from coverage_env.rl.evaluation.maneuver_eval import (
-    run_episode, _nn_choice, _policy_choice_factory,
+    run_episode, _nn_choice, _policy_choice_factory, replay_recorded,
 )
 from coverage_env.rl.ppo.ppo import PPOAgent
 from coverage_env.rl.trainer.distributed import DistributedTrainer, _free_port, validate_exact_resume
@@ -127,7 +127,7 @@ class OverfitTrainer(DistributedTrainer):
         # Evaluation must not advance training action RNG, the pool's schedule,
         # or mutable mission state. Each rank handles disjoint pristine copies.
         rng = capture_rng_state()
-        actor = self.agent.actor.module
+        actor = self.agent.actor.module if hasattr(self.agent.actor, "module") else self.agent.actor
         was_training = actor.training
         local = {"rows": [], "nn": [], "error": None,
                  "usage": self.environment.usage()}
@@ -138,12 +138,16 @@ class OverfitTrainer(DistributedTrainer):
             choose = _policy_choice_factory(actor)
             for index in range(self.rank, len(templates), self.world_size):
                 env = deepcopy(templates[index])
-                row = run_episode(env, choose)
+                row = run_episode(env, choose, record=True)
                 row.update(index=index, seed=manifest["instances"][index]["seed"])
                 self._check_eval_row(row)
+                replay = replay_recorded(deepcopy(templates[index]), row["actions"])
+                if (not replay["completed"] or abs(replay["total_time"] - row["total_time"]) > 1e-6):
+                    raise RuntimeError(f"recorded action replay failed for fixed instance {index}")
+                row["replay_ok"] = True
                 local["rows"].append(row)
                 if update_idx == 0:
-                    baseline = run_episode(deepcopy(templates[index]), _nn_choice)
+                    baseline = run_episode(deepcopy(templates[index]), _nn_choice, record=True)
                     baseline.update(index=index, seed=row["seed"])
                     self._check_eval_row(baseline)
                     if not baseline["completed"]:

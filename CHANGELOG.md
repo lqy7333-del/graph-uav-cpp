@@ -1,5 +1,23 @@
 ## 2026-11-02
 
+### 117. **完整 episode 采样的固定 10 地块 PPO 实现（仅准备，未开始正式训练）**
+
+- 新增 `collection_mode=complete_episodes`：每 rank 4 条到真实终止的 episode，
+  4 卡共 16 条，再更新；不再为凑固定步数 reset，也不在批末预取零步实例。
+- 旧 `fixed_steps` 路径保持默认，历史语义不变。
+- 变长 DDP 使用全局有效样本计数归一化、全局优势标准化和 mask 填充；所有 rank
+  backward/optimizer step 次数一致，padding 不进入 loss/统计。
+- 每 episode 独立 GAE；正常终止 bootstrap 0，安全截断保留 bootstrap 并标记；
+  失败/截断不丢弃、不补采成功。
+- 固定 10 地块 train/valid bank（种子 81000–81009、82000–82029），完整快照、
+  manifest、哈希和指纹持久化；B42/240 起始 SHA 已核对。
+- greedy 训练/验证曲线分开；评估保存动作序列、每步摘要并独立重放校验。
+- 4-GPU 3-update smoke：119 s wall，48 episodes/868 transitions，24 同步
+  optimizer steps，门禁通过；200-update 预估约 1.5–2 h（含评估）。
+- CPU 边界恢复对照 actor/critic 逐位一致；仅支持 update 边界恢复。
+- 新增 7 项测试；完整套件 297/299 通过，2 项失败在 baseline 911da56 已存在。
+- 正式训练未启动，未运行 sealed test。
+
 ### 116. **固定 10×20 有界诊断：greedy 与采样平均分离**
 
 - 检查 0/460/580/600/780/1000 六个 checkpoint，每实例 16 次采样，共 960 episodes，全部完成；

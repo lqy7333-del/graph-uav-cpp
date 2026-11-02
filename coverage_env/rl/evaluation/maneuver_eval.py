@@ -21,6 +21,7 @@ Checkpoint selection follows the frozen rule, in this order:
 """
 
 from __future__ import annotations
+import dataclasses
 
 import argparse
 import json
@@ -40,6 +41,7 @@ from coverage_env.config import DEFAULT_CONFIG_PATH, load_config
 from coverage_env.env.instance_generator import InstanceGenerator
 from coverage_env.rl.checkpoint import evaluation_config
 from coverage_env.rl.decoder.action_decoder import CoveragePolicy
+from coverage_env.rl.action_space import CoverageAction
 from coverage_env.rl.evaluation.validation_suite import _nearest_field_choice
 
 FIELD_COUNTS = tuple(range(5, 21))
@@ -215,9 +217,16 @@ def _policy_choice_factory(policy: CoveragePolicy):
     return choose
 
 
-def run_episode(environment, choose) -> dict:
-    """Execute one fixed instance and return episode-level metrics."""
+def run_episode(environment, choose, *, record=False) -> dict:
+    """Execute one fixed instance and return episode-level metrics.
+
+    With ``record=True`` the complete action sequence and a compact per-step
+    state summary are returned as JSON-safe data; replaying those actions on a
+    pristine copy verifies the evaluation independently.
+    """
     state = environment.reset()
+    actions = []
+    state_summaries = []
     done = False
     info: dict = {}
     steps = 0
@@ -233,6 +242,17 @@ def run_episode(environment, choose) -> dict:
         infer_seconds += float(infer_s)
         if action is None:
             break
+        if record:
+            actions.append(dataclasses.asdict(action))
+            uavs = state.get("uavs", {})
+            uav = next(iter(uavs.values())) if uavs else {}
+            state_summaries.append({
+                "step": steps, "uav_position": uav.get("position"),
+                "heading": uav.get("heading"),
+                "energy": uav.get("remaining_energy"),
+                "payload": uav.get("remaining_payload"),
+                "coverage": uav.get("coverage_ratio"),
+            })
         state, _reward, done, info = environment.step(action)
         steps += 1
         if info.get("failed"):
@@ -250,7 +270,7 @@ def run_episode(environment, choose) -> dict:
                      and info.get("termination_reason") == "mission_complete")
     total_time = float(summary.get("total_time", 0.0))
     maneuver = float(summary.get("time_maneuver_extra", 0.0))
-    return {
+    result = {
         "completed": completed,
         "termination_reason": str(info.get("termination_reason", "no_action")),
         "steps": steps,
@@ -280,6 +300,28 @@ def run_episode(environment, choose) -> dict:
         "mask_ms_per_step": 1000.0 * mask_seconds / steps if steps else 0.0,
         "infer_ms_per_step": 1000.0 * infer_seconds / steps if steps else 0.0,
     }
+    if record:
+        result["actions"] = actions
+        result["state_summaries"] = state_summaries
+    return result
+
+
+def replay_recorded(environment, actions):
+    """Independently execute a recorded action list on a pristine environment."""
+    environment.reset()
+    done = False
+    info = {}
+    for item in actions:
+        action = CoverageAction(**item) if isinstance(item, dict) else item
+        _state, _reward, done, info = environment.step(action)
+        if done:
+            break
+    summary = environment.get_summary()
+    return {"completed": bool(done and info.get("success")
+                              and info.get("termination_reason") == "mission_complete"),
+            "total_time": float(summary.get("total_time", 0.0)),
+            "coverage_ratio": float(summary.get("coverage_ratio", 0.0)),
+            "done": bool(done)}
 
 
 def _make_environment(config: dict, count: int, seed: int):
