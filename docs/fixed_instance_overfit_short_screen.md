@@ -4,18 +4,23 @@
 
 ## 0. Result in one table
 
-| endpoint | greedy (s) | greedy vs start | 8-sample mean (s) | sampled vs start |
+| endpoint | greedy (s) | start − greedy | 8-sample mean (s) | start − sampled |
 |---|---:|---:|---:|---:|
 | frozen start (B42/240) | 7089.3 | 0 | 7287.5 | 0 |
-| control, actor LR 3e-4 | **7057.4** | **+31.9** | 7290.3 | +2.8 |
-| low, actor LR 3e-5 | 7086.5 | +2.8 | **7184.6** | **−102.9** |
+| control, actor LR 3e-4 | **7057.4** | **+31.9** | 7290.3 | −2.8 |
+| low, actor LR 3e-5 | 7086.5 | +2.8 | **7184.6** | **+102.9** |
 
-Key: lower is better. Sampled differences are fixed-ten conditional (8 trajectories per instance; all 80/80 complete).
+Sign: **baseline − candidate; positive = candidate faster**. Lower time is better. Sampled differences are
+fixed-ten conditional (8 trajectories per instance; all 80/80 complete).
 
-- **Low LR did not improve greedy** (7086.5 vs control 7057.4, i.e. 29.1 s slower than control; only +2.8 vs start).
-- **Low LR did improve the sampled average**: −105.7 s vs control [−134.3, −77.7], and −102.9 vs start [−129.7, −77.3].
-- **Control’s greedy improved, but its sampled average did not**: +2.8 s [−29.4, +34.6].
-- This is a **metric divergence**, not a clean stability win. Under the pre-agreed rule (“低 LR 同时优于起点和控制组” on both the fixed endpoint and sampled average), this screen **does not justify extending to 120 updates**.
+- **Low LR did not improve greedy** (7086.5 vs control 7057.4: low is 29.1 s slower; only 2.8 s faster than start).
+- **Low LR did improve the sampled average**:
+  - start − low: **+102.9 s** [76.9, 129.4];
+  - control − low: **+105.7 s** [77.3, 133.7].
+- **Control’s greedy improved, but its sampled average did not**:
+  - start − control: **−2.8 s** [−34.6, 28.7].
+- This is a **metric divergence**, not a clean stability win. The sampled clue is positive and statistically supported on these ten fixed tasks, but it has not transferred to greedy deployment.
+- Under the strict dual-metric extension rule (low must beat both start and control on greedy **and** sampled average), the screen **does not justify extending to 120 updates**. It does justify a second-seed 60×2 replication.
 
 ## 1. Setup
 
@@ -48,19 +53,25 @@ Key: lower is better. Sampled differences are fixed-ten conditional (8 trajector
 
 ## 3. Sampled endpoints
 
-| endpoint | sampled mean (s) | fixed-ten 95% CI | vs start | vs control |
+| candidate | sampled mean (s) | fixed-ten 95% CI | start − candidate | control − candidate |
 |---|---:|---:|---:|---:|
 | start | 7287.5 | [7264.1, 7310.6] | — | — |
-| control 60 | 7290.3 | [7266.8, 7315.5] | +2.8 [−29.4, +34.6] | — |
-| low 60 | **7184.6** | [7164.5, 7204.3] | **−102.9 [−129.7, −77.3]** | **−105.7 [−134.3, −77.7]** |
+| control 60 | 7290.3 | [7266.8, 7315.5] | −2.8 [−34.6, 28.7] | — |
+| low 60 | **7184.6** | [7164.5, 7204.3] | **+102.9 [76.9, 129.4]** | **+105.7 [77.3, 133.7]** |
 
-- Low LR improves the sampled average on the same ten instances; the paired interval excludes zero.
-- Control does not improve the sampled average.
-- Greedy and sampling therefore point in **different directions**:
-  - control: better greedy, no sampled gain;
-  - low: better sampled average, no greedy gain.
+Positive is better. The intervals are **conditional on the fixed ten instances**: only
+the eight sampled trajectories per instance are resampled. Pairs use the same sampling
+seeds for each instance/replicate.
 
-This is exactly why the decision cannot be “low LR is stable” without qualification.
+- **start − low**: all **10/10** instances improve; top-3 account for 47.9% of the gain
+  (max single instance 175.3 s), so the clue is not one-task-only.
+- **control − low**: **7/10** instances improve, **3/10** are worse (−41.2, −31.6, −55.9 s);
+  top-3 account for 58.1% of the net gain. The average gain is supported but not uniform.
+- **start − control**: only 4/10 instances improve, 6/10 worse; CI includes zero.
+  Control has no sampled-average improvement to speak of.
+
+So the sampled clue for low LR is real on this panel, but it coexists with task-level losses
+and does not translate into greedy gains.
 
 ## 4. Did low LR merely freeze the model?
 
@@ -82,23 +93,38 @@ No. Actor parameter distance from the start (all actor tensors, L2):
 
 The low arm is close to a “small-update” regime (KL ≈ 0, clip ≈ 1.4%), but the sampled gain is not mirrored in greedy, so it cannot be called a stability fix.
 
+## 4.1 Greedy trajectory volatility (auxiliary only)
+
+| arm | final greedy (s) | range | std | max adjacent regression | max adjacent improvement | max above start | min below start | MAD from start |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| control | 7057.4 | 154.9 | 51.4 | +62.8 | −154.9 | +64.0 | −90.9 | 43.4 |
+| low | 7086.5 | 52.0 | 17.8 | +20.2 | −48.5 | +29.0 | −23.0 | 13.4 |
+
+- Low LR is smoother on these seven greedy points and ends near the start.
+- Control has larger swings but a better final greedy.
+- With one paired training and only seven nodes, this is **descriptive**, not a stability proof.
+- Low’s final KL is near zero; that does not by itself prove “no learning” or “learning completed”.
+
 ## 5. Decision under the pre-agreed rule
 
 The proposed extension criterion was: low LR improves **both** the fixed endpoint and the sampled average relative to start and control.
 
-Observed:
+Observed (positive = candidate faster):
 
-- low vs start: greedy +2.8 s, sampled **−102.9 s**;
-- low vs control: greedy **−29.1 s** (worse), sampled **−105.7 s** (better).
+- low vs start: greedy +2.8 s, sampled **+102.9 s**;
+- low vs control: greedy **−29.1 s** (worse), sampled **+105.7 s** (better).
 
 So the result is **mixed**:
 
-- **No extension to 120 updates** under the stated rule.
-- Do not call “stability solved”; the curves and metrics disagree.
-- Do not call “low LR useless” either: it produced a real sampled-average gain with a much smaller actor change, but not a greedy gain.
-- Do not call “control learned a better deployable policy” without qualification: control’s sampled average did not improve.
+- **No extension to 120 updates** under the strict dual-metric rule.
+- **Do not call low LR useless**: the sampled-average gain is supported by fixed-ten conditional intervals,
+  with only 1.71% actor change (not frozen).
+- **Do not call stability solved**: greedy did not improve and is 29.1 s slower than control.
+- **Do not call control a better deployable policy without qualification**: its sampled average did not improve.
+- The correct next step is a **second-seed 60×2 replication**, not a longer single-seed run.
 
-If the research question is **deployment/greedy performance**, control is better at this 60-update endpoint. If the question is **expected sampled cost**, low is better. They are different targets.
+If the research question is **deployment/greedy performance**, control is better at this 60-update endpoint.
+If the question is **expected sampled cost**, low is better. They are different targets.
 
 ## 6. Improvement space (limited statement)
 
@@ -123,6 +149,8 @@ The lost original 780 (6960.4 s greedy) remains a separate historical in-sample 
 ## 8. Files
 
 - [short_sampled_endpoints.json](fixed_instance_overfit/short_sampled_endpoints.json)
+- [short_paired_stats.json](fixed_instance_overfit/short_paired_stats.json)
+- [short_paired_per_instance.csv](fixed_instance_overfit/short_paired_per_instance.csv)
 - [short_control_curve.csv](fixed_instance_overfit/short_control_curve.csv)
 - [short_low_curve.csv](fixed_instance_overfit/short_low_curve.csv)
 - [short_lr_screen.png](fixed_instance_overfit/short_lr_screen.png)
