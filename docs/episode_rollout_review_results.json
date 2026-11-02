@@ -1,44 +1,148 @@
 {
-  "two_rank_collect_failure": [
-    {
-      "rank": 0,
-      "phase": "collect",
-      "raised": true,
-      "error": "RuntimeError('all-rank collect failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'collect\\', \\'error\\': \"RuntimeError(\\'injected collect failure\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 299, in train\\\\n    closure = self._collect_episodes()\\\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 40, in <lambda>\\\\n    trainer._collect_episodes=lambda: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected collect failure\\\\\\'))\\\\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 40, in <genexpr>\\\\n    trainer._collect_episodes=lambda: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected collect failure\\\\\\'))\\\\nRuntimeError: injected collect failure\\\\n\\'}]')",
-      "update_count": 0,
-      "log_exists": false,
-      "diag_exists": true
-    },
-    {
-      "rank": 1,
-      "phase": "collect",
-      "raised": true,
-      "error": "RuntimeError('all-rank collect failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'collect\\', \\'error\\': \"RuntimeError(\\'injected collect failure\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 299, in train\\\\n    closure = self._collect_episodes()\\\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 40, in <lambda>\\\\n    trainer._collect_episodes=lambda: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected collect failure\\\\\\'))\\\\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 40, in <genexpr>\\\\n    trainer._collect_episodes=lambda: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected collect failure\\\\\\'))\\\\nRuntimeError: injected collect failure\\\\n\\'}]')",
-      "update_count": 0,
-      "log_exists": false,
-      "diag_exists": true
-    }
-  ],
-  "two_rank_gate_failure": [
-    {
-      "rank": 0,
-      "phase": "gate",
-      "raised": true,
-      "error": "RuntimeError('all-rank gate_construct failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'gate_construct\\', \\'error\\': \"RuntimeError(\\'injected gate failure\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 331, in train\\\\n    local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {\\\\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 42, in <lambda>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected gate failure\\\\\\'))\\\\n                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 42, in <genexpr>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected gate failure\\\\\\'))\\\\nRuntimeError: injected gate failure\\\\n\\'}]')",
-      "update_count": 0,
-      "log_exists": false,
-      "diag_exists": true
-    },
-    {
-      "rank": 1,
-      "phase": "gate",
-      "raised": true,
-      "error": "RuntimeError('all-rank gate_construct failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'gate_construct\\', \\'error\\': \"RuntimeError(\\'injected gate failure\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 331, in train\\\\n    local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {\\\\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 42, in <lambda>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected gate failure\\\\\\'))\\\\n                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 42, in <genexpr>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected gate failure\\\\\\'))\\\\nRuntimeError: injected gate failure\\\\n\\'}]')",
-      "update_count": 0,
-      "log_exists": false,
-      "diag_exists": true
-    }
-  ],
+  "real_ddp_failure_gloo": {
+    "collect": [
+      {
+        "rank": 0,
+        "backend": "gloo",
+        "phase": "collect",
+        "raised": true,
+        "error": "RuntimeError('all-rank collect failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'collect\\', \\'error\\': \"RuntimeError(\\'injected sampling failure after first DDP forward\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 299, in train\\\\n    closure = self._collect_episodes()\\\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 222, in _collect_episodes\\\\n    output, action, log_prob, value = self._sample_action(state)\\\\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 51, in injected_sample\\\\n    raise RuntimeError(\\\\\\'injected sampling failure after first DDP forward\\\\\\')\\\\nRuntimeError: injected sampling failure after first DDP forward\\\\n\\'}]')",
+        "update_count": 0,
+        "sample_calls": 18,
+        "log_exists": false,
+        "diag_exists": true
+      },
+      {
+        "rank": 1,
+        "backend": "gloo",
+        "phase": "collect",
+        "raised": true,
+        "error": "RuntimeError('all-rank collect failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'collect\\', \\'error\\': \"RuntimeError(\\'injected sampling failure after first DDP forward\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 299, in train\\\\n    closure = self._collect_episodes()\\\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 222, in _collect_episodes\\\\n    output, action, log_prob, value = self._sample_action(state)\\\\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 51, in injected_sample\\\\n    raise RuntimeError(\\\\\\'injected sampling failure after first DDP forward\\\\\\')\\\\nRuntimeError: injected sampling failure after first DDP forward\\\\n\\'}]')",
+        "update_count": 0,
+        "sample_calls": 2,
+        "log_exists": false,
+        "diag_exists": true
+      }
+    ],
+    "gate": [
+      {
+        "rank": 0,
+        "backend": "gloo",
+        "phase": "gate",
+        "raised": true,
+        "error": "RuntimeError('all-rank gate_construct failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'gate_construct\\', \\'error\\': \"RuntimeError(\\'injected gate-construction failure after DDP sampling\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 331, in train\\\\n    local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {\\\\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <lambda>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\n                                                ^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <genexpr>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\nRuntimeError: injected gate-construction failure after DDP sampling\\\\n\\'}]')",
+        "update_count": 0,
+        "sample_calls": 18,
+        "log_exists": false,
+        "diag_exists": true
+      },
+      {
+        "rank": 1,
+        "backend": "gloo",
+        "phase": "gate",
+        "raised": true,
+        "error": "RuntimeError('all-rank gate_construct failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'gate_construct\\', \\'error\\': \"RuntimeError(\\'injected gate-construction failure after DDP sampling\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 331, in train\\\\n    local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {\\\\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <lambda>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\n                                                ^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <genexpr>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\nRuntimeError: injected gate-construction failure after DDP sampling\\\\n\\'}]')",
+        "update_count": 0,
+        "sample_calls": 18,
+        "log_exists": false,
+        "diag_exists": true
+      }
+    ]
+  },
+  "real_ddp_failure_nccl_4gpu": {
+    "collect": [
+      {
+        "rank": 0,
+        "backend": "nccl",
+        "phase": "collect",
+        "raised": true,
+        "error": "RuntimeError('all-rank collect failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'collect\\', \\'error\\': \"RuntimeError(\\'injected sampling failure after first DDP forward\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 299, in train\\\\n    closure = self._collect_episodes()\\\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 222, in _collect_episodes\\\\n    output, action, log_prob, value = self._sample_action(state)\\\\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 51, in injected_sample\\\\n    raise RuntimeError(\\\\\\'injected sampling failure after first DDP forward\\\\\\')\\\\nRuntimeError: injected sampling failure after first DDP forward\\\\n\\'}, None, None]')",
+        "update_count": 0,
+        "sample_calls": 19,
+        "log_exists": false,
+        "diag_exists": true
+      },
+      {
+        "rank": 1,
+        "backend": "nccl",
+        "phase": "collect",
+        "raised": true,
+        "error": "RuntimeError('all-rank collect failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'collect\\', \\'error\\': \"RuntimeError(\\'injected sampling failure after first DDP forward\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 299, in train\\\\n    closure = self._collect_episodes()\\\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 222, in _collect_episodes\\\\n    output, action, log_prob, value = self._sample_action(state)\\\\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 51, in injected_sample\\\\n    raise RuntimeError(\\\\\\'injected sampling failure after first DDP forward\\\\\\')\\\\nRuntimeError: injected sampling failure after first DDP forward\\\\n\\'}, None, None]')",
+        "update_count": 0,
+        "sample_calls": 2,
+        "log_exists": false,
+        "diag_exists": true
+      },
+      {
+        "rank": 2,
+        "backend": "nccl",
+        "phase": "collect",
+        "raised": true,
+        "error": "RuntimeError('all-rank collect failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'collect\\', \\'error\\': \"RuntimeError(\\'injected sampling failure after first DDP forward\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 299, in train\\\\n    closure = self._collect_episodes()\\\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 222, in _collect_episodes\\\\n    output, action, log_prob, value = self._sample_action(state)\\\\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 51, in injected_sample\\\\n    raise RuntimeError(\\\\\\'injected sampling failure after first DDP forward\\\\\\')\\\\nRuntimeError: injected sampling failure after first DDP forward\\\\n\\'}, None, None]')",
+        "update_count": 0,
+        "sample_calls": 18,
+        "log_exists": false,
+        "diag_exists": true
+      },
+      {
+        "rank": 3,
+        "backend": "nccl",
+        "phase": "collect",
+        "raised": true,
+        "error": "RuntimeError('all-rank collect failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'collect\\', \\'error\\': \"RuntimeError(\\'injected sampling failure after first DDP forward\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 299, in train\\\\n    closure = self._collect_episodes()\\\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 222, in _collect_episodes\\\\n    output, action, log_prob, value = self._sample_action(state)\\\\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 51, in injected_sample\\\\n    raise RuntimeError(\\\\\\'injected sampling failure after first DDP forward\\\\\\')\\\\nRuntimeError: injected sampling failure after first DDP forward\\\\n\\'}, None, None]')",
+        "update_count": 0,
+        "sample_calls": 18,
+        "log_exists": false,
+        "diag_exists": true
+      }
+    ],
+    "gate": [
+      {
+        "rank": 0,
+        "backend": "nccl",
+        "phase": "gate",
+        "raised": true,
+        "error": "RuntimeError('all-rank gate_construct failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'gate_construct\\', \\'error\\': \"RuntimeError(\\'injected gate-construction failure after DDP sampling\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 331, in train\\\\n    local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {\\\\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <lambda>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\n                                                ^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <genexpr>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\nRuntimeError: injected gate-construction failure after DDP sampling\\\\n\\'}, None, None]')",
+        "update_count": 0,
+        "sample_calls": 19,
+        "log_exists": false,
+        "diag_exists": true
+      },
+      {
+        "rank": 1,
+        "backend": "nccl",
+        "phase": "gate",
+        "raised": true,
+        "error": "RuntimeError('all-rank gate_construct failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'gate_construct\\', \\'error\\': \"RuntimeError(\\'injected gate-construction failure after DDP sampling\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 331, in train\\\\n    local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {\\\\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <lambda>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\n                                                ^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <genexpr>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\nRuntimeError: injected gate-construction failure after DDP sampling\\\\n\\'}, None, None]')",
+        "update_count": 0,
+        "sample_calls": 19,
+        "log_exists": false,
+        "diag_exists": true
+      },
+      {
+        "rank": 2,
+        "backend": "nccl",
+        "phase": "gate",
+        "raised": true,
+        "error": "RuntimeError('all-rank gate_construct failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'gate_construct\\', \\'error\\': \"RuntimeError(\\'injected gate-construction failure after DDP sampling\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 331, in train\\\\n    local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {\\\\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <lambda>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\n                                                ^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <genexpr>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\nRuntimeError: injected gate-construction failure after DDP sampling\\\\n\\'}, None, None]')",
+        "update_count": 0,
+        "sample_calls": 18,
+        "log_exists": false,
+        "diag_exists": true
+      },
+      {
+        "rank": 3,
+        "backend": "nccl",
+        "phase": "gate",
+        "raised": true,
+        "error": "RuntimeError('all-rank gate_construct failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'gate_construct\\', \\'error\\': \"RuntimeError(\\'injected gate-construction failure after DDP sampling\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 331, in train\\\\n    local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {\\\\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <lambda>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\n                                                ^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_ddp.py\", line 55, in <genexpr>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(\\\\nRuntimeError: injected gate-construction failure after DDP sampling\\\\n\\'}, None, None]')",
+        "update_count": 0,
+        "sample_calls": 18,
+        "log_exists": false,
+        "diag_exists": true
+      }
+    ]
+  },
   "two_rank_gradient": {
     "update_steps": 2,
     "ratio_std": 0.0,
@@ -97,6 +201,15 @@
     "pass": 302,
     "fail": 2,
     "skipped": 3,
-    "failures_pre_existing_at": "911da56"
+    "failures_pre_existing_at": "911da56",
+    "known_failures": [
+      "test_nearest_neighbor_episode...test_5_10_20_fields_x_10_episodes",
+      "test_uav...test_depot_and_manual_path_execution"
+    ]
+  },
+  "unit_tests": {
+    "file": "test_episode_rollout.py",
+    "tests": 12,
+    "pass": 12
   }
 }
