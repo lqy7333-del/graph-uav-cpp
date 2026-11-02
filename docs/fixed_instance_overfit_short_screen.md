@@ -146,6 +146,12 @@ The lost original 780 (6960.4 s greedy) remains a separate historical in-sample 
   - control: `998acaa57e5141ad…`
   - low: `146ef0ec3ef567ea…`
 
+## 7.1 Seed 43 replication
+
+A second 60×2 run from the same start/bank is reported separately:
+[fixed_instance_overfit_short_screen_seed43.md](fixed_instance_overfit_short_screen_seed43.md).
+Do not pool the two seeds.
+
 ## 8. Files
 
 - [short_sampled_endpoints.json](fixed_instance_overfit/short_sampled_endpoints.json)
