@@ -498,7 +498,8 @@ class DistributedTrainer:
         temporary.replace(path)
         print(f"[rank 0] wrote run summary -> {path}", flush=True)
 
-    def train(self, num_updates: int, rollout_steps: int, *, start_update: int = 1) -> None:
+    def train(self, num_updates: int, rollout_steps: int, *, start_update: int = 1,
+              stop_at: int | None = None) -> None:
         """Run ``num_updates`` synchronized updates of ``rollout_steps`` steps each.
 
         ``start_update`` lets a resumed run continue at the next update index
@@ -513,7 +514,8 @@ class DistributedTrainer:
         self.run_metadata.update(num_updates=num_updates, rollout_steps=rollout_steps,
                                  world_size=self.world_size)
 
-        for update_idx in range(max(1, start_update), num_updates + 1):
+        last_update = num_updates if stop_at is None else min(num_updates, stop_at)
+        for update_idx in range(max(1, start_update), last_update + 1):
             update_started = time.perf_counter()
             # Sampling is stochastic and must not feed the autograd graph.
             self.agent.actor.eval()

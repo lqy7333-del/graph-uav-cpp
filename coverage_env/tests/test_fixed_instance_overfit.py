@@ -149,6 +149,40 @@ class FixedInstanceTests(unittest.TestCase):
         self.assertFalse(zero["actor_optimizer"]["state"])
         self.assertEqual(zero["resolved_config"]["rl"], original["resolved_config"]["rl"])
 
+    def test_branch_changes_only_actor_lr_and_stop_at_is_bounded(self):
+        # Tiny CPU run: create a source checkpoint at update 1, branch with a
+        # lower actor LR, and separately verify --stop-at leaves no later file.
+        source = self.root / "source"
+        source.mkdir()
+        base = SimpleNamespace(bank=str(self.bank), output=str(source), seed=42,
+                               num_updates=2, rollout_steps=2, eval_every=1,
+                               resume=None, device="cpu", branch_from=None,
+                               actor_lr=None, branch_label=None, stop_at=None)
+        _worker(0, 1, base)
+        branch = self.root / "branch"
+        branch.mkdir()
+        branched = SimpleNamespace(bank=str(self.bank), output=str(branch), seed=42,
+                                   num_updates=2, rollout_steps=2, eval_every=1,
+                                   resume=None, device="cpu",
+                                   branch_from=str(source / "ckpt_update_1.pt"),
+                                   actor_lr=1e-4, branch_label="unit",
+                                   stop_at=None)
+        _worker(0, 1, branched)
+        checkpoint = torch.load(branch / "ckpt_update_2.pt", weights_only=False)
+        self.assertEqual(checkpoint["update_count"], 2)
+        self.assertEqual(checkpoint["actor_optimizer"]["param_groups"][0]["lr"], 1e-4)
+        self.assertEqual(checkpoint["training_metadata"]["branch_actor_lr"], 1e-4)
+        self.assertEqual(checkpoint["training_metadata"]["branch_source_update"], 1)
+        stopped = self.root / "stopped"
+        stopped.mkdir()
+        bounded = SimpleNamespace(bank=str(self.bank), output=str(stopped), seed=42,
+                                  num_updates=2, rollout_steps=2, eval_every=1,
+                                  resume=None, device="cpu", branch_from=None,
+                                  actor_lr=None, branch_label=None, stop_at=1)
+        _worker(0, 1, bounded)
+        self.assertTrue((stopped / "ckpt_update_1.pt").exists())
+        self.assertFalse((stopped / "ckpt_update_2.pt").exists())
+
     def test_checkpoint_rejects_modified_manifest(self):
         restored = deepcopy(FixedInstancePool(self.bank))
         path = self.bank / "manifest.json"

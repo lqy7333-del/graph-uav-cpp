@@ -10,6 +10,7 @@ import argparse
 from copy import deepcopy
 import csv
 import datetime
+import shutil
 import json
 import math
 import os
@@ -243,8 +244,39 @@ def _worker(rank, world_size, args):
         agent = PPOAgent(CoveragePolicy(environment, config=config), config, device=device)
         start = 1
         runtime = None
+        saved = None
+        branch_mode = bool(getattr(args, "branch_from", None))
         initialization = manifest.get("initialization")
-        if args.resume:
+        if branch_mode:
+            saved = torch.load(args.branch_from, map_location="cpu", weights_only=False)
+            metadata = saved.get("training_metadata", {})
+            if metadata.get("bank_manifest_sha") != environment.manifest_sha:
+                raise ValueError("Branch checkpoint must use the same fixed instance bank.")
+            for key, expected in (("num_updates", args.num_updates),
+                                  ("rollout_steps", args.rollout_steps),
+                                  ("seed", args.seed),
+                                  ("world_size", world_size)):
+                if metadata.get(key) != expected:
+                    raise ValueError(f"Branch checkpoint {key}={metadata.get(key)} != {expected}")
+            config = deepcopy(saved["resolved_config"])
+            config["ppo"]["actor_learning_rate"] = float(args.actor_lr)
+            if float(config["ppo"].get("learning_rate", args.actor_lr)) == float(args.actor_lr):
+                pass
+            start = agent.load_checkpoint(args.branch_from, restore_rng=False,
+                                          load_optimizers=True) + 1
+            runtime = saved["rank_runtime"][rank]
+            environment = runtime["environment"]
+            environment.directory = str(Path(args.bank).resolve())
+            # Preserve critic LR and all optimizer moments; change only actor LR.
+            agent.actor_lr_start = float(args.actor_lr)
+            for group in agent.actor_optimizer.param_groups:
+                group["lr"] = float(args.actor_lr)
+            if rank == 0:
+                source_references = Path(args.branch_from).resolve().parent / "references.json"
+                if not source_references.exists():
+                    raise ValueError("Branch source has no references.json")
+                shutil.copy(source_references, Path(args.output) / "references.json")
+        elif args.resume:
             saved = torch.load(args.resume, map_location="cpu", weights_only=False)
             validate_exact_resume(saved, config, args, world_size)
             if saved["training_metadata"].get("bank_manifest_sha") != environment.manifest_sha:
@@ -271,10 +303,23 @@ def _worker(rank, world_size, args):
                                 "initial_actor_sha256": initial_hash,
                                 "initialization": initialization,
                                 "purpose": "training_set_overfit_not_generalization"}
+        if branch_mode:
+            trainer.run_metadata.update({
+                "branch_from": str(Path(args.branch_from).resolve()),
+                "branch_actor_lr": float(getattr(args, "actor_lr")),
+                "branch_label": getattr(args, "branch_label", None),
+                "branch_source_update": int(saved.get("update_count", 0)),
+                "branch_source_actor_sha256": parameter_sha256(agent.actor),
+                "purpose": "paired_branch_actor_lr_experiment_not_exact_resume",
+            })
         if runtime:
-            trainer.run_metadata = deepcopy(saved["training_metadata"])
-            trainer._rank_stats = deepcopy(runtime["rank_stats"])
-            trainer._count_emas = deepcopy(runtime["count_emas"])
+            if branch_mode:
+                trainer._rank_stats = deepcopy(runtime["rank_stats"])
+                trainer._count_emas = deepcopy(runtime["count_emas"])
+            else:
+                trainer.run_metadata = deepcopy(saved["training_metadata"])
+                trainer._rank_stats = deepcopy(runtime["rank_stats"])
+                trainer._count_emas = deepcopy(runtime["count_emas"])
             restore_rng_state(runtime["rng"])
         else:
             random.seed(args.seed + rank)
@@ -283,13 +328,16 @@ def _worker(rank, world_size, args):
         if rank == 0:
             _write_json(Path(args.output) / f"resolved_config_update_{start}.json",
                         {"resolved_config": config, "training_metadata": trainer.run_metadata,
-                         "optimizer": "exact_resume" if runtime else "fresh_finetune_schedule"})
+                         "optimizer": ("branch_preserve_optimizer_state" if branch_mode
+                                        else "exact_resume" if runtime
+                                        else "fresh_finetune_schedule")})
         if start == 1:
             trainer._save_checkpoint(0)
         else:
             # Recovers an evaluation interrupted after an atomic checkpoint save.
             trainer.evaluate_bank(start - 1)
-        trainer.train(args.num_updates, args.rollout_steps, start_update=start)
+        trainer.train(args.num_updates, args.rollout_steps, start_update=start,
+                      stop_at=getattr(args, "stop_at", None))
     finally:
         if distributed and dist.is_initialized():
             dist.destroy_process_group()
@@ -348,6 +396,13 @@ def main():
     p.add_argument("--eval-every", type=int, default=20)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--resume", help="Exact resume of this diagnostic, not its initial pretrained model.")
+    p.add_argument("--branch-from", help="Checkpoint to branch from, preserving optimizer/RNG/environment.")
+    p.add_argument("--actor-lr", type=float, default=None,
+                   help="With --branch-from: set only the actor optimizer/LR start.")
+    p.add_argument("--branch-label", default=None,
+                   help="Optional label recorded in branch metadata.")
+    p.add_argument("--stop-at", type=int, default=None,
+                   help="Run only through this update while keeping num-updates as the target schedule.")
     p.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     p = sub.add_parser("plot")
     p.add_argument("--output", required=True)
@@ -360,12 +415,26 @@ def main():
         return
     if min(args.num_updates, args.rollout_steps, args.eval_every) < 1:
         parser.error("Update, rollout and evaluation counts must be positive.")
+    if args.stop_at is not None and not (1 <= args.stop_at <= args.num_updates):
+        parser.error("--stop-at must be in [1, num-updates].")
+    if args.resume and args.branch_from:
+        parser.error("--resume and --branch-from are different continuation modes.")
+    if args.branch_from and (args.actor_lr is None or args.actor_lr <= 0):
+        parser.error("--branch-from requires a positive --actor-lr.")
+    if args.branch_from:
+        if Path(args.branch_from).resolve().parent == Path(args.output).resolve():
+            parser.error("A branch must use a new output directory, not the source run.")
+    elif args.actor_lr is not None:
+        parser.error("--actor-lr is only valid with --branch-from.")
     output = Path(args.output).resolve()
     if args.resume:
         if Path(args.resume).resolve().parent != output or not (output / "references.json").exists():
             parser.error("Exact resume requires the original run directory and update-0 references.")
+    elif args.branch_from:
+        if output.exists() and any(output.iterdir()):
+            parser.error("A branch requires an empty output directory.")
     elif output.exists() and any(output.iterdir()):
-        parser.error("New training requires an empty output directory; use --resume for continuation.")
+        parser.error("New training requires an empty output directory; use --resume or --branch-from.")
     output.mkdir(parents=True, exist_ok=True)
     args.output = str(output)
     world_size = torch.cuda.device_count() if args.device == "cuda" else 1
