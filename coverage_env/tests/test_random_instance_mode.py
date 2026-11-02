@@ -90,6 +90,20 @@ class RandomInstanceModeTests(unittest.TestCase):
         self.assertTrue(torch.equal(torch.random.get_rng_state(),torch_state))
         self.assertTrue((out/'diagnostic/evaluation/update_0.json').exists())
 
+    def test_checkpoint_frequency_is_separate_from_evaluation_frequency(self):
+        env0=load_bank(self.bank)[1][0]
+        agent=PPOAgent(CoveragePolicy(env0,config=self.config),self.config,device='cpu')
+        trainer=RandomInstanceEpisodeTrainer(
+            env0,agent,rank=0,world_size=1,checkpoint_dir=None,
+            config=self.config,diagnostic_bank=self.bank,validation_bank=self.bank,
+            instance_seed_base=900_000_000,num_fields=10,
+            episodes_per_rank=1,max_episode_steps=100,eval_every=20)
+        trainer.run_metadata['num_updates']=1200
+        self.assertTrue(trainer._should_evaluate(0))
+        self.assertFalse(trainer._should_evaluate(10))
+        self.assertTrue(trainer._should_evaluate(20))
+        self.assertTrue(trainer._should_evaluate(1200))
+
     def test_episode_records_are_rank_local_and_10_fields(self):
         env0=load_bank(self.bank)[1][0]
         agent=PPOAgent(CoveragePolicy(env0,config=self.config),self.config,device='cpu')

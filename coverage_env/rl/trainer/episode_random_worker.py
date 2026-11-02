@@ -17,9 +17,9 @@ from coverage_env.rl.checkpoint import parameter_sha256, restore_rng_state
 
 
 # None distinguishes omitted options from explicit resume overrides.
-_RUN_DEFAULTS = dict(num_updates=600, episodes_per_rank=4, max_episode_steps=500,
+_RUN_DEFAULTS = dict(num_updates=1200, episodes_per_rank=4, max_episode_steps=500,
                      seed=42, instance_seed_base=900_000_000, num_fields=10,
-                     actor_lr=1e-4, critic_lr=3e-3)
+                     actor_lr=1e-4, critic_lr=3e-3, eval_every=20)
 
 
 def resolve_run_arguments(args, saved=None):
@@ -116,6 +116,7 @@ def _worker(rank, world, args):
             if int(meta.get('world_size',-1))!=world: raise ValueError('world_size changed')
             if int(meta.get('episodes_per_rank',-1))!=int(args.episodes_per_rank): raise ValueError('episodes/rank changed')
             if int(meta.get('max_episode_steps',-1))!=int(args.max_episode_steps): raise ValueError('max steps changed')
+            if int(meta.get('eval_every',-1))!=int(args.eval_every): raise ValueError('eval_every changed')
             if int(meta.get('instance_seed_base',-1))!=int(args.instance_seed_base): raise ValueError('instance seed base changed')
             if meta.get('diagnostic_bank_sha')!=file_sha256(Path(args.diagnostic_bank)/'manifest.json'): raise ValueError('diagnostic bank changed')
             if meta.get('validation_bank_sha')!=file_sha256(Path(args.validation_bank)/'manifest.json'): raise ValueError('validation bank changed')
@@ -151,7 +152,8 @@ def _worker(rank, world, args):
             checkpoint_every=args.checkpoint_every,config=config,
             diagnostic_bank=args.diagnostic_bank,validation_bank=args.validation_bank,
             instance_seed_base=args.instance_seed_base,num_fields=10,
-            episodes_per_rank=args.episodes_per_rank,max_episode_steps=args.max_episode_steps)
+            episodes_per_rank=args.episodes_per_rank,max_episode_steps=args.max_episode_steps,
+            eval_every=args.eval_every)
         if stream_state:
             trainer.stream.restore(stream_state)
             trainer._episode_seq=int(saved['rank_runtime'][rank].get('episode_seq',stream_state['counter']))
@@ -162,6 +164,7 @@ def _worker(rank, world, args):
             'collection_mode':'complete_episodes','instance_mode':'random_instances',
             'num_fields':10,'episodes_per_rank':args.episodes_per_rank,
             'max_episode_steps':args.max_episode_steps,'instance_seed_base':args.instance_seed_base,
+            'eval_every':args.eval_every,
             'generator_config_sha':trainer.generator_config_sha,
             'diagnostic_bank_sha':file_sha256(Path(args.diagnostic_bank)/'manifest.json'),
             'validation_bank_sha':file_sha256(Path(args.validation_bank)/'manifest.json'),
@@ -196,7 +199,9 @@ def main():
     p.add_argument('--max-episode-steps',type=int,default=None); p.add_argument('--seed',type=int,default=None)
     p.add_argument('--instance-seed-base',type=int,default=None); p.add_argument('--num-fields',type=int,default=None)
     p.add_argument('--actor-lr',type=float,default=None); p.add_argument('--critic-lr',type=float,default=None)
-    p.add_argument('--checkpoint-every',type=int,default=10); p.add_argument('--device',choices=('cuda','cpu'),default='cuda')
+    p.add_argument('--checkpoint-every',type=int,default=10)
+    p.add_argument('--eval-every',type=int,default=20)
+    p.add_argument('--device',choices=('cuda','cpu'),default='cuda')
     args=p.parse_args()
     ck = torch.load(args.resume, map_location='cpu', weights_only=False) if args.resume else None
     resolve_run_arguments(args, ck)

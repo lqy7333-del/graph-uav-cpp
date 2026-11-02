@@ -1,6 +1,6 @@
 # Random-instance fixed-10-field complete-episode PPO protocol
 
-**Status: implemented and tested; formal 600-update training NOT started.**
+**Status: implemented and tested; formal 1,200-update training NOT started.**
 
 - Branch: `codex/episode-rollout-10fields`
 - Review baseline: `e0a41fc`
@@ -58,7 +58,7 @@ maneuver proxy are unchanged.
 | collection mode | `complete_episodes` |
 | episodes/rank | 4 |
 | world size | 4 |
-| updates | **600** = 9,600 training episodes |
+| updates | **1,200** = 19,200 training episodes |
 | safety cap | 500 steps/episode |
 | actor LR | **1e-4** |
 | critic LR | **0.003** |
@@ -70,7 +70,8 @@ maneuver proxy are unchanged.
 | randomize_uav | false |
 | reward | time; existing maneuver proxy |
 | optimizer weighting | transition-weighted PPO, not per-trajectory |
-| eval | update 0 and every 10 updates, two fixed 10-field panels |
+| checkpoint | update 0, every 10 updates, and final |
+| eval | update 0 and every **20** updates, two fixed 10-field panels |
 | training seed | 42 |
 
 Resolved config and actual checkpoint metadata:
@@ -118,7 +119,8 @@ supported.
 - `valid30` → **fixed validation panel** (10 fields, seeds 82000–82029).
 - Both are fixed, already used during development/review, and are **not
   sealed test** data.
-- At update 0 and every 10 updates, greedy evaluation covers both panels.
+- At update 0 and every **20** updates, greedy evaluation covers both panels;
+  checkpoints are still saved every 10 updates. Update 0 is evaluated.
 - Each instance row includes cost, completion, actions and per-step summaries;
   independent replay must match completion state, termination reason and cost.
 - Real failures are retained and completion rate is explicit. Means are shown
@@ -128,6 +130,8 @@ supported.
   remain.
 - Diagnostic curve and validation curve are separate:
   `diagnostic/diagnostic_curve.csv`, `validation/validation_curve.csv`.
+- 1,200 updates produce 61 full-panel evaluation points (0,20,…,1200), the
+  same number as the earlier 600-update/every-10 plan.
 - Training random-instance sample statistics are separate:
   `train_log.csv` and `train_episodes_rank_*.csv`; they are never mixed with
   fixed-panel greedy curves.
@@ -145,10 +149,10 @@ PYTHONPATH=. /home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/bin/python \
   --diagnostic-bank /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/train10 \
   --validation-bank /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/valid30 \
   --output /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_instances_s42 \
-  --num-updates 600 --episodes-per-rank 4 --seed 42 \
+  --num-updates 1200 --episodes-per-rank 4 --seed 42 \
   --instance-seed-base 900000000 \
   --actor-lr 1e-4 --critic-lr 3e-3 \
-  --device cuda --checkpoint-every 10
+  --device cuda --checkpoint-every 10 --eval-every 20
 ```
 
 No `--initial-checkpoint` is supplied.
@@ -174,13 +178,18 @@ panels, 4 episodes/rank:
 - 48 episodes / 954 transitions / 24 synchronized optimizer steps;
 - 12 distinct seeds and 12 distinct fingerprints per rank; all exactly 10 fields.
 
-Training-only extrapolation for 600: **≈4.7 h**. Evaluation scales to 40 panel
-instances and 61 points; using the smoke eval share gives **≈2.5–3 h**. Budget
-**≈7–8 h** before the formal run; this is not a measured 600-update time.
+Training-only extrapolation for 1,200: **≈9.3 h**. Evaluation remains at 61
+panel points (0,20,…,1200) and 40 panel instances; using the smoke eval share
+gives **≈2.5–3 h**. Budget **≈12–13 h** before the formal run; this is not a
+measured 1,200-update time.
+
+The entropy annealing is tied to the total 1,200-update budget and must be
+frozen before launch. It is not the old 600-update schedule stretched after the
+fact; 600 is the mid-run inspection point, not a separate schedule boundary.
 
 ## 9. Tests
 
-New random-instance tests: 5/5 pass. Full suite: **309 tests, 307 pass,
+New random-instance tests: 6/6 pass. Full suite: **310 tests, 308 pass,
 2 pre-existing failures, 3 skipped**. The two failures reproduce at baseline
 `911da56`.
 
@@ -190,7 +199,7 @@ Evidence:
 - [`episode_rollout_random_resume.json`](episode_rollout_random_resume.json)
 - [`episode_rollout_review_results.json`](episode_rollout_review_results.json)
 
-**No formal 600-update run was started.**
+**No formal 1,200-update run was started.**
 
 ## 10. Pre-launch review fixes (2026-11-02)
 

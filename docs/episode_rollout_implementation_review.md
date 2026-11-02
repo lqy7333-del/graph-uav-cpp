@@ -204,12 +204,13 @@ resume passes.
 - fixed panel evaluation does not advance the stream or training RNG;
 - rank-local episode records preserve 10-field identity.
 
-Full suite is **309 tests, 307 pass, 2 failures, 3 skipped**; the two failures
-reproduce at baseline `911da56`.
+Full suite is **310 tests, 308 pass, 2 failures, 3 skipped**; the two failures
+reproduce at baseline `911da56`. The new eval-frequency test checks update 0
+and 20-update evaluation with 10-update checkpoints.
 
 ### Not run
 
-- Formal 600-update random-instance training.
+- Formal 1,200-update random-instance training.
 - Final/sealed test set.
 - Mid-episode resume.
 - Complete `RUN_DDP_TESTS=1` suite; targeted real-DDP Gloo and 4-GPU NCCL

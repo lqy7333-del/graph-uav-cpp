@@ -67,7 +67,8 @@ class RandomInstanceEpisodeTrainer(EpisodeRolloutTrainer):
                  checkpoint_dir=None, checkpoint_every=10, config=None,
                  diagnostic_bank=None, validation_bank=None,
                  instance_seed_base=900_000_000, num_fields=10,
-                 episodes_per_rank=4, max_episode_steps=500):
+                 episodes_per_rank=4, max_episode_steps=500,
+                 eval_every=20):
         super().__init__(environment, agent, rank=rank, world_size=world_size,
                          checkpoint_dir=checkpoint_dir, checkpoint_every=checkpoint_every,
                          config=config, validation_bank=validation_bank,
@@ -76,6 +77,9 @@ class RandomInstanceEpisodeTrainer(EpisodeRolloutTrainer):
         self.diagnostic_bank = str(Path(diagnostic_bank).resolve()) if diagnostic_bank else None
         self.validation_bank = str(Path(validation_bank).resolve()) if validation_bank else None
         self.num_fields = int(num_fields)
+        self.eval_every = int(eval_every)
+        if self.eval_every < 1:
+            raise ValueError("eval_every must be positive")
         self.generator = InstanceGenerator(config)
         self.generator_config = copy.deepcopy(config)
         self.generator_config_sha = hashlib.sha256(
@@ -205,15 +209,21 @@ class RandomInstanceEpisodeTrainer(EpisodeRolloutTrainer):
                 "episode_seq": self._episode_seq,
                 "current_update": self._current_update}
 
+    def _should_evaluate(self, update_idx):
+        final = int(self.run_metadata.get("num_updates", -1))
+        return (int(update_idx) == 0 or int(update_idx) % self.eval_every == 0
+                or int(update_idx) == final)
+
     def _save_checkpoint(self, update_idx):
         self._write_episode_records()
         # Base save includes instance_stream via extra_rank_runtime.
-        # Evaluate both panels without using the inherited fixed-bank path.
+        # Checkpoints can be more frequent than full panel evaluations.
         from coverage_env.rl.trainer.distributed import DistributedTrainer
         DistributedTrainer._save_checkpoint(self, update_idx)
-        self._evaluate_panel(self.diagnostic_bank, "diagnostic", update_idx)
-        if self.validation_bank:
-            self._evaluate_panel(self.validation_bank, "validation", update_idx)
+        if self._should_evaluate(update_idx):
+            self._evaluate_panel(self.diagnostic_bank, "diagnostic", update_idx)
+            if self.validation_bank:
+                self._evaluate_panel(self.validation_bank, "validation", update_idx)
 
     def _evaluate_panel(self, bank, name, update_idx):
         if not bank:
@@ -294,6 +304,7 @@ class RandomInstanceEpisodeTrainer(EpisodeRolloutTrainer):
             "generator_config_sha": self.generator_config_sha,
             "diagnostic_bank": self.diagnostic_bank,
             "validation_bank": self.validation_bank,
+            "eval_every": self.eval_every,
         })
         super().train(num_updates, rollout_steps, start_update=start_update, stop_at=stop_at)
         self._write_episode_records()

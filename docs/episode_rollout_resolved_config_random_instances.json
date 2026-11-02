@@ -2,7 +2,7 @@
   "baseline_sha": "e0a41fc",
   "branch": "codex/episode-rollout-10fields",
   "mode": "random_instances_fixed_10_fields",
-  "num_updates": 600,
+  "num_updates": 1200,
   "seed": 42,
   "episodes_per_rank": 4,
   "instance_seed_base": 900000000,
@@ -211,5 +211,7 @@
     "diagnostic": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/train10",
     "validation": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/valid30"
   },
-  "note": "Each training episode is newly generated; fixed panels are evaluation only."
+  "note": "Each training episode is newly generated; fixed panels are evaluation only.",
+  "eval_every": 20,
+  "checkpoint_every": 10
 }
