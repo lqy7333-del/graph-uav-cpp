@@ -1,0 +1,149 @@
+{
+  "rows": [
+    {
+      "index": 0,
+      "seed": 70000,
+      "nn": 7356.787924834838,
+      "initial": 7244.230289344086,
+      "current": 7149.92012159996,
+      "search": 7149.92012159996,
+      "improvement": 0.0,
+      "search_completed": true,
+      "coverage": 1.0,
+      "actions": 38,
+      "fingerprint": "8dbac3f5760b80626ed7d6f47f33dd2b584d4cb8a933fe70fab63ddef0fdc57e"
+    },
+    {
+      "index": 1,
+      "seed": 70001,
+      "nn": 6132.494204168019,
+      "initial": 6178.578846069726,
+      "current": 6155.40133599499,
+      "search": 6024.142117110054,
+      "improvement": 131.25921888493667,
+      "search_completed": true,
+      "coverage": 0.9970475538461188,
+      "actions": 40,
+      "fingerprint": "7d307796e549c8a9750b1eca990171843246f1b7e033c70cb2ec2d2db6076555"
+    },
+    {
+      "index": 2,
+      "seed": 70002,
+      "nn": 6084.801696936248,
+      "initial": 6389.232116584429,
+      "current": 6098.3235998450555,
+      "search": 6071.054249952744,
+      "improvement": 27.269349892311766,
+      "search_completed": true,
+      "coverage": 1.0,
+      "actions": 37,
+      "fingerprint": "a3238c530b891510f59142b3534a287a91af294256ba2bb2c9063f4f177215bd"
+    },
+    {
+      "index": 3,
+      "seed": 70003,
+      "nn": 7021.915064589131,
+      "initial": 6736.916356932622,
+      "current": 6880.159034070706,
+      "search": 6760.799866123918,
+      "improvement": 119.35916794678815,
+      "search_completed": true,
+      "coverage": 1.0,
+      "actions": 41,
+      "fingerprint": "015e5675cd79fc17241c9b4a12dcd05b3d9faa7629a9938722e19e43b82c9e77"
+    },
+    {
+      "index": 4,
+      "seed": 70004,
+      "nn": 7652.2746597769565,
+      "initial": 7612.667265453312,
+      "current": 7731.451089909566,
+      "search": 7567.708675191252,
+      "improvement": 163.74241471831374,
+      "search_completed": true,
+      "coverage": 1.0,
+      "actions": 37,
+      "fingerprint": "c39e265ce7ac81bde7e05846471997a12fc4baade7924cdc3d062af6668a71fe"
+    },
+    {
+      "index": 5,
+      "seed": 70005,
+      "nn": 7246.261508646263,
+      "initial": 7116.930994167676,
+      "current": 7065.347172001924,
+      "search": 7002.956030016226,
+      "improvement": 62.391141985698596,
+      "search_completed": true,
+      "coverage": 1.0,
+      "actions": 35,
+      "fingerprint": "a9c0482ffeaf02202719923e1ade47591dabc494ad86cd49e5a434a530262df8"
+    },
+    {
+      "index": 6,
+      "seed": 70006,
+      "nn": 8626.881782676473,
+      "initial": 8484.682064534916,
+      "current": 8581.420349998918,
+      "search": 8521.795333706405,
+      "improvement": 59.625016292513465,
+      "search_completed": true,
+      "coverage": 1.0,
+      "actions": 41,
+      "fingerprint": "3c2bdc1e56cb495a5f1c758845dd053e406f4b3331993cc1f1d204d49e9a87d6"
+    },
+    {
+      "index": 7,
+      "seed": 70007,
+      "nn": 7147.374988045558,
+      "initial": 7190.012998150785,
+      "current": 7167.771754123215,
+      "search": 7122.458049057991,
+      "improvement": 45.313705065223985,
+      "search_completed": true,
+      "coverage": 1.0,
+      "actions": 39,
+      "fingerprint": "c45501cd7e841b7c3d0b224ecbf2e75ef58e3954c0bac066a3e6271c242cd386"
+    },
+    {
+      "index": 8,
+      "seed": 70008,
+      "nn": 5907.8366939207335,
+      "initial": 5865.8832987974,
+      "current": 5702.277423951136,
+      "search": 5695.724734392253,
+      "improvement": 6.552689558883685,
+      "search_completed": true,
+      "coverage": 1.0,
+      "actions": 35,
+      "fingerprint": "0f48f3d2769f386e28edcbadbb9dc1138d51395bbee5b09ee835e12a7caf78a4"
+    },
+    {
+      "index": 9,
+      "seed": 70009,
+      "nn": 7866.79600695767,
+      "initial": 8073.514901077098,
+      "current": 7774.140909849164,
+      "search": 7715.224654897553,
+      "improvement": 58.916254951611336,
+      "search_completed": true,
+      "coverage": 1.0,
+      "actions": 38,
+      "fingerprint": "e04458cecb34a48966ae9f83709af5fedbfe84bfd7cf96be65ce06f6751fcca6"
+    }
+  ],
+  "means": {
+    "nn": 7104.342453055189,
+    "initial": 7089.264913111205,
+    "current": 7030.621279134463,
+    "search": 6963.178383204835,
+    "improvement": 67.44289592962814
+  },
+  "counts": {
+    "search_completions": 400,
+    "search_seconds": 1084.7255483299996
+  },
+  "notes": [
+    "original u780 is missing",
+    "current model = control_s43@60"
+  ]
+}
