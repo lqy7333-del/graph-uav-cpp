@@ -65,9 +65,9 @@ not overwritten:
 - Formal 200-update training and the final test set were not run.
 - Validation uses the same greedy decoding/evaluation as training-bank eval; it
   is not a learned early-stopping signal.
-- Best checkpoint is not selected by validation in this first implementation;
-  only final and per-checkpoint outputs are preserved. A pre-registered selection
-  rule must be added before any formal comparison.
+- Validation writes `validation/best.json` using the existing completion-first,
+  all-instances-complete time rule. Final checkpoints and all intermediate
+  checkpoints are preserved; selection must not be redefined after seeing results.
 
 ## Test evidence
 

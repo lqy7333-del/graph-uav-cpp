@@ -109,6 +109,11 @@ class EpisodeRolloutTrainer(OverfitTrainer):
             summary.update(update=update_idx, scope="validation_only")
             _write_json(directory / "evaluation" / f"update_{update_idx}.json",
                         {"summary": summary, "rows": rows})
+            best_path = directory / "best.json"
+            best = json.loads(best_path.read_text(encoding="utf-8")) if best_path.exists() else None
+            from coverage_env.rl.trainer.overfit import candidate_key
+            if best is None or candidate_key(summary) < candidate_key(best):
+                _write_json(best_path, summary)
             history = [json.loads(p.read_text(encoding="utf-8"))["summary"]
                        for p in (directory / "evaluation").glob("update_*.json")]
             history.sort(key=lambda r: r["update"])
