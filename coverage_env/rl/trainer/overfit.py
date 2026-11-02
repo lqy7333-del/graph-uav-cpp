@@ -240,8 +240,14 @@ def _worker(rank, world_size, args):
         environment = FixedInstancePool(args.bank, seed=args.seed + rank)
         manifest = environment.manifest
         config = deepcopy(manifest["config"])
+        if getattr(args, "actor_lr", None) is not None:
+            config["ppo"]["actor_learning_rate"] = float(args.actor_lr)
         torch.manual_seed(args.seed)
         agent = PPOAgent(CoveragePolicy(environment, config=config), config, device=device)
+        if getattr(args, "actor_lr", None) is not None:
+            agent.actor_lr_start = float(args.actor_lr)
+            for group in agent.actor_optimizer.param_groups:
+                group["lr"] = float(args.actor_lr)
         start = 1
         runtime = None
         saved = None
@@ -421,11 +427,11 @@ def main():
         parser.error("--resume and --branch-from are different continuation modes.")
     if args.branch_from and (args.actor_lr is None or args.actor_lr <= 0):
         parser.error("--branch-from requires a positive --actor-lr.")
+    if args.actor_lr is not None and args.actor_lr <= 0:
+        parser.error("--actor-lr must be positive.")
     if args.branch_from:
         if Path(args.branch_from).resolve().parent == Path(args.output).resolve():
             parser.error("A branch must use a new output directory, not the source run.")
-    elif args.actor_lr is not None:
-        parser.error("--actor-lr is only valid with --branch-from.")
     output = Path(args.output).resolve()
     if args.resume:
         if Path(args.resume).resolve().parent != output or not (output / "references.json").exists():
