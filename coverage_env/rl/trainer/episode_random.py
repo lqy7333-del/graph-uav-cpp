@@ -11,7 +11,7 @@ from typing import Any
 import torch
 import torch.distributed as dist
 
-from coverage_env.env.instance_generator import InstanceGenerator
+from coverage_env.env.instance_generator import InstanceGenerator, GeometryGenerationError
 from coverage_env.env.fixed_instance_pool import load_bank
 from coverage_env.rl.trainer.episode_rollout import EpisodeRolloutTrainer
 from coverage_env.rl.trainer.overfit import _write_json, aggregate_rows, candidate_key
@@ -99,14 +99,13 @@ class RandomInstanceEpisodeTrainer(EpisodeRolloutTrainer):
                 env = self.generator.generate(
                     num_fields=self.num_fields, seed=seed,
                     randomize_each_reset=False, randomize_uav=False)
-            except Exception as exc:
+            except GeometryGenerationError as exc:
                 last_error = exc
                 self.stream.retries += 1
+                self._record_generation_retry(seed, counter, attempt, exc)
                 continue
             if len(env.fields) != self.num_fields:
-                last_error = ValueError(f"generator returned {len(env.fields)} fields")
-                self.stream.retries += 1
-                continue
+                raise ValueError(f"generator returned {len(env.fields)} fields")
             fingerprint = instance_fingerprint(env)
             area = sum(float(f.area) for f in env.fields)
             self._episode_seq += 1
@@ -124,6 +123,23 @@ class RandomInstanceEpisodeTrainer(EpisodeRolloutTrainer):
             return env
         raise RuntimeError(f"could not generate 10-field instance after "
                            f"{RandomInstanceStream.MAX_ATTEMPTS} attempts: {last_error!r}")
+
+    def _record_generation_retry(self, seed, counter, attempt, error):
+        # Persist immediately, including attempts in an episode that never starts.
+        if self.checkpoint_dir is None:
+            return
+        path = Path(self.checkpoint_dir) / f"generation_retries_rank_{self.rank}.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        causes = []
+        cause = error
+        while cause is not None:
+            causes.append({"type": type(cause).__name__, "message": str(cause)})
+            cause = cause.__cause__
+        row = {"update": self._current_update, "rank": self.rank,
+               "instance_seed": seed, "stream_counter": counter,
+               "attempt": attempt, "errors": causes}
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(row, ensure_ascii=False) + "\n")
 
     def _start_episode(self):
         env = self._new_environment()
@@ -258,13 +274,10 @@ class RandomInstanceEpisodeTrainer(EpisodeRolloutTrainer):
         summary.update(update=update_idx, scope=f"fixed_{name}_panel")
         _write_json(directory / "evaluation" / f"update_{update_idx}.json",
                     {"summary": summary, "rows": rows})
-        best_path = directory / "best.json"
-        best = json.loads(best_path.read_text(encoding="utf-8")) if best_path.exists() else None
-        if best is None or candidate_key(summary) < candidate_key(best):
-            _write_json(best_path, summary)
         history = [json.loads(p.read_text(encoding="utf-8"))["summary"]
                    for p in (directory / "evaluation").glob("update_*.json")]
         history.sort(key=lambda r: r["update"])
+        _write_json(directory / "best.json", min(history, key=candidate_key))
         keys = sorted(set().union(*(r.keys() for r in history)))
         with (directory / f"{name}_curve.csv").open("w", newline="", encoding="utf-8") as stream:
             writer = csv.DictWriter(stream, fieldnames=keys)

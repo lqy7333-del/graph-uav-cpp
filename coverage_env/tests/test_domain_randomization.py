@@ -6,7 +6,7 @@ import random
 import unittest
 
 from coverage_env.config import DEFAULT_CONFIG_PATH, load_config
-from coverage_env.env.instance_generator import InstanceGenerator
+from coverage_env.env.instance_generator import InstanceGenerator, GeometryGenerationError
 from coverage_env.rl.action_mask import get_action_mask
 
 
@@ -120,7 +120,7 @@ class DomainRandomizationTests(unittest.TestCase):
         def flaky_center(*args, **kwargs):
             calls["count"] += 1
             if calls["count"] <= 2:
-                raise RuntimeError("synthetic placement failure")
+                raise GeometryGenerationError("synthetic placement failure")
             return original(*args, **kwargs)
 
         generator._sample_center = flaky_center
@@ -136,7 +136,7 @@ class DomainRandomizationTests(unittest.TestCase):
         generator = InstanceGenerator(self.config)
 
         def always_fails(*_args, **_kwargs):
-            raise RuntimeError("synthetic placement failure")
+            raise GeometryGenerationError("synthetic placement failure")
 
         generator._sample_center = always_fails
         with self.assertRaises(RuntimeError) as context:
@@ -153,7 +153,7 @@ class DomainRandomizationTests(unittest.TestCase):
         def once_flaky(*args, **kwargs):
             if state["fail"]:
                 state["fail"] = False
-                raise RuntimeError("synthetic placement failure")
+                raise GeometryGenerationError("synthetic placement failure")
             return original(*args, **kwargs)
 
         InstanceGenerator._sample_center = staticmethod(once_flaky)

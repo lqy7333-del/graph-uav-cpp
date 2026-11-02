@@ -12,8 +12,88 @@ from coverage_env.rl.decoder.action_decoder import CoveragePolicy
 from coverage_env.rl.ppo.ppo import PPOAgent
 from coverage_env.rl.trainer.distributed import _free_port
 from coverage_env.rl.trainer.episode_random import RandomInstanceEpisodeTrainer
-from coverage_env.rl.trainer.overfit import _LocalModule
+from coverage_env.rl.trainer.overfit import _LocalModule, candidate_key
 from coverage_env.rl.checkpoint import parameter_sha256, restore_rng_state
+
+
+# None distinguishes omitted options from explicit resume overrides.
+_RUN_DEFAULTS = dict(num_updates=600, episodes_per_rank=4, max_episode_steps=500,
+                     seed=42, instance_seed_base=900_000_000, num_fields=10,
+                     actor_lr=1e-4, critic_lr=3e-3)
+
+
+def resolve_run_arguments(args, saved=None):
+    for name, default in _RUN_DEFAULTS.items():
+        if saved is None:
+            expected = default
+        elif name in ("actor_lr", "critic_lr"):
+            key = "actor_learning_rate" if name == "actor_lr" else "critic_learning_rate"
+            expected = saved["resolved_config"]["ppo"][key]
+        else:
+            expected = saved["training_metadata"][name]
+        requested = getattr(args, name)
+        if saved is not None and requested is not None and requested != expected:
+            raise ValueError(f"resume {name} changed: {requested!r} != {expected!r}")
+        setattr(args, name, expected if requested is None else requested)
+    if args.num_fields != 10:
+        raise ValueError("this protocol requires exactly 10 fields")
+    if saved is not None:
+        if saved['training_metadata'].get('collection_mode') != 'complete_episodes':
+            raise ValueError('collection mode changed')
+
+
+def validate_optimizer_lrs(agent, config):
+    # The frozen protocol uses no LR schedule. Check loaded optimizer values,
+    # not merely the config/logging attributes.
+    if config['ppo'].get('lr_schedule', 'none') != 'none':
+        raise ValueError('random-instance protocol requires lr_schedule=none')
+    for kind in ('actor', 'critic'):
+        expected = config['ppo'][kind + '_learning_rate']
+        optimizer = getattr(agent, kind + '_optimizer')
+        if any(group['lr'] != expected for group in optimizer.param_groups):
+            raise ValueError(f'{kind} optimizer LR differs from resolved configuration')
+
+
+def restore_panel_history(source, out, cutoff):
+    """Rebuild selection from history, preserving the selected weights.
+
+    Future evaluations relative to the resumed checkpoint are never imported.
+    Same-directory rewind is refused instead of silently mixing two histories.
+    """
+    source, out = Path(source).resolve(), Path(out).resolve()
+    for panel in ('diagnostic', 'validation'):
+        src, dst = source / panel, out / panel
+        records = []
+        for path in (src / 'evaluation').glob('update_*.json'):
+            record = json.loads(path.read_text(encoding='utf-8'))
+            if record['summary']['update'] > cutoff:
+                if source == out:
+                    raise ValueError('same-directory resume has evaluations newer than checkpoint; use a new output')
+                continue
+            records.append((path, record))
+        if not records:
+            raise ValueError(f'missing {panel} evaluation history for resume')
+        if source != out:
+            if (dst / 'evaluation').exists():
+                raise ValueError('resume output already contains evaluation history')
+            (dst / 'evaluation').mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src / 'references.json', dst / 'references.json')
+            for path, _ in records:
+                shutil.copy2(path, dst / 'evaluation' / path.name)
+        history = sorted((r['summary'] for _, r in records), key=lambda r: r['update'])
+        best = min(history, key=candidate_key)
+        weights = source / f"ckpt_update_{best['update']}.pt"
+        if not weights.is_file():
+            raise ValueError(f'missing historical best checkpoint: {weights}')
+        if source != out:
+            shutil.copy2(weights, out / weights.name)
+        (dst / 'best.json').write_text(json.dumps(best, indent=2), encoding='utf-8')
+        import csv
+        keys = sorted(set().union(*(r.keys() for r in history)))
+        with (dst / f'{panel}_curve.csv').open('w', newline='', encoding='utf-8') as stream:
+            writer = csv.DictWriter(stream, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(history)
 
 
 def _worker(rank, world, args):
@@ -26,6 +106,7 @@ def _worker(rank, world, args):
         torch.set_num_threads(1)
         device=torch.device(f'cuda:{rank}' if distributed else 'cpu')
         saved=torch.load(args.resume,map_location='cpu',weights_only=False) if args.resume else None
+        resolve_run_arguments(args, saved)
         if saved is not None:
             config=saved['resolved_config']; meta=saved['training_metadata']
             if meta.get('instance_mode')!='random_instances': raise ValueError('not random-instance checkpoint')
@@ -49,17 +130,20 @@ def _worker(rank, world, args):
             environment=load_bank(args.diagnostic_bank)[1][0]  # policy template only
             stream_state=None; start_update=1
         config=json.loads(json.dumps(config))
-        config['environment']['num_fields']={'min':10,'max':10}
-        config['ppo'].update(collection_mode='complete_episodes', episodes_per_rank=args.episodes_per_rank,
-                             max_episode_steps=args.max_episode_steps, randomize_uav=False,
-                             value_gate=True, actor_learning_rate=args.actor_lr,
-                             critic_learning_rate=args.critic_lr)
+        if saved is None:
+            config['environment']['num_fields']={'min':10,'max':10}
+            config['ppo'].update(collection_mode='complete_episodes', episodes_per_rank=args.episodes_per_rank,
+                                 max_episode_steps=args.max_episode_steps, randomize_uav=False,
+                                 value_gate=True, actor_learning_rate=args.actor_lr,
+                                 critic_learning_rate=args.critic_lr)
         torch.manual_seed(args.seed)
         agent=PPOAgent(CoveragePolicy(environment,config=config),config,device=device)
         if saved is not None:
             agent.load_checkpoint(args.resume,map_location=device,restore_rng=False,load_optimizers=True)
             restore_rng_state(saved['rank_runtime'][rank]['rng'])
-        initial_hash=parameter_sha256(agent.actor)
+        validate_optimizer_lrs(agent, config)
+        initial_hash=(saved['training_metadata']['initial_actor_sha256'] if saved is not None
+                      else parameter_sha256(agent.actor))
         agent.actor=DDP(agent.actor,device_ids=[rank]) if distributed else _LocalModule(agent.actor)
         agent.critic=DDP(agent.critic,device_ids=[rank]) if distributed else agent.critic
         trainer=RandomInstanceEpisodeTrainer(
@@ -85,23 +169,19 @@ def _worker(rank, world, args):
             'purpose':'random_instance_fixed_10field_generalization'}
         if saved is None:
             random.seed(args.seed+rank); np.random.seed(args.seed+rank); torch.manual_seed(args.seed+rank)
-        if rank==0:
-            Path(args.output).mkdir(parents=True,exist_ok=True)
-            if saved is not None:
-                source=Path(args.resume).resolve().parent; out=Path(args.output).resolve()
-                if source!=out:
-                    for name,target in (("references.json","references.json"),
-                                        ("validation/references.json","validation/references.json"),
-                                        ("diagnostic/references.json","diagnostic/references.json"),
-                                        ("learning_curve.csv","learning_curve.csv"),
-                                        ("validation/validation_curve.csv","validation/validation_curve.csv"),
-                                        ("diagnostic/diagnostic_curve.csv","diagnostic/diagnostic_curve.csv")):
-                        if (source/name).exists():
-                            (out/target).parent.mkdir(parents=True,exist_ok=True); shutil.copy2(source/name,out/target)
-                    for dname in ('evaluation','validation/evaluation','diagnostic/evaluation'):
-                        if (source/dname).is_dir(): shutil.copytree(source/dname,out/dname,dirs_exist_ok=True)
-            (Path(args.output)/'resolved_config_update_1.json').write_text(
-                json.dumps({'resolved_config':config,'training_metadata':trainer.run_metadata},indent=2),encoding='utf-8')
+        preparation_error = None
+        try:
+            if rank==0:
+                Path(args.output).mkdir(parents=True,exist_ok=True)
+                if saved is not None:
+                    source=Path(args.resume).resolve().parent; out=Path(args.output).resolve()
+                    restore_panel_history(source, out, start_update - 1)
+                (Path(args.output)/f'resolved_config_update_{start_update}.json').write_text(
+                    json.dumps({'resolved_config':config,'training_metadata':trainer.run_metadata},indent=2),encoding='utf-8')
+        except Exception as exc:
+            preparation_error = {"rank": rank, "error": repr(exc)}
+        trainer._all_rank_phase_check(preparation_error, update_idx=start_update,
+                                      phase="resume_history")
         trainer.train(args.num_updates,None,start_update=start_update)
         if distributed: dist.barrier()
     finally:
@@ -112,17 +192,14 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument('--diagnostic-bank',required=True); p.add_argument('--validation-bank',required=True)
     p.add_argument('--output',required=True); p.add_argument('--resume',default=None)
-    p.add_argument('--num-updates',type=int,default=600); p.add_argument('--episodes-per-rank',type=int,default=4)
-    p.add_argument('--max-episode-steps',type=int,default=500); p.add_argument('--seed',type=int,default=42)
-    p.add_argument('--instance-seed-base',type=int,default=900_000_000); p.add_argument('--num-fields',type=int,default=10)
-    p.add_argument('--actor-lr',type=float,default=1e-4); p.add_argument('--critic-lr',type=float,default=3e-3)
+    p.add_argument('--num-updates',type=int,default=None); p.add_argument('--episodes-per-rank',type=int,default=None)
+    p.add_argument('--max-episode-steps',type=int,default=None); p.add_argument('--seed',type=int,default=None)
+    p.add_argument('--instance-seed-base',type=int,default=None); p.add_argument('--num-fields',type=int,default=None)
+    p.add_argument('--actor-lr',type=float,default=None); p.add_argument('--critic-lr',type=float,default=None)
     p.add_argument('--checkpoint-every',type=int,default=10); p.add_argument('--device',choices=('cuda','cpu'),default='cuda')
     args=p.parse_args()
-    if args.num_fields!=10: raise SystemExit('this protocol requires exactly 10 fields')
-    if args.resume:
-        ck=torch.load(args.resume,map_location='cpu',weights_only=False)
-        args.num_updates=int(ck['training_metadata']['num_updates']); args.seed=int(ck['training_metadata']['seed'])
-        args.instance_seed_base=int(ck['training_metadata']['instance_seed_base'])
+    ck = torch.load(args.resume, map_location='cpu', weights_only=False) if args.resume else None
+    resolve_run_arguments(args, ck)
     world=torch.cuda.device_count() if args.device=='cuda' else 1
     if args.device=='cuda' and world<1: raise SystemExit('No CUDA GPUs')
     os.environ['MASTER_ADDR']='127.0.0.1'; os.environ['MASTER_PORT']=str(_free_port())

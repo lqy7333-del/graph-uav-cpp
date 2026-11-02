@@ -191,3 +191,30 @@ Evidence:
 - [`episode_rollout_review_results.json`](episode_rollout_review_results.json)
 
 **No formal 600-update run was started.**
+
+## 10. Pre-launch review fixes (2026-11-02)
+
+Resume options now distinguish omitted options from explicit overrides. Omitted
+training options inherit the checkpoint; explicit mismatches are rejected before
+training. Loaded optimizer learning rates must match the frozen configuration
+(`lr_schedule=none`). Resume does not rewrite the generator/training configuration.
+
+Cross-directory resume imports evaluation history only through the resumed
+checkpoint, reconstructs both panel best records and curves, and copies the
+historical selected weights. Subsequent evaluations recompute best from all saved
+history. Missing selected weights fail loudly. Same-directory rewind with newer
+evaluations is rejected; use a fresh output directory for such a branch. History
+preparation failures are synchronized through the existing all-rank phase check.
+
+Only `GeometryGenerationError` is retryable at the random-episode source.
+Each failed attempt is written immediately to
+`generation_retries_rank_<rank>.jsonl`, including seed, stream counter, attempt,
+exception type/message and cause chain. Other exceptions stop collection through
+the existing phase check; they are not silently replaced with another map.
+
+Local regression validation includes 11 new tests (including real CPU worker
+continuous-vs-cross-directory-resume parameter/stream/selection equality) and
+17 existing random-instance/complete-episode tests, and 30 generator/fixed-instance
+regressions (58 relevant tests passed in total). Legacy geometry fault injection
+uses the new retryable exception type. No new GPU training or formal
+run was executed in this review. The formal command and algorithm are unchanged.

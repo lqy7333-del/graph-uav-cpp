@@ -16,6 +16,10 @@ from coverage_env.geometry.coordinate import CoordinateTransformer
 from coverage_env.geometry.discretization import discretize_field
 
 
+class GeometryGenerationError(RuntimeError):
+    """A sampled geometry cannot satisfy placement/area constraints; retryable."""
+
+
 class InstanceGenerator:
     """Generate valid irregular fields, a depot, and configured UAVs."""
 
@@ -132,9 +136,9 @@ class InstanceGenerator:
                 return self._sample_components_once(
                     rng, num_fields, randomize_uav=randomize_uav
                 )
-            except RuntimeError as exc:
+            except GeometryGenerationError as exc:
                 last_error = exc
-        raise RuntimeError(
+        raise GeometryGenerationError(
             f"Field placement failed after {attempts} attempts for "
             f"num_fields={num_fields}; the workspace is too crowded for this "
             f"field count."
@@ -334,12 +338,12 @@ class InstanceGenerator:
                         f"field-{order}", points, transformer, piece.area,
                         min_area, max_area,
                     ))
-            except (ValueError, RuntimeError):
+            except (ValueError, GeometryGenerationError):
                 continue
             block_parcels = [list(piece.exterior.coords)[:-1] for piece in objects]
             return fields, block_parcels
 
-        raise RuntimeError(
+        raise GeometryGenerationError(
             "Unable to tessellate the field block; loosen field_generator.field_size."
         )
 
@@ -579,7 +583,7 @@ class InstanceGenerator:
                     )
                     break
                 if position is None:
-                    raise RuntimeError(
+                    raise GeometryGenerationError(
                         "Unable to grow a clustered field block; grow the workspace or "
                         "reduce field_generator.field_size."
                     )
@@ -635,7 +639,7 @@ class InstanceGenerator:
                 best_distance = high
                 break
             if best is None:
-                raise RuntimeError(
+                raise GeometryGenerationError(
                     "Unable to separate the field clusters; reduce cluster_gap_m."
                 )
             cluster_positions.append(best)
@@ -719,7 +723,7 @@ class InstanceGenerator:
                         position = candidate
                         break
                 if position is None:
-                    raise RuntimeError(
+                    raise GeometryGenerationError(
                         "Unable to grow a contiguous field block; reduce "
                         "field_generator.field_size or raise growth_attempts."
                     )
@@ -847,7 +851,7 @@ class InstanceGenerator:
                 for old_x, old_y, old_radius in placed
             ):
                 return x, y
-        raise RuntimeError(
+        raise GeometryGenerationError(
             "Unable to place non-overlapping fields in configured workspace; "
             "increase workspace bounds or reduce field size/count."
         )
