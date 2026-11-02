@@ -70,6 +70,11 @@ These seed blocks are disjoint from the historical 40000–40095, 50000–51599,
 60000–61599 and 70000–70009 blocks. Manifest, snapshots, SHA256 and instance
 fingerprints are in [`episode_rollout_banks.json`](episode_rollout_banks.json).
 
+**Interpretation boundary:** the ten training instances are a fixed-set fitting
+experiment, not a generalization result. The thirty independent validation
+instances measure same-scale (10-field) new-instance behavior; they do **not**
+constitute a completed 5–20-field unified generalization experiment.
+
 ## Semantics
 
 - Sampling network is in eval/deterministic mode; policy parameters fixed during

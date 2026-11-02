@@ -55,6 +55,12 @@ not overwritten:
 8. A rank cannot have zero valid rows under `episodes_per_rank >= 1`; the CLI
    rejects zero. This is stated rather than silently injecting duplicate data.
 
+## Interpretation boundary
+
+The ten training instances are a fixed-set fitting experiment. The thirty
+independent validation instances are same-scale (10-field) new-instance
+observations; they do not establish 5–20-field unified generalization.
+
 ## Known limitations
 
 - **Only boundary resume is supported.** A checkpoint is saved after an update;
