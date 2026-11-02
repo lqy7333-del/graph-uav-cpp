@@ -1,3 +1,17 @@
+## 2026-11-02
+
+### 120. **真实 DDP 故障注入验收：Gloo 双 rank 与 NCCL 4 卡**
+
+- actor/critic 使用 DistributedDataParallel；生产 EpisodeRolloutTrainer 在
+  rank1 首次 DDP policy forward 之后注入采样异常，rank0 正常继续。
+- 2-rank Gloo 与 4-GPU NCCL 采样故障：所有 rank 受限退出，update_count=0，
+  无 train_log，run_failures 诊断写入。
+- 相同 DDP 包装下注入 gate 构造异常：所有 rank 退出、无 optimizer 更新、诊断写入。
+- 两 rank 不等长梯度与集中参考：actor 5.96e-08，critic 2.98e-08。
+- 评估失败按完成状态/终止原因/成本比较；同目录恢复、max step 和验证 bank 校验通过。
+- 完整套件 304 项中 302 通过，2 项为 baseline 911da56 已有失败。
+- 正式 600-update 随机初始化训练仍未启动。
+
 ### 118. **完整 episode PPO 审查修复：mini-batch 归一化、全局 padding 跳过、故障同步、恢复校验**
 
 - `update_masked` 按当前同步 mini-batch 的全局有效样本数归一化，而不是整份
