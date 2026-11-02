@@ -3,10 +3,13 @@
 ## Files
 
 - `coverage_env/rl/trainer/episode_rollout.py` — complete-episode collector,
-  per-episode GAE, global advantage normalization, masked PPO update,
-  train/validation evaluation.
-- `coverage_env/rl/trainer/episode_worker.py` — fixed-bank DDP worker/CLI,
-  random or checkpoint initialization, boundary resume.
+  per-episode GAE, global advantage normalization, masked PPO update.
+- `coverage_env/rl/trainer/episode_random.py` — fresh random 10-field instance
+  source, seed stream, diagnostic/validation panel evaluation.
+- `coverage_env/rl/trainer/episode_random_worker.py` — random-instance DDP CLI;
+  random initialization and boundary resume.
+- `coverage_env/rl/trainer/episode_worker.py` — legacy fixed-bank CLI retained
+  for historical compatibility.
 - `coverage_env/rl/ppo/ppo.py` — `update_masked` for unequal local lengths.
 - `coverage_env/rl/evaluation/maneuver_eval.py` — recorded actions, per-step
   summaries, independent replay helper.
@@ -60,9 +63,11 @@ Verified in the baseline and preserved:
 
 ## Interpretation boundary
 
-The ten training instances are a fixed-set fitting experiment. The thirty
-independent validation instances are same-scale (10-field) new-instance
-observations; they do **not** establish 5–20-field unified generalization.
+The formal protocol trains on **freshly generated instances with exactly 10
+fields** at every episode. `train10` is now a fixed diagnostic panel and
+`valid30` is the fixed validation panel; neither is a training source. This is
+same-scale generalization, not fixed-ten-instance overfitting and not a
+completed 5–20-field unified generalization study.
 
 ## Evaluation semantics
 
@@ -164,16 +169,24 @@ The two failures reproduce at baseline `911da56`:
 - `test_nearest_neighbor_episode...test_5_10_20_fields_x_10_episodes`;
 - `test_uav...test_depot_and_manual_path_execution`.
 
-### Random-init 4-GPU smoke
+### Random-instance 4-GPU smoke
 
-3 updates on the dedicated 2-instance smoke bank, no initial checkpoint:
+3 updates with fresh generated 10-field instances; the fixed panels used for
+evaluation were the 2-instance smoke bank:
 
-- **122 s total wall**;
-- training accounting **54.9 s** (≈18.3 s/update);
-- 48 episodes / 951 transitions;
+- **148 s total wall**;
+- training accounting **83.9 s** (≈28 s/update);
+- 48 episodes / 954 transitions;
 - 24 synchronized optimizer steps;
-- actual actor/critic LR `1e-4 / 0.003`;
-- no failure/truncation; train and validation replay checks pass.
+- 12 distinct seeds and 12 distinct fingerprints per rank; every instance has
+  10 fields;
+- actual actor/critic LR `1e-4 / 0.003`; `initialization=None`;
+- reward mode `time`, gamma `1.0`, area range **5,000–20,000 m²**;
+- no failure/truncation; diagnostic/validation greedy replay checks pass.
+
+Random stream/resume evidence:
+[`episode_rollout_random_smoke.json`](episode_rollout_random_smoke.json),
+[`episode_rollout_random_resume.json`](episode_rollout_random_resume.json).
 
 ### Exact boundary resume
 
@@ -181,9 +194,22 @@ CPU continuous run vs resume from update-1 checkpoint: update-2 actor/critic
 state dicts bit-identical. Wrong `max_episode_steps` is rejected; same-directory
 resume passes.
 
+### Random-instance tests
+
+`test_random_instance_mode.py`: **5/5 pass**:
+
+- rank seed blocks disjoint and reproducible;
+- stream counter independent of action-length randomness;
+- fresh instances change seed/fingerprint and all have 10 fields;
+- fixed panel evaluation does not advance the stream or training RNG;
+- rank-local episode records preserve 10-field identity.
+
+Full suite is **309 tests, 307 pass, 2 failures, 3 skipped**; the two failures
+reproduce at baseline `911da56`.
+
 ### Not run
 
-- Formal 600-update random-init training.
+- Formal 600-update random-instance training.
 - Final/sealed test set.
 - Mid-episode resume.
 - Complete `RUN_DDP_TESTS=1` suite; targeted real-DDP Gloo and 4-GPU NCCL

@@ -1,5 +1,21 @@
 ## 2026-11-02
 
+### 121. **随机 10 地块实例训练协议：每次 episode 生成新地图**
+
+- 撤回“固定十训练实例拟合”目标；正式训练改为固定 **10 地块规模**、每条训练
+  episode 重新生成实例；原 `train10` 改为固定诊断面板，`valid30` 为固定验证面板。
+- 新增 `RandomInstanceEpisodeTrainer` / `episode_random_worker.py`：每 rank 独立
+  seed 流，seed 为 `base + rank*1,000,000 + counter*64 + attempt`，与动作长度/
+  策略 RNG/评估隔离；生成重试有上限并逐 episode 记录。
+- 每 rank 4 条完整 episode、4 卡 16 条；保留 GAE/PPO、mask/padding、全局
+  mini-batch 归一化、门禁、动作重放和失败保留。
+- checkpoint 保存 instance stream、生成配置哈希、面板哈希、mode/fields/
+  world/budget/episodes/seed/max steps；边界恢复验证后续 seed/指纹一致。
+- 4-GPU random-init 3-update smoke：148 s wall、83.9 s 训练、48 episodes、
+  954 transitions、24 同步步；4 rank 各 12 个不同 seed/指纹，全部 10 地块。
+- 新测试 5 项；完整套件 309 项中 307 通过，2 项为 baseline 已有失败。
+- 正式 600-update / 9,600 episodes 训练未启动。
+
 ### 120. **真实 DDP 故障注入验收：Gloo 双 rank 与 NCCL 4 卡**
 
 - actor/critic 使用 DistributedDataParallel；生产 EpisodeRolloutTrainer 在
