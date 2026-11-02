@@ -88,8 +88,9 @@ constitute a completed 5–20-field unified generalization experiment.
 - Unequal local transition counts are padded only for DDP synchronization.
   Padding rows have mask 0 and are excluded from policy loss, value loss,
   entropy, advantages and statistics.
-- Every rank performs the same number of backward/optimizer steps; loss is
-  scaled by the all-reduced global valid-transition count and DDP world size.
+- Every rank performs the same number of backward/optimizer steps. Each
+  synchronized mini-batch is normalized by that mini-batch's global valid
+  count; a global-zero mini-batch skips both optimizers on every rank.
 - Advantages are standardized with all-reduced global valid sum/sumsq/count,
   not per-rank means.
 - No duplicate real samples are counted; local zero-valid rank is not possible
@@ -146,8 +147,8 @@ PYTHONPATH=. /home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/bin/python \
   -m coverage_env.rl.trainer.episode_worker \
   --bank /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/train10 \
   --validation-bank /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/valid30 \
-  --output /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_s42_resume \
-  --resume /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_s42/ckpt_update_10.pt \
+  --output /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_s42_resume \
+  --resume /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_s42/ckpt_update_10.pt \
   --device cuda --checkpoint-every 10
 ```
 

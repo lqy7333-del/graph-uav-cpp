@@ -3,156 +3,188 @@
 ## Files
 
 - `coverage_env/rl/trainer/episode_rollout.py` — complete-episode collector,
-  per-episode GAE, global normalization, masked update, train/validation eval.
-- `coverage_env/rl/trainer/episode_worker.py` — fixed-bank DDP worker and CLI,
-  new-optimizer fine-tune and boundary resume.
+  per-episode GAE, global advantage normalization, masked PPO update,
+  train/validation evaluation.
+- `coverage_env/rl/trainer/episode_worker.py` — fixed-bank DDP worker/CLI,
+  random or checkpoint initialization, boundary resume.
 - `coverage_env/rl/ppo/ppo.py` — `update_masked` for unequal local lengths.
-- `coverage_env/rl/evaluation/maneuver_eval.py` — optional recorded action
-  sequence, per-step summaries and independent replay helper.
-- `coverage_env/rl/trainer/overfit.py` — evaluation now requests recordings and
-  refuses a row whose replay disagrees.
-- `coverage_env/config/default.yaml` — explicit `collection_mode`,
-  `episodes_per_rank`, `max_episode_steps` defaults; legacy remains default.
-- `coverage_env/tests/test_episode_rollout.py` — new bounded tests.
+- `coverage_env/rl/evaluation/maneuver_eval.py` — recorded actions, per-step
+  summaries, independent replay helper.
+- `coverage_env/rl/trainer/overfit.py` — evaluation requests recordings and
+  compares replay state/cost.
+- `coverage_env/config/default.yaml` — explicit collection-mode defaults;
+  legacy `fixed_steps` remains default.
+- `coverage_env/tests/test_episode_rollout.py` — 12 bounded tests.
+- `scripts/maneuver_time/ddp_failure_ddp.py` — real-DDP Gloo/NCCL fault injection.
+- `scripts/maneuver_time/ddp_gradient_smoke.py` — unequal-rank gradient reference.
 
 ## Preserved audited behavior
 
-The implementation reuses the existing GAE/PPO, graph encoder, masked decoder,
-reward/time ledger, fixed bank, checkpoint payload, DDP gate, rank-runtime and
-greedy evaluator. No reward, feature, network, executor, workload, resupply or
-return code was changed.
+No reward, feature, network, executor, workload, resupply, return, GAE or gate
+code was replaced. The existing GAE/PPO, graph encoder, masked decoder, time
+ledger, fixed bank, checkpoint payload, DDP gate, rank-runtime and greedy
+evaluator are reused.
 
-The pre-existing diffs at B42/240 that matter were checked in the baseline and
-not overwritten:
+Verified in the baseline and preserved:
 
-- GAE bootstrap next state includes heading and real `next_state`;
+- bootstrap uses real `next_state` including heading;
 - true terminal `next_value=0`;
-- done/truncated boundaries are separate in `compute_advantage`;
-- actor eval mode is used for both sampling and replay;
-- all-rank value/tail/replay/finite gates;
-- all-rank abort and failure snapshots;
-- reward/time/distance/resource ledger;
+- done/truncated boundaries do not propagate GAE across episodes;
+- actor eval mode for sampling and replay;
+- all-rank value/tail/log-prob/finite gates and common abort;
+- reward/time/distance/resource closure;
 - checkpoint actor/critic/optimizers/RNG/rank runtime;
 - fixed-bank manifest/fingerprint checks;
 - greedy fixed-bank evaluation;
-- recorded action replay is now wired into evaluation.
+- recorded action replay for evaluation.
 
 ## Unequal DDP design
 
-1. Each rank collects exactly 4 terminal episodes, so local lengths differ.
-2. Local GAE is computed once on the complete buffer; episode boundaries prevent
-   cross-episode propagation.
-3. Global valid count/sum/sumsq are all-reduced; local advantages are standardized
-   with the global mean/variance.
-4. `global_steps = all_reduce_max(local_count)` and each rank pads its local
-   transition list to `global_steps`. Every rank runs the same number of
-   minibatches/backwards.
-5. Padding rows are structurally valid repeats of the last local transition but
-   `mask=0`; they are excluded from all losses/statistics.
-6. Loss terms are summed over valid local rows and multiplied by
-   `world_size/global_valid_count`, compensating for DDP gradient averaging.
-7. The critic loss uses the same valid mask and normalization.
-8. A rank cannot have zero valid rows under `episodes_per_rank >= 1`; the CLI
-   rejects zero. This is stated rather than silently injecting duplicate data.
+1. Each rank collects exactly 4 terminal episodes; local lengths differ.
+2. Local GAE is computed once; episode boundaries prevent cross-episode leakage.
+3. Global valid count/sum/sumsq are all-reduced; local advantages are
+   standardized with the global mean/variance.
+4. `global_steps = all_reduce_max(local_count)`; every rank pads to the same
+   length and runs the same number of minibatches/backwards.
+5. Padding rows have mask 0 and are excluded from policy loss, value loss,
+   entropy, advantages and statistics.
+6. **Each synchronized mini-batch is normalized by that mini-batch's global
+   valid count**, not by the full rollout count. This preserves ordinary PPO's
+   per-minibatch scale.
+7. A mini-batch whose global valid count is 0 is skipped by **all ranks**; both
+   optimizers are not stepped, so Adam momentum cannot move padding-only batches.
+8. Logged `updates` counts actual synchronized optimizer steps.
+9. Production `episodes_per_rank >= 1` guarantees each rank has at least one
+   transition to use as a structurally valid padding template. The CLI rejects
+   zero episodes; duplicate samples are never counted as valid.
 
 ## Interpretation boundary
 
 The ten training instances are a fixed-set fitting experiment. The thirty
 independent validation instances are same-scale (10-field) new-instance
-observations; they do not establish 5–20-field unified generalization.
+observations; they do **not** establish 5–20-field unified generalization.
 
-## Known limitations
+## Evaluation semantics
 
-- **Only boundary resume is supported.** A checkpoint is saved after an update;
-  the fourth episode's terminal state is saved in rank runtime. The next update
-  starts with reset. Mid-episode/arbitrary-time resume is not claimed.
-- The `update_masked` API requires at least one local transition, because it needs
-  a structurally valid padding state. Production collection guarantees that.
-- Formal 600-update random-init training and the final test set were not run.
-- Validation uses the same greedy decoding/evaluation as training-bank eval; it
-  is not a learned early-stopping signal.
-- Validation writes `validation/best.json` using the existing completion-first,
-  all-instances-complete time rule. Final checkpoints and all intermediate
-  checkpoints are preserved; selection must not be redefined after seeing results.
+Rows are compared with independent replay by `completed`, `termination_reason`
+and `total_time`. A real failure is retained as a failed row; it is not coerced
+to success, deleted, or replaced. Completion rate is reported separately, and
+mean cost is filled only when all rows completed.
 
-## ## Review fixes incorporated
+## Resume scope and checks
 
-- PPO `update_masked` now normalizes each synchronized mini-batch by that
-  mini-batch's global valid count, preserving original per-minibatch PPO scale.
-- Every mini-batch all-reduces its valid count; if the global count is zero,
-  **all ranks skip both optimizer steps** and no Adam momentum is applied.
-- Logged `updates` counts actual synchronized optimizer steps.
-- Sampled collection failures and gate-construction failures are synchronized
-  with `_all_rank_phase_check`, followed by a common failure and saved
-  `run_failures/update_<n>_<phase>.json`.
-- Same-directory resume no longer copies `references.json` onto itself; resume
-  validates world size, episodes/rank, budget, seed, training bank and validation
-  bank.
-- The CLI supports no initial checkpoint = random actor/critic, with actor LR
-  `1e-4` and critic LR `0.003` explicitly written into config and optimizer.
-- The former 200-update fine-tune protocol is superseded by the 600-update
-  random-init protocol.
+Supported: **exact continuation at a saved update boundary**, including
+same-directory resume. Checkpoint payload stores actor/critic/optimizers, RNG,
+rank runtime/environment, bank manifest and update count.
 
-Test evidence
+Resume rejects mismatches in:
+
+- world size;
+- episodes per rank;
+- update budget;
+- seed;
+- `max_episode_steps`;
+- collection mode;
+- training bank manifest;
+- validation bank manifest, omission, or addition;
+- initialization source.
+
+When resuming to a different output directory, references, existing evaluation
+directories, learning/validation curves and best files are copied; same-directory
+resume does not copy a file onto itself. Mid-episode resume is not supported and
+not claimed.
+
+## Real-DDP fault injection
+
+`scripts/maneuver_time/ddp_failure_ddp.py` wraps **actor and critic in
+DistributedDataParallel** and runs the production `EpisodeRolloutTrainer`.
+
+Injections:
+
+- rank 1 raises on its second sampling step, **after its first DDP policy
+  forward**, while other ranks continue sampling;
+- rank 1 raises gate construction after collection.
+
+Results:
+
+- 2-rank Gloo collect: both ranks raise, `update_count=0`, no `train_log.csv`,
+  rank0 sampled 18 steps, rank1 2; diagnostic written.
+- 2-rank Gloo gate: both ranks raise, no update, diagnostic written.
+- **4-GPU NCCL collect**: all four ranks raise, all `update_count=0`, no log,
+  rank0/2/3 sampled 18–19 steps while rank1 failed at step 2; diagnostic written.
+- **4-GPU NCCL gate**: all four ranks raise, no update, diagnostic written.
+
+Raw results: [`episode_rollout_review_results.json`](episode_rollout_review_results.json).
+
+## Unequal-rank gradient reference
+
+2-rank Gloo, actor/critic DDP-wrapped, no optimizer steps:
+
+- rank0 3 valid transitions, rank1 6;
+- batch size 4, global steps 6;
+- rank0's second mini-batch is pure padding;
+- global valid counts 7 and 2.
+
+DDP accumulated gradients vs centralized reference:
+
+| quantity | max difference |
+|---|---:|
+| actor | **5.96e-08** |
+| critic | **2.98e-08** |
+
+## Test evidence
 
 ### Unit/CPU
 
-`test_episode_rollout.py`: 12 tests, all pass:
+`test_episode_rollout.py`: **12/12 pass**:
 
-- complete episodes exceed the ignored legacy `rollout_steps`;
-- exactly N starts and no extra reset/zero-step instance at the batch boundary;
-- next update starts a new episode cleanly;
-- isolated GAE hand calculation across two episodes;
+- episode length exceeds ignored legacy `rollout_steps`;
+- exactly N starts, no extra reset/zero-step instance at batch boundary;
+- next update starts cleanly;
+- isolated cross-episode GAE hand calculation;
 - truncated bootstrap preserved while GAE breaks;
 - masked padding excluded from actor statistics;
-- independent recorded replay of evaluation actions;
-- evaluation writes actions/state summaries/replay_ok.
+- mini-batch loss scale `-1` restored (not `-0.5`);
+- global padding-only mini-batch does not move parameters;
+- injected collect/gate failures write diagnostics;
+- evaluation action replay;
+- evaluation failure replay compared rather than coerced to success.
 
-### Existing regression subset
+### Regression/full suite
 
-`test_fixed_instance_overfit`, `test_maneuver_eval`, `test_training_ddp_runtime`
-+ new tests: 44 tests pass (3 skipped without `RUN_DDP_TESTS=1`).
+Affected regression subset: 44 pass, 3 skipped.
 
-### Full suite
+Full suite:
 
-`python -m unittest discover -s coverage_env/tests -p 'test_*.py'`:
-**304 tests, 302 pass, 2 failures, 3 skipped**.
+`python -m unittest discover -s coverage_env/tests -p 'test_*.py'`
+→ **304 tests, 302 pass, 2 failures, 3 skipped**.
 
-The two failures are pre-existing at baseline `911da56` and reproduce there:
+The two failures reproduce at baseline `911da56`:
 
-- `test_nearest_neighbor_episode...test_5_10_20_fields_x_10_episodes`
-  (`0 != 10` completed, configuration exception/payload edge);
-- `test_uav...test_depot_and_manual_path_execution` (`16.0 != 40.0`).
+- `test_nearest_neighbor_episode...test_5_10_20_fields_x_10_episodes`;
+- `test_uav...test_depot_and_manual_path_execution`.
 
-They are not caused by this branch and were not silently fixed.
+### Random-init 4-GPU smoke
 
-### 4-GPU smoke
+3 updates on the dedicated 2-instance smoke bank, no initial checkpoint:
 
-Command used a dedicated 2-instance smoke bank and a separate output dir:
-
-```bash
-python -m coverage_env.rl.trainer.episode_worker \
- --bank .../smoke_bank --validation-bank .../smoke_bank \
- --initial-checkpoint .../initial_B42_240.pt \
- --output .../gpu_smoke_final \
- --num-updates 3 --episodes-per-rank 4 --seed 42 \
- --device cuda --checkpoint-every 1
-```
-
-Result: exit 0, wall **122 s**; 3 updates; rank0 12 episodes / 236 transitions;
-global 48 episodes / 951 transitions; 24 synchronized optimizer steps;
-no failed or truncated episodes; gates passed; train and validation eval wrote
-recorded actions and replay_ok=true for each row.
+- **122 s total wall**;
+- training accounting **54.9 s** (≈18.3 s/update);
+- 48 episodes / 951 transitions;
+- 24 synchronized optimizer steps;
+- actual actor/critic LR `1e-4 / 0.003`;
+- no failure/truncation; train and validation replay checks pass.
 
 ### Exact boundary resume
 
-CPU full run (2 updates, 2 episodes/rank) vs resume from update-1 checkpoint:
-update-2 actor and critic state dicts are bit-identical. This validates
-optimizer, RNG, bank order and schedule continuation at an update boundary.
+CPU continuous run vs resume from update-1 checkpoint: update-2 actor/critic
+state dicts bit-identical. Wrong `max_episode_steps` is rejected; same-directory
+resume passes.
 
 ### Not run
 
-- Formal 200-update training.
+- Formal 600-update random-init training.
 - Final/sealed test set.
 - Mid-episode resume.
-- `RUN_DDP_TESTS=1` loopback Gloo suite (the real 4-GPU NCCL smoke was run).
+- Complete `RUN_DDP_TESTS=1` suite; targeted real-DDP Gloo and 4-GPU NCCL
+  injection and gradient scripts were run directly.
