@@ -67,5 +67,6 @@ test run. The same is required at both branch endpoints.
 
 ## 6. Status
 
-At the time of writing, `new780` is training in the persistent directory.
-No branch has started; no original checkpoint was silently substituted.
+The long new-780 rebuild was stopped and archived; it is not used. The accepted
+screen is the 60-update pair from B42/240 (`short/control_s42`,
+`short/lr3e5_s42`). Results: `docs/fixed_instance_overfit_short_screen.md`.
