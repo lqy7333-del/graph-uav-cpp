@@ -37,8 +37,8 @@ Verified in the baseline and preserved:
 - all-rank value/tail/log-prob/finite gates and common abort;
 - reward/time/distance/resource closure;
 - checkpoint actor/critic/optimizers/RNG/rank runtime;
-- fixed-bank manifest/fingerprint checks;
-- greedy fixed-bank evaluation;
+- fixed-panel manifest/fingerprint checks;
+- greedy fixed diagnostic/validation panel evaluation;
 - recorded action replay for evaluation.
 
 ## Unequal DDP design
@@ -162,7 +162,7 @@ Affected regression subset: 44 pass, 3 skipped.
 Full suite:
 
 `python -m unittest discover -s coverage_env/tests -p 'test_*.py'`
-→ **304 tests, 302 pass, 2 failures, 3 skipped**.
+→ **309 tests, 307 pass, 2 failures, 3 skipped**.
 
 The two failures reproduce at baseline `911da56`:
 
@@ -196,7 +196,7 @@ resume passes.
 
 ### Random-instance tests
 
-`test_random_instance_mode.py`: **5/5 pass**:
+`test_random_instance_mode.py`: **5/5 pass** (in addition to the 12 episode tests):
 
 - rank seed blocks disjoint and reproducible;
 - stream counter independent of action-length randomness;
