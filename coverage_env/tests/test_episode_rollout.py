@@ -18,6 +18,7 @@ from coverage_env.rl.evaluation.maneuver_eval import (
 from coverage_env.rl.ppo.loss import compute_advantage
 from coverage_env.rl.ppo.ppo import PPOAgent
 from coverage_env.rl.trainer.episode_rollout import EpisodeRolloutTrainer
+from coverage_env.tests.test_training_runtime import ToyPolicy, toy_config
 
 
 class EpisodeRolloutTests(unittest.TestCase):
@@ -81,6 +82,46 @@ class EpisodeRolloutTests(unittest.TestCase):
         self.assertAlmostEqual(float(adv[3]), 10.0, places=6)
         self.assertAlmostEqual(float(adv[2]), 15.0, places=6)
 
+    def test_masked_ppo_uses_per_minibatch_mean_not_rollout_scale(self):
+        from types import SimpleNamespace
+        agent = PPOAgent(ToyPolicy(), toy_config())
+        agent.batch_size = 3
+        agent.epochs = 1
+        rows = [SimpleNamespace(log_prob=0.0) for _ in range(6)]
+
+        def fake_rows(transitions, indices):
+            count = len(indices)
+            p = torch.zeros(1, requires_grad=True)
+            return p * 0 + torch.zeros(count), torch.zeros(count), p * 0 + torch.zeros(count)
+        agent._per_transition_minibatch_rows = fake_rows
+        stats = agent.update_masked(rows, [True] * 6, global_valid_count=6,
+                                    global_steps=6,
+                                    advantages=torch.ones(6), returns=torch.zeros(6))
+        self.assertEqual(stats["updates"], 2)
+        # Two 3-sample minibatches each have mean policy loss 1; the old
+        # rollout-wide /6 scaling would report -0.5 per minibatch.
+        self.assertAlmostEqual(stats["actor_loss"], -1.0, places=6)
+
+    def test_global_padding_only_minibatch_skips_optimizer_steps(self):
+        from types import SimpleNamespace
+        agent = PPOAgent(ToyPolicy(), toy_config())
+        agent.batch_size = 3
+        agent.epochs = 1
+        rows = [SimpleNamespace(log_prob=0.0) for _ in range(6)]
+        before = {k: v.detach().clone() for k, v in agent.actor.state_dict().items()}
+
+        def fake_rows(transitions, indices):
+            count = len(indices)
+            p = torch.zeros(1, requires_grad=True)
+            return p * 0 + torch.zeros(count), torch.zeros(count), p * 0 + torch.zeros(count)
+        agent._per_transition_minibatch_rows = fake_rows
+        stats = agent.update_masked(rows, [False] * 6, global_valid_count=6,
+                                    global_steps=6,
+                                    advantages=torch.zeros(6), returns=torch.zeros(6))
+        self.assertEqual(stats["updates"], 0)
+        for key, value in agent.actor.state_dict().items():
+            self.assertTrue(torch.equal(value, before[key]), key)
+
     def test_masked_update_ignores_padding_and_keeps_shapes_valid(self):
         pool = FixedInstancePool(self.bank, seed=42)
         agent = PPOAgent(CoveragePolicy(pool, config=self.config), self.config, device="cpu")
@@ -107,6 +148,32 @@ class EpisodeRolloutTests(unittest.TestCase):
                                       truncated=[False, True], device="cpu")
         self.assertAlmostEqual(float(adv[1]), 3.0, places=6)
         self.assertAlmostEqual(float(adv[0]), 1.0 + 0.5 * 3.0, places=6)
+
+    def test_sampling_failure_is_synchronized_and_diagnosed(self):
+        pool = FixedInstancePool(self.bank, seed=42)
+        agent = PPOAgent(CoveragePolicy(pool, config=self.config), self.config, device="cpu")
+        out = self.root / "failure_collect"
+        trainer = EpisodeRolloutTrainer(pool, agent, rank=0, world_size=1,
+                                        checkpoint_dir=out, checkpoint_every=1,
+                                        config=self.config, episodes_per_rank=1,
+                                        max_episode_steps=200)
+        trainer._collect_episodes = lambda: (_ for _ in ()).throw(RuntimeError("injected collect failure"))
+        with self.assertRaises(RuntimeError):
+            trainer.train(1, rollout_steps=1)
+        self.assertTrue((out / "run_failures/update_1_collect.json").exists())
+
+    def test_gate_construction_failure_is_synchronized_and_diagnosed(self):
+        pool = FixedInstancePool(self.bank, seed=42)
+        agent = PPOAgent(CoveragePolicy(pool, config=self.config), self.config, device="cpu")
+        out = self.root / "failure_gate"
+        trainer = EpisodeRolloutTrainer(pool, agent, rank=0, world_size=1,
+                                        checkpoint_dir=out, checkpoint_every=1,
+                                        config=self.config, episodes_per_rank=1,
+                                        max_episode_steps=200)
+        trainer._local_gate_metrics = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("injected gate failure"))
+        with self.assertRaises(RuntimeError):
+            trainer.train(1, rollout_steps=1)
+        self.assertTrue((out / "run_failures/update_1_gate_construct.json").exists())
 
     def test_recorded_action_replay_is_independent(self):
         manifest = json.loads((self.bank / "manifest.json").read_text())

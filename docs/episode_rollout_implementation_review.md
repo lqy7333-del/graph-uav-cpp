@@ -62,14 +62,32 @@ not overwritten:
   starts with reset. Mid-episode/arbitrary-time resume is not claimed.
 - The `update_masked` API requires at least one local transition, because it needs
   a structurally valid padding state. Production collection guarantees that.
-- Formal 200-update training and the final test set were not run.
+- Formal 600-update random-init training and the final test set were not run.
 - Validation uses the same greedy decoding/evaluation as training-bank eval; it
   is not a learned early-stopping signal.
 - Validation writes `validation/best.json` using the existing completion-first,
   all-instances-complete time rule. Final checkpoints and all intermediate
   checkpoints are preserved; selection must not be redefined after seeing results.
 
-## Test evidence
+## ## Review fixes incorporated
+
+- PPO `update_masked` now normalizes each synchronized mini-batch by that
+  mini-batch's global valid count, preserving original per-minibatch PPO scale.
+- Every mini-batch all-reduces its valid count; if the global count is zero,
+  **all ranks skip both optimizer steps** and no Adam momentum is applied.
+- Logged `updates` counts actual synchronized optimizer steps.
+- Sampled collection failures and gate-construction failures are synchronized
+  with `_all_rank_phase_check`, followed by a common failure and saved
+  `run_failures/update_<n>_<phase>.json`.
+- Same-directory resume no longer copies `references.json` onto itself; resume
+  validates world size, episodes/rank, budget, seed, training bank and validation
+  bank.
+- The CLI supports no initial checkpoint = random actor/critic, with actor LR
+  `1e-4` and critic LR `0.003` explicitly written into config and optimizer.
+- The former 200-update fine-tune protocol is superseded by the 600-update
+  random-init protocol.
+
+Test evidence
 
 ### Unit/CPU
 

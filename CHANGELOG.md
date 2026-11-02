@@ -1,4 +1,17 @@
-## 2026-11-02
+### 118. **完整 episode PPO 审查修复：mini-batch 归一化、全局 padding 跳过、故障同步、恢复校验**
+
+- `update_masked` 按当前同步 mini-batch 的全局有效样本数归一化，而不是整份
+  rollout 长度；恢复原 PPO 的 mini-batch 数值尺度。
+- 每个 mini-batch all-reduce 有效样本数；全局为 0 时所有 rank 跳过 actor/critic
+  optimizer step，避免 Adam 动量在纯 padding 批次移动参数；`updates` 只计实际 step。
+- 采样和 gate 构造异常通过 all-rank phase check 共同退出并写
+  `run_failures/update_<n>_<phase>.json`。
+- 同目录 resume 修复；新增 world size、episodes/rank、预算、seed、训练/验证 bank
+  身份校验。
+- 新增 random-init 入口：不加载 B42/240，actor LR 1e-4、critic LR 0.003；
+  正式协议改为 600 updates / 9,600 episodes。
+- 新增 padding、mini-batch 缩放、故障注入、同目录恢复测试；4-GPU random-init
+  3-update smoke 122 s wall、54.9 s 训练记账。
 
 ### 117. **完整 episode 采样的固定 10 地块 PPO 实现（仅准备，未开始正式训练）**
 

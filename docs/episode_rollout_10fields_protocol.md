@@ -1,12 +1,12 @@
 # Fixed 10-field complete-episode PPO protocol
 
-**Status: implemented and tested; formal training NOT started.**
+**Status: review fixes implemented and tested; random-init formal training NOT started.**
 
 - Branch: `codex/episode-rollout-10fields`
-- Baseline: `911da56` (`codex/fixed-instance-overfit`)
-- Initial checkpoint: persistent B42/240 copy
-- SHA256: `71cfda4f20805e553888854ebd12ba47b6244fbe25ce7ae0a62f7cdf8faa7560`
-- Missing original u780: not sought, not retrained, not substituted.
+- Review baseline: `2d44e57`; fixes after that commit
+- Baseline code: `911da56` (`codex/fixed-instance-overfit`)
+- **Initialization: random actor and critic; no B42/240 weights**
+- Original u780: not sought, not retrained, not substituted.
 
 ## Why the mode exists
 
@@ -28,9 +28,9 @@ starts with a reset only because a new episode is required. The legacy
 | GPUs / world size | 4 |
 | episodes per synchronized update | 16 |
 | safety cap | 500 environment steps/episode |
-| start | B42/240 weights, new optimizers, update 0, new schedules |
-| actor LR | 3e-4 |
-| critic LR | 0.003 |
+| start | **random actor/critic**, new optimizers, update 0, new schedules |
+| actor LR | **1e-4** |
+| critic LR | **0.003** |
 | gamma / GAE lambda | 1.0 / 0.95 |
 | clip / epochs / batch | inherited: 0.2 / 4 / 64 |
 | entropy schedule | inherited: 0.01, hold 0.1, end 0.0 |
@@ -39,14 +39,16 @@ starts with a reset only because a new episode is required. The legacy
 | reward | time, existing maneuver proxy |
 | randomize_uav | false |
 | optimizer protocol | transition-weighted PPO (not per-trajectory weighting) |
-| update budget | 200 (not a convergence claim) |
+| update budget | **600** = 9,600 sampled episodes (not a convergence claim) |
 | checkpoint/eval | update 0 and every 10 updates |
 | training seed | 42 |
 
 The complete resolved config and a field-by-field diff are in
-[`episode_rollout_resolved_config.json`](episode_rollout_resolved_config.json).
-Only collection scope/protocol fields change; no reward, feature, network,
-executor, workload, resupply or return logic changes.
+[`episode_rollout_resolved_config_random.json`](episode_rollout_resolved_config_random.json).
+Relative to the bank configuration, the only real change is actor LR
+`3e-4 → 1e-4`; critic LR remains `0.003`, and no reward, feature, network,
+executor, workload, resupply or return logic changes. LR schedule is explicitly
+`none`.
 
 ## Fixed banks
 
@@ -112,7 +114,10 @@ Supported: **exact continuation at a saved update boundary**. A CPU test
 (2 episodes/rank, 2 updates) compared a continuous update-2 checkpoint with a
 checkpoint resumed from update 1: actor and critic tensors were bit-identical.
 The checkpoint stores actor/critic/optimizers, RNG, rank runtime/environment and
-update count. Mid-episode resume is **not** supported and not claimed.
+update count. Resume validates world size, episodes per rank, update budget,
+seed, collection mode, training bank and validation bank before continuing.
+Same-directory resume is tested. Mid-episode resume is **not** supported and not
+claimed.
 
 ## Formal command (NOT executed)
 
@@ -122,9 +127,9 @@ PYTHONPATH=. /home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/bin/python \
   -m coverage_env.rl.trainer.episode_worker \
   --bank /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/train10 \
   --validation-bank /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/valid30 \
-  --initial-checkpoint /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/initial_B42_240.pt \
-  --output /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_s42 \
-  --num-updates 200 --episodes-per-rank 4 --seed 42 \
+  --output /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_s42 \
+  --num-updates 600 --episodes-per-rank 4 --seed 42 \
+  --actor-lr 1e-4 --critic-lr 3e-3 \
   --device cuda --checkpoint-every 10
 ```
 
@@ -142,15 +147,17 @@ PYTHONPATH=. /home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/bin/python \
 
 ## Cost estimate (conditional, from 3-update smoke)
 
-Smoke was 2 training instances + 2 validation instances, 4 GPUs, 4 episodes/rank:
-3 updates took **119 s total wall**, of which training accounting was **51.6 s**
-(≈17.2 s/update). Extrapolating training only: 200 updates ≈ **57 min**.
+Random-init smoke was 2 training instances + 2 validation instances, 4 GPUs,
+4 episodes/rank: **3 updates took 122 s total wall**, of which training
+accounting was **54.9 s** (≈18.3 s/update). Training-only extrapolation:
+600 updates ≈ **3.0 h**.
 
 Evaluation cost scales with 40 instances/checkpoint (10 train + 30 validation)
-and 21 evaluation points (0,10,…,200); smoke had 4 instances/checkpoint and
-4 points. Using the smoke eval share gives a conservative **~40–60 min** for
-evaluation. Therefore the formal run should be budgeted at **roughly 1.5–2 h**,
-not 57 min. This is an estimate, not a measured 200-update time.
+and 61 evaluation points (0,10,…,600); smoke had 4 instances/checkpoint and
+4 points. Using the smoke eval share gives a conservative **~2.5–3 h** for
+evaluation. Therefore the formal run should be budgeted at **roughly 5–6.5 h**,
+pending the reviewer's acceptance. This is an estimate, not a measured
+600-update time.
 
 ## Tests
 

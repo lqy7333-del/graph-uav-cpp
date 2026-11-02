@@ -6,7 +6,7 @@ never resets between updates just to fill a step budget, and pads only for DDP
 synchronization (masked rows never enter a loss).
 """
 from __future__ import annotations
-import copy, json, math, time
+import copy, json, math, time, traceback
 from pathlib import Path
 import torch
 import torch.distributed as dist
@@ -122,6 +122,38 @@ class EpisodeRolloutTrainer(OverfitTrainer):
             with (directory / "validation_curve.csv").open("w", newline="", encoding="utf-8") as stream:
                 writer = csv.DictWriter(stream, fieldnames=keys)
                 writer.writeheader(); writer.writerows(history)
+
+    def _all_rank_phase_check(self, local_error, *, update_idx, phase):
+        """Synchronize a sampling/gate-construction failure across all ranks.
+
+        Every rank reaches this method even when its own phase raised. A single
+        failing rank therefore cannot leave the others entering a collective
+        alone. Rank 0 writes the gathered diagnostics before all ranks raise.
+        """
+        flag = torch.tensor([1.0 if local_error else 0.0], dtype=torch.float64,
+                            device=self.agent.device)
+        if dist.is_initialized():
+            dist.all_reduce(flag, op=dist.ReduceOp.MAX)
+        any_error = bool(float(flag.item()) > 0.0)
+        if not any_error:
+            return
+        gathered = [None] * self.world_size
+        if dist.is_initialized():
+            dist.all_gather_object(gathered, local_error)
+        else:
+            gathered = [local_error]
+        if self.rank == 0 and self.checkpoint_dir is not None:
+            directory = Path(self.checkpoint_dir) / "run_failures"
+            directory.mkdir(parents=True, exist_ok=True)
+            payload = {"update": update_idx, "phase": phase,
+                       "errors": gathered, "config": self.config,
+                       "run_metadata": self.run_metadata}
+            path = directory / f"update_{update_idx}_{phase}.json"
+            path.write_text(json.dumps(payload, indent=2, ensure_ascii=False,
+                                       default=str), encoding="utf-8")
+        if dist.is_initialized():
+            dist.barrier()
+        raise RuntimeError(f"all-rank {phase} failure at update {update_idx}: {gathered}")
 
     def _sample_action(self, state):
         with torch.no_grad():
@@ -257,7 +289,14 @@ class EpisodeRolloutTrainer(OverfitTrainer):
             self._save_checkpoint(0)
         for update_idx in range(max(1, start_update), last_update + 1):
             started = time.perf_counter()
-            closure = self._collect_episodes()
+            before_stats = (self._stats_completed, self._stats_failed, self._stats_truncated)
+            collect_error = None
+            try:
+                closure = self._collect_episodes()
+            except Exception as exc:
+                collect_error = {"rank": self.rank, "phase": "collect",
+                                 "error": repr(exc), "traceback": traceback.format_exc()}
+            self._all_rank_phase_check(collect_error, update_idx=update_idx, phase="collect")
             transitions = list(self.buffer.transitions)
             adv, returns = compute_advantage(
                 [t.reward for t in transitions], [t.value for t in transitions],
@@ -280,15 +319,24 @@ class EpisodeRolloutTrainer(OverfitTrainer):
                 global_steps = int(max_len.item())
             else:
                 global_steps = local_count
-            # Reuse the audited pre/post update gates on the complete-episode buffer.
-            local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {
-                "value_state_gap_max": 0.0, "value_state_scale": 1.0, "pair_q_max": 0.0,
-                "tail_value_error": 0.0, "tail_value_scale": 1.0, "tail_q": 0.0,
-                "replay_logprob_error": 0.0, "replay_value_error": 0.0,
-                "episode_closure_error_max": closure,
-                "finite": all(math.isfinite(t.reward) and math.isfinite(t.value)
-                              and math.isfinite(t.next_value) for t in transitions),
-            }
+            # Construct gate metrics defensively. A rank-local exception here
+            # must be synchronized before any rank enters _gate_or_abort's
+            # collectives.
+            gate_error = None
+            try:
+                local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {
+                    "value_state_gap_max": 0.0, "value_state_scale": 1.0, "pair_q_max": 0.0,
+                    "tail_value_error": 0.0, "tail_value_scale": 1.0, "tail_q": 0.0,
+                    "replay_logprob_error": 0.0, "replay_value_error": 0.0,
+                    "episode_closure_error_max": closure,
+                    "finite": all(math.isfinite(t.reward) and math.isfinite(t.value)
+                                  and math.isfinite(t.next_value) for t in transitions),
+                }
+            except Exception as exc:
+                local_gate = None
+                gate_error = {"rank": self.rank, "phase": "gate_construct",
+                              "error": repr(exc), "traceback": traceback.format_exc()}
+            self._all_rank_phase_check(gate_error, update_idx=update_idx, phase="gate_construct")
             if self.value_gate_enabled:
                 gate = self._gate_or_abort(local_gate, update_idx)
             else:
@@ -310,9 +358,9 @@ class EpisodeRolloutTrainer(OverfitTrainer):
                     "episodes_this_update": self.episodes_per_rank,
                     "transitions_this_update": local_count,
                     "transitions_total_rank0": self._rank_stats["transitions"],
-                    "completed_this_update": self._stats_completed,
-                    "failed_this_update": self._stats_failed,
-                    "truncated_this_update": self._stats_truncated,
+                    "completed_this_update": self._stats_completed - before_stats[0],
+                    "failed_this_update": self._stats_failed - before_stats[1],
+                    "truncated_this_update": self._stats_truncated - before_stats[2],
                     "optimizer_steps_total": self._rank_stats["optimizer_steps"],
                     "update_wall_seconds": round(float(self._rank_stats["wall_seconds"]), 3),
                     "entropy_coef": round(float(progress["entropy_coef"]), 6),

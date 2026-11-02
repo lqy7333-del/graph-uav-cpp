@@ -470,13 +470,13 @@ class PPOAgent:
         world = 1
         if torch.distributed.is_available() and torch.distributed.is_initialized():
             world = torch.distributed.get_world_size()
-        scale = float(world) / float(global_valid_count)
         batch_size = max(1, self.batch_size)
         actor_losses, critic_losses, entropies, policy_losses = [], [], [], []
         ratio_stds, clip_fractions, approx_kls, grad_norms = [], [], [], []
         preds, targets = [], []
         valid_adv = adv[mask]
         advantage_std = self._tensor_std(valid_adv)
+        optimizer_steps = 0
         for _epoch in range(max(1, self.epochs)):
             permutation = torch.randperm(global_steps).tolist()
             for start in range(0, global_steps, batch_size):
@@ -491,6 +491,24 @@ class PPOAgent:
                 )
                 ratios = torch.exp(current_log_probs - old_log_probs)
                 weights = mask[batch_indices].to(current_log_probs.dtype)
+                valid = mask[batch_indices]
+                # Normalize by THIS synchronized mini-batch's valid count, not
+                # the whole rollout. This preserves ordinary PPO's per-minibatch
+                # loss scale when several minibatches immediately update Adam.
+                local_batch_count = float(valid.sum().item())
+                batch_count = local_batch_count
+                if torch.distributed.is_available() and torch.distributed.is_initialized():
+                    count_tensor = torch.tensor([batch_count], dtype=torch.float64,
+                                                device=self.device)
+                    torch.distributed.all_reduce(count_tensor, op=torch.distributed.ReduceOp.SUM)
+                    batch_count = float(count_tensor.item())
+                if batch_count <= 0.0:
+                    # Global padding-only mini-batch: every rank must skip both
+                    # optimizer steps so Adam momentum cannot move parameters.
+                    self.actor_optimizer.zero_grad(set_to_none=True)
+                    self.critic_optimizer.zero_grad(set_to_none=True)
+                    continue
+                scale = float(world) / batch_count
                 batch_advantages = adv[batch_indices]
                 unclipped = ratios * batch_advantages
                 clipped = torch.clamp(ratios, 1.0 - self.clip_ratio,
@@ -508,8 +526,8 @@ class PPOAgent:
                 (self.value_coef * critic_loss).backward()
                 nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
                 self.critic_optimizer.step()
+                optimizer_steps += 1
 
-                valid = mask[batch_indices]
                 if bool(valid.any().item()):
                     actor_losses.append(float(actor_loss.detach().item()))
                     critic_losses.append(float(critic_loss.detach().item()))
@@ -524,7 +542,8 @@ class PPOAgent:
                                         if torch.is_tensor(total_norm) else float(total_norm))
                     preds.append(current_values.detach()[valid])
                     targets.append(ret[batch_indices].detach()[valid])
-        self.update_count += 1
+        if optimizer_steps:
+            self.update_count += 1
         prediction = torch.cat(preds) if preds else torch.zeros(0, device=self.device)
         target = torch.cat(targets) if targets else torch.zeros(0, device=self.device)
         return {
@@ -542,7 +561,7 @@ class PPOAgent:
             "clip_fraction": sum(clip_fractions) / len(clip_fractions) if clip_fractions else 0.0,
             "approx_kl": sum(approx_kls) / len(approx_kls) if approx_kls else 0.0,
             "actor_grad_norm": sum(grad_norms) / len(grad_norms) if grad_norms else 0.0,
-            "updates": len(actor_losses),
+            "updates": optimizer_steps,
             "actor_samples": int(mask.sum().item()),
             "excluded_actor_samples": int((~mask).sum().item()),
         }

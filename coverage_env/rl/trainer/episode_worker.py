@@ -32,6 +32,28 @@ def _worker(rank, world_size, args):
             config = saved["resolved_config"]
             environment = saved["rank_runtime"][rank]["environment"]
             manifest = environment.manifest
+            meta = saved.get("training_metadata", {})
+            if meta.get("world_size") != world_size:
+                raise ValueError("resume world_size does not match checkpoint")
+            if int(meta.get("episodes_per_rank", -1)) != int(args.episodes_per_rank):
+                raise ValueError("resume episodes_per_rank does not match checkpoint")
+            if int(meta.get("num_updates", -1)) != int(args.num_updates):
+                raise ValueError("resume num_updates does not match checkpoint")
+            if int(meta.get("seed", -1)) != int(args.seed):
+                raise ValueError("resume seed does not match checkpoint")
+            if meta.get("collection_mode") != "complete_episodes":
+                raise ValueError("resume checkpoint is not complete_episodes mode")
+            from coverage_env.env.fixed_instance_pool import file_sha256
+            args_bank_sha = file_sha256(Path(args.bank) / "manifest.json")
+            if meta.get("bank_manifest_sha") != args_bank_sha:
+                raise ValueError("resume --bank identity does not match checkpoint")
+            if meta.get("bank_manifest_sha") != environment.manifest_sha:
+                raise ValueError("resume training bank changed")
+            if args.validation_bank:
+                from coverage_env.env.fixed_instance_pool import file_sha256
+                val_sha = file_sha256(Path(args.validation_bank) / "manifest.json")
+                if meta.get("validation_bank_manifest_sha") != val_sha:
+                    raise ValueError("resume validation bank changed")
         else:
             environment = FixedInstancePool(args.bank, seed=args.seed + rank)
             manifest = environment.manifest
@@ -49,8 +71,14 @@ def _worker(rank, world_size, args):
             config["ppo"]["max_episode_steps"] = args.max_episode_steps
             config["ppo"]["randomize_uav"] = False
             config["ppo"]["value_gate"] = True
+        if saved is None:
             config["ppo"]["actor_learning_rate"] = float(args.actor_lr)
             config["ppo"]["critic_learning_rate"] = float(args.critic_lr)
+            config["ppo"]["collection_mode"] = "complete_episodes"
+            config["ppo"]["episodes_per_rank"] = args.episodes_per_rank
+            config["ppo"]["max_episode_steps"] = args.max_episode_steps
+            config["ppo"]["randomize_uav"] = False
+            config["ppo"]["value_gate"] = True
         torch.manual_seed(args.seed)
         agent = PPOAgent(CoveragePolicy(environment, config=config), config, device=device)
         if saved is not None:
@@ -87,9 +115,12 @@ def _worker(rank, world_size, args):
             "max_episode_steps": args.max_episode_steps,
             "bank_manifest_sha": environment.manifest_sha,
             "initial_actor_sha256": initial_hash,
-            "initialization": {"checkpoint": str(args.initial_checkpoint),
-                               "sha256": __import__("hashlib").sha256(Path(args.initial_checkpoint).read_bytes()).hexdigest()} if args.initial_checkpoint else None,
-            "purpose": "fixed_10field_complete_episode_finetune",
+            "initialization": ({"checkpoint": str(args.initial_checkpoint),
+                                "sha256": __import__("hashlib").sha256(Path(args.initial_checkpoint).read_bytes()).hexdigest()}
+                               if args.initial_checkpoint else None),
+            "purpose": "fixed_10field_complete_episode_finetune_or_random",
+            "validation_bank_manifest_sha": (__import__("coverage_env.env.fixed_instance_pool", fromlist=["file_sha256"]).file_sha256(Path(args.validation_bank) / "manifest.json")
+                                             if args.validation_bank else None),
         }
         if saved is None:
             random.seed(args.seed + rank); np.random.seed(args.seed + rank); torch.manual_seed(args.seed + rank)
@@ -97,11 +128,13 @@ def _worker(rank, world_size, args):
             Path(args.output).mkdir(parents=True, exist_ok=True)
             if saved is not None:
                 source = Path(args.resume).resolve().parent
-                for name, target in (("references.json", "references.json"),
-                                     ("validation/references.json", "validation/references.json")):
-                    if (source / name).exists():
-                        (Path(args.output) / target).parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(source / name, Path(args.output) / target)
+                output_dir = Path(args.output).resolve()
+                if source != output_dir:
+                    for name, target in (("references.json", "references.json"),
+                                         ("validation/references.json", "validation/references.json")):
+                        if (source / name).exists():
+                            (output_dir / target).parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(source / name, output_dir / target)
             (Path(args.output) / "resolved_config_update_1.json").write_text(
                 json.dumps({"resolved_config": config, "training_metadata": trainer.run_metadata},
                            indent=2, ensure_ascii=False), encoding="utf-8")
@@ -130,13 +163,12 @@ def main():
     p.add_argument("--max-episode-steps", type=int, default=500)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--checkpoint-every", type=int, default=1)
-    p.add_argument("--actor-lr", type=float, default=3e-4)
-    p.add_argument("--critic-lr", type=float, default=1e-3)
+    p.add_argument("--actor-lr", type=float, default=1e-4)
+    p.add_argument("--critic-lr", type=float, default=3e-3)
     p.add_argument("--device", choices=("cuda","cpu"), default="cuda")
     args=p.parse_args()
     if args.episodes_per_rank < 1: raise SystemExit("episodes-per-rank must be positive")
-    if not args.resume and not args.initial_checkpoint:
-        raise SystemExit("provide --initial-checkpoint for a new run or --resume for a boundary continuation")
+    # No initial checkpoint means fresh random actor/critic (the formal mode).
     if args.resume:
         ck = torch.load(args.resume, map_location="cpu", weights_only=False)
         args.num_updates = int(ck["training_metadata"].get("num_updates", args.num_updates))
