@@ -185,6 +185,16 @@ class EpisodeRolloutTests(unittest.TestCase):
         self.assertTrue(repaired["completed"])
         self.assertAlmostEqual(repaired["total_time"], row["total_time"], places=6)
 
+    def test_failed_episode_replay_is_compared_not_forced_to_success(self):
+        env = FixedInstancePool(self.bank, seed=42)
+        row = run_episode(env, lambda _e, _s: (None, 0.0, 0.0), record=True)
+        self.assertFalse(row["completed"])
+        self.assertEqual(row["termination_reason"], "no_action")
+        replay = replay_recorded(env._active, row["actions"])
+        self.assertFalse(replay["completed"])
+        self.assertEqual(replay["termination_reason"], row["termination_reason"])
+        self.assertAlmostEqual(replay["total_time"], row["total_time"], places=6)
+
     def test_eval_actions_are_saved_when_checkpoint_directory_is_used(self):
         pool = FixedInstancePool(self.bank, seed=42)
         agent = PPOAgent(CoveragePolicy(pool, config=self.config), self.config, device="cpu")

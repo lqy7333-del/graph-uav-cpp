@@ -319,6 +319,7 @@ def replay_recorded(environment, actions):
     summary = environment.get_summary()
     return {"completed": bool(done and info.get("success")
                               and info.get("termination_reason") == "mission_complete"),
+            "termination_reason": str(info.get("termination_reason", "no_action")),
             "total_time": float(summary.get("total_time", 0.0)),
             "coverage_ratio": float(summary.get("coverage_ratio", 0.0)),
             "done": bool(done)}

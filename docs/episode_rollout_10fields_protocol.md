@@ -100,8 +100,9 @@ fingerprints are in [`episode_rollout_banks.json`](episode_rollout_banks.json).
 - Training bank curve and validation bank curve are written separately:
   `learning_curve.csv` and `validation/validation_curve.csv`.
 - Evaluation saves full action lists and per-step state summaries; each row is
-  replayed from a pristine environment and must match completion/time before it
-  is written (`replay_ok=true`).
+  replayed from a pristine environment and must match `completed`,
+  `termination_reason`, and total time before it is written. Real failures are
+  retained (never coerced to success); completion rate is reported separately.
 - Evaluation captures/restores Python/NumPy/Torch RNG and does not consume the
   collection pool's order or optimizer state.
 - Failed instances are not dropped; completion rate is reported. Mean cost is

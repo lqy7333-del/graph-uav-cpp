@@ -91,7 +91,7 @@ Test evidence
 
 ### Unit/CPU
 
-`test_episode_rollout.py`: 11 tests, all pass:
+`test_episode_rollout.py`: 12 tests, all pass:
 
 - complete episodes exceed the ignored legacy `rollout_steps`;
 - exactly N starts and no extra reset/zero-step instance at the batch boundary;
@@ -105,12 +105,12 @@ Test evidence
 ### Existing regression subset
 
 `test_fixed_instance_overfit`, `test_maneuver_eval`, `test_training_ddp_runtime`
-+ new tests: 43 tests pass (3 skipped without `RUN_DDP_TESTS=1`).
++ new tests: 44 tests pass (3 skipped without `RUN_DDP_TESTS=1`).
 
 ### Full suite
 
 `python -m unittest discover -s coverage_env/tests -p 'test_*.py'`:
-**303 tests, 301 pass, 2 failures, 3 skipped**.
+**304 tests, 302 pass, 2 failures, 3 skipped**.
 
 The two failures are pre-existing at baseline `911da56` and reproduce there:
 

@@ -1,0 +1,102 @@
+{
+  "two_rank_collect_failure": [
+    {
+      "rank": 0,
+      "phase": "collect",
+      "raised": true,
+      "error": "RuntimeError('all-rank collect failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'collect\\', \\'error\\': \"RuntimeError(\\'injected collect failure\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 299, in train\\\\n    closure = self._collect_episodes()\\\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 40, in <lambda>\\\\n    trainer._collect_episodes=lambda: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected collect failure\\\\\\'))\\\\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 40, in <genexpr>\\\\n    trainer._collect_episodes=lambda: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected collect failure\\\\\\'))\\\\nRuntimeError: injected collect failure\\\\n\\'}]')",
+      "update_count": 0,
+      "log_exists": false,
+      "diag_exists": true
+    },
+    {
+      "rank": 1,
+      "phase": "collect",
+      "raised": true,
+      "error": "RuntimeError('all-rank collect failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'collect\\', \\'error\\': \"RuntimeError(\\'injected collect failure\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 299, in train\\\\n    closure = self._collect_episodes()\\\\n              ^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 40, in <lambda>\\\\n    trainer._collect_episodes=lambda: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected collect failure\\\\\\'))\\\\n                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 40, in <genexpr>\\\\n    trainer._collect_episodes=lambda: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected collect failure\\\\\\'))\\\\nRuntimeError: injected collect failure\\\\n\\'}]')",
+      "update_count": 0,
+      "log_exists": false,
+      "diag_exists": true
+    }
+  ],
+  "two_rank_gate_failure": [
+    {
+      "rank": 0,
+      "phase": "gate",
+      "raised": true,
+      "error": "RuntimeError('all-rank gate_construct failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'gate_construct\\', \\'error\\': \"RuntimeError(\\'injected gate failure\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 331, in train\\\\n    local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {\\\\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 42, in <lambda>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected gate failure\\\\\\'))\\\\n                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 42, in <genexpr>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected gate failure\\\\\\'))\\\\nRuntimeError: injected gate failure\\\\n\\'}]')",
+      "update_count": 0,
+      "log_exists": false,
+      "diag_exists": true
+    },
+    {
+      "rank": 1,
+      "phase": "gate",
+      "raised": true,
+      "error": "RuntimeError('all-rank gate_construct failure at update 1: [None, {\\'rank\\': 1, \\'phase\\': \\'gate_construct\\', \\'error\\': \"RuntimeError(\\'injected gate failure\\')\", \\'traceback\\': \\'Traceback (most recent call last):\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/coverage_env/rl/trainer/episode_rollout.py\", line 331, in train\\\\n    local_gate = self._local_gate_metrics(transitions, closure) if self.value_gate_enabled else {\\\\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 42, in <lambda>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected gate failure\\\\\\'))\\\\n                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\\\n  File \"/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/ddp_failure_smoke.py\", line 42, in <genexpr>\\\\n    trainer._local_gate_metrics=lambda *a, **k: (_ for _ in ()).throw(RuntimeError(\\\\\\'injected gate failure\\\\\\'))\\\\nRuntimeError: injected gate failure\\\\n\\'}]')",
+      "update_count": 0,
+      "log_exists": false,
+      "diag_exists": true
+    }
+  ],
+  "two_rank_gradient": {
+    "update_steps": 2,
+    "ratio_std": 0.0,
+    "actor_max_grad_diff": 5.960464477539063e-08,
+    "critic_max_grad_diff": 2.9802322387695312e-08,
+    "ddp_actor_gn": 2.9364481509825744,
+    "ref_actor_gn": 2.9364482282371416,
+    "ddp_critic_gn": 1.3764029314325212,
+    "ref_critic_gn": 1.3764029243012958,
+    "ref_losses": [
+      -0.8628265261650085,
+      -1.1504231691360474,
+      -2.013108253479004
+    ],
+    "zero_grad_calls": [
+      "a",
+      "c",
+      "a",
+      "c"
+    ],
+    "optimizer_steps": [
+      "a",
+      "c",
+      "a",
+      "c"
+    ],
+    "ddp_actor_loss": -0.8628265261650085,
+    "ddp_policy_loss": -0.8571429252624512,
+    "ddp_entropy": 0.5683625340461731,
+    "rank0_rows": 3,
+    "rank1_rows": 6,
+    "batch_size": 4,
+    "global_steps": 6,
+    "padding_batch_rank0": true
+  },
+  "same_dir_resume": {
+    "same_dir_resume": true,
+    "actor_equal": true,
+    "critic_equal": true,
+    "actor_lr": 0.0001,
+    "critic_lr": 0.003,
+    "transitions": 98
+  },
+  "random_smoke": {
+    "transitions": 951,
+    "episodes": 48,
+    "optimizer_steps_global_synchronous": 24,
+    "optimizer_steps_per_rank_sum": 96,
+    "wall_seconds_max": 54.89938189300301,
+    "field_counts": {
+      "10": 48
+    }
+  },
+  "full_suite": {
+    "tests": 304,
+    "pass": 302,
+    "fail": 2,
+    "skipped": 3,
+    "failures_pre_existing_at": "911da56"
+  }
+}

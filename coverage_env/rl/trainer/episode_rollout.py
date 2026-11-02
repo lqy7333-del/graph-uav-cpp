@@ -70,15 +70,19 @@ class EpisodeRolloutTrainer(OverfitTrainer):
                 row = run_episode(env, choose, record=True)
                 row.update(index=index, seed=manifest["instances"][index]["seed"])
                 replay = replay_recorded(copy.deepcopy(templates[index]), row["actions"])
-                if (not replay["completed"] or abs(replay["total_time"] - row["total_time"]) > 1e-6):
-                    raise RuntimeError(f"recorded validation replay failed for instance {index}")
-                row["replay_ok"] = True
+                same = (replay["completed"] == row["completed"]
+                        and replay["termination_reason"] == row["termination_reason"]
+                        and abs(replay["total_time"] - row["total_time"]) <= 1e-6)
+                if not same:
+                    raise RuntimeError(f"recorded validation replay mismatch for instance {index}: "
+                                       f"original=({row['completed']},{row['termination_reason']},{row['total_time']}) "
+                                       f"replay=({replay['completed']},{replay['termination_reason']},{replay['total_time']})")
+                row["replay_ok"] = bool(same)
+                row["replay"] = replay
                 local["rows"].append(row)
                 if update_idx == 0:
                     base = run_episode(copy.deepcopy(templates[index]), _nn_choice, record=True)
                     base.update(index=index, seed=row["seed"])
-                    if not base["completed"]:
-                        raise RuntimeError("NN cannot complete validation instance")
                     local["nn"].append(base)
         except Exception as exc:
             local["error"] = repr(exc)

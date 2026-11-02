@@ -41,6 +41,10 @@ def _worker(rank, world_size, args):
                 raise ValueError("resume num_updates does not match checkpoint")
             if int(meta.get("seed", -1)) != int(args.seed):
                 raise ValueError("resume seed does not match checkpoint")
+            if int(meta.get("max_episode_steps", -1)) != int(args.max_episode_steps):
+                raise ValueError("resume max_episode_steps does not match checkpoint")
+            if args.initial_checkpoint is not None:
+                raise ValueError("resume cannot change the initialization source")
             if meta.get("collection_mode") != "complete_episodes":
                 raise ValueError("resume checkpoint is not complete_episodes mode")
             from coverage_env.env.fixed_instance_pool import file_sha256
@@ -49,11 +53,16 @@ def _worker(rank, world_size, args):
                 raise ValueError("resume --bank identity does not match checkpoint")
             if meta.get("bank_manifest_sha") != environment.manifest_sha:
                 raise ValueError("resume training bank changed")
-            if args.validation_bank:
-                from coverage_env.env.fixed_instance_pool import file_sha256
+            from coverage_env.env.fixed_instance_pool import file_sha256
+            saved_val = meta.get("validation_bank_manifest_sha")
+            if saved_val:
+                if not args.validation_bank:
+                    raise ValueError("resume must provide the checkpoint's validation bank")
                 val_sha = file_sha256(Path(args.validation_bank) / "manifest.json")
-                if meta.get("validation_bank_manifest_sha") != val_sha:
+                if saved_val != val_sha:
                     raise ValueError("resume validation bank changed")
+            elif args.validation_bank:
+                raise ValueError("checkpoint had no validation bank; cannot add one on resume")
         else:
             environment = FixedInstancePool(args.bank, seed=args.seed + rank)
             manifest = environment.manifest
@@ -131,10 +140,17 @@ def _worker(rank, world_size, args):
                 output_dir = Path(args.output).resolve()
                 if source != output_dir:
                     for name, target in (("references.json", "references.json"),
-                                         ("validation/references.json", "validation/references.json")):
+                                         ("validation/references.json", "validation/references.json"),
+                                         ("learning_curve.csv", "learning_curve.csv"),
+                                         ("validation/validation_curve.csv", "validation/validation_curve.csv"),
+                                         ("best.json", "best.json"),
+                                         ("validation/best.json", "validation/best.json")):
                         if (source / name).exists():
                             (output_dir / target).parent.mkdir(parents=True, exist_ok=True)
                             shutil.copy2(source / name, output_dir / target)
+                    for dirname in ("evaluation", "validation/evaluation"):
+                        if (source / dirname).is_dir():
+                            shutil.copytree(source / dirname, output_dir / dirname, dirs_exist_ok=True)
             (Path(args.output) / "resolved_config_update_1.json").write_text(
                 json.dumps({"resolved_config": config, "training_metadata": trainer.run_metadata},
                            indent=2, ensure_ascii=False), encoding="utf-8")

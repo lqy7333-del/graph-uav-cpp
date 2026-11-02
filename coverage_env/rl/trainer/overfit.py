@@ -142,16 +142,20 @@ class OverfitTrainer(DistributedTrainer):
                 row.update(index=index, seed=manifest["instances"][index]["seed"])
                 self._check_eval_row(row)
                 replay = replay_recorded(deepcopy(templates[index]), row["actions"])
-                if (not replay["completed"] or abs(replay["total_time"] - row["total_time"]) > 1e-6):
-                    raise RuntimeError(f"recorded action replay failed for fixed instance {index}")
-                row["replay_ok"] = True
+                same = (replay["completed"] == row["completed"]
+                        and replay["termination_reason"] == row["termination_reason"]
+                        and abs(replay["total_time"] - row["total_time"]) <= 1e-6)
+                if not same:
+                    raise RuntimeError(f"recorded action replay mismatch for fixed instance {index}: "
+                                       f"original=({row['completed']},{row['termination_reason']},{row['total_time']}) "
+                                       f"replay=({replay['completed']},{replay['termination_reason']},{replay['total_time']})")
+                row["replay_ok"] = bool(same)
+                row["replay"] = replay
                 local["rows"].append(row)
                 if update_idx == 0:
                     baseline = run_episode(deepcopy(templates[index]), _nn_choice, record=True)
                     baseline.update(index=index, seed=row["seed"])
                     self._check_eval_row(baseline)
-                    if not baseline["completed"]:
-                        raise RuntimeError(f"NN cannot complete fixed instance {index}; do not silently replace it.")
                     local["nn"].append(baseline)
         except Exception as exc:
             local["error"] = repr(exc)
