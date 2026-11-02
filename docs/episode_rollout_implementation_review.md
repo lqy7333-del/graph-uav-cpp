@@ -91,7 +91,7 @@ Test evidence
 
 ### Unit/CPU
 
-`test_episode_rollout.py`: 7 tests, all pass:
+`test_episode_rollout.py`: 11 tests, all pass:
 
 - complete episodes exceed the ignored legacy `rollout_steps`;
 - exactly N starts and no extra reset/zero-step instance at the batch boundary;
@@ -105,12 +105,12 @@ Test evidence
 ### Existing regression subset
 
 `test_fixed_instance_overfit`, `test_maneuver_eval`, `test_training_ddp_runtime`
-+ new tests: 39 tests pass (3 skipped without `RUN_DDP_TESTS=1`).
++ new tests: 43 tests pass (3 skipped without `RUN_DDP_TESTS=1`).
 
 ### Full suite
 
 `python -m unittest discover -s coverage_env/tests -p 'test_*.py'`:
-**299 tests, 297 pass, 2 failures, 3 skipped**.
+**303 tests, 301 pass, 2 failures, 3 skipped**.
 
 The two failures are pre-existing at baseline `911da56` and reproduce there:
 
@@ -133,8 +133,8 @@ python -m coverage_env.rl.trainer.episode_worker \
  --device cuda --checkpoint-every 1
 ```
 
-Result: exit 0, wall **119 s**; 3 updates; rank0 12 episodes / 214 transitions;
-global 48 episodes / 868 transitions; 24 synchronized optimizer steps;
+Result: exit 0, wall **122 s**; 3 updates; rank0 12 episodes / 236 transitions;
+global 48 episodes / 951 transitions; 24 synchronized optimizer steps;
 no failed or truncated episodes; gates passed; train and validation eval wrote
 recorded actions and replay_ok=true for each row.
 
