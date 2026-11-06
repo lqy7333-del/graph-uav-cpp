@@ -1,5 +1,20 @@
 ## 2026-11-06
 
+### 125. **CHANet 组件消融 C/D：去跨地块/去内部边界交互**
+
+- 新增 `no_cross_field_boundary`（C）和 `no_intra_boundary`（D）variant；
+  NodeLocalResidual 以逐节点残差 MLP 替换对应 BoundaryInter/Intra 层，保持
+  residual/LayerNorm/GELU，宽度902按参数量规则选择。
+- C/D encoder 983,174 vs A 983,296（−122，−0.0124%）；actor 1,252,105 vs
+  1,252,227；替换层 232,198 vs 232,320。
+- 配对初始化扩展为复制所有未替换模块，包括保留的图交互层；仅替换层随机初始化；
+  optimizer 新建；strict load。
+- C/D 四卡 smoke、update3→4 恢复均通过；12 episodes/rank、seed/指纹与 A 一致、
+  无门禁/NaN/DDP 错误。
+- 新增 C/D edge-isolation、local isolation、single/batch、paired-init 测试；
+  targeted tests 50 passed。
+- C/D 正式 1,200-update 训练已按顺序启动，结果待汇总。
+
 ### 124. **CHANet A/B 在全新 10 地块实例上的配对确认**
 
 - 冻结 A_u1060、A_u1200、B_u760、B_u1200，在 20 个全新 10 地块实例上

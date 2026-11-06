@@ -105,3 +105,74 @@ def test_worker_b_update_restore_and_variant_rejection(setup,tmp_path):
     assert restored['rank_runtime'][0]['instance_stream']==continuous['rank_runtime'][0]['instance_stream']
     with pytest.raises(ValueError,match='variant changed'):
         _worker(0,1,args('bad',resume=str(tmp_path/'B/ckpt_update_1.pt'),encoder_variant='chanet'))
+
+
+def test_component_c_d_edge_isolation_single_batch_gradients(setup):
+    c, envs = setup
+    graphs = [GraphBuilder(c).build_graph(e) for e in envs]
+    a = CoverageGraphEncoder.from_config(c['rl']['encoder'])
+    c_enc = CoverageGraphEncoder.from_config({**c['rl']['encoder'], 'variant':'no_cross_field_boundary'})
+    d_enc = CoverageGraphEncoder.from_config({**c['rl']['encoder'], 'variant':'no_intra_boundary'})
+    for m in (a,c_enc,d_enc): m.eval()
+    # Parameter counts remain within the replacement-width rule.
+    na=sum(p.numel() for p in a.parameters())
+    for m in (c_enc,d_enc):
+        nm=sum(p.numel() for p in m.parameters())
+        assert abs(nm-na)/na < .01
+    from coverage_env.rl.graph.relation_builder import EDGE_BB_INTER, EDGE_BB_INTRA
+    g=graphs[0]
+    inter=copy.deepcopy(g); inter.edge_attr=inter.edge_attr.clone()
+    inter.edge_attr[g.edge_type==EDGE_BB_INTER] += 5.0
+    intra=copy.deepcopy(g); intra.edge_attr=intra.edge_attr.clone()
+    intra.edge_attr[g.edge_type==EDGE_BB_INTRA] += 5.0
+    for target in (a,c_enc,d_enc):
+        target.eval()
+        base=target(g)
+        # C ignores cross-field edge attributes; A and D can respond.
+        c_out=target(inter)
+        d_out=target(intra)
+        if target is c_enc:
+            assert torch.equal(base['boundary_embedding'],c_out['boundary_embedding'])
+            assert not torch.equal(base['boundary_embedding'],d_out['boundary_embedding'])
+        elif target is d_enc:
+            assert torch.equal(base['boundary_embedding'],d_out['boundary_embedding'])
+            assert not torch.equal(base['boundary_embedding'],c_out['boundary_embedding'])
+        else:
+            assert not torch.equal(base['boundary_embedding'],c_out['boundary_embedding'])
+            assert not torch.equal(base['boundary_embedding'],d_out['boundary_embedding'])
+    # Local replacement: changing another node cannot affect the target row.
+    from coverage_env.rl.encoder.component_ablation import NodeLocalResidual, reference_gat_parameter_count
+    local=NodeLocalResidual(16, reference_gat_parameter_count(16,4,4), 4, 0.0).eval()
+    h=torch.randn(5,16); h2=h.clone(); h2[0]+=3.0
+    ei=torch.tensor([[0,1],[2,3]],dtype=torch.long); ea=torch.randn(2,4)
+    out,_=local(h,ei,ea); out2,_=local(h2,ei,ea)
+    assert torch.equal(out[1:],out2[1:])
+    # Single and disjoint-union batched paths agree for both variants.
+    batch=collate_graphs(graphs)
+    for enc in (c_enc,d_enc):
+        singles=[enc(g) for g in graphs]
+        joined=encode_graph_batch(enc,batch)
+        for i,row in enumerate(singles):
+            assert torch.allclose(row['field_embedding'],joined['field_embedding'][batch.field_offsets[i]:batch.field_offsets[i+1]],atol=1e-5)
+            assert torch.allclose(row['boundary_embedding'],joined['boundary_embedding'][batch.boundary_offsets[i]:batch.boundary_offsets[i+1]],atol=1e-5)
+        loss=sum((joined[k]*torch.randn_like(joined[k])).sum() for k in ('field_embedding','boundary_embedding'))
+        loss.backward()
+        assert all(p.grad is not None and torch.isfinite(p.grad).all() for p in enc.parameters())
+
+
+def test_component_c_d_paired_initialization_copies_retained_layers(setup,tmp_path):
+    c,envs=setup
+    a=PPOAgent(CoveragePolicy(envs[0],config=c),c,device='cpu')
+    payload=a.checkpoint_payload(); payload.update(update_idx=0,training_metadata={'initialization':None,'seed':42})
+    path=tmp_path/'a0.pt'; torch.save(payload,path)
+    for variant,replaced in (('no_cross_field_boundary','encoder.boundary_inter_encoder.'),
+                              ('no_intra_boundary','encoder.boundary_intra_encoder.')):
+        cc=copy.deepcopy(c); cc['rl']['encoder']['variant']=variant
+        agent=PPOAgent(CoveragePolicy(envs[0],config=cc),cc,device='cpu')
+        meta=initialize_from_a_zero(agent,path,cc,{'seed':42})
+        assert meta['encoder_variant']==variant and meta['replaced_modules']==[replaced]
+        assert meta['copied_critic'] and not agent.actor_optimizer.state
+        for key,value in payload['actor'].items():
+            if key.startswith(replaced): continue
+            assert key in agent.actor.state_dict() and torch.equal(value,agent.actor.state_dict()[key]),key
+        assert any(k.startswith(replaced) for k in agent.actor.state_dict())

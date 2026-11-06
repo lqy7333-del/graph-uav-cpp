@@ -14,6 +14,9 @@ from coverage_env.rl.graph.relation_builder import (
 )
 from coverage_env.rl.encoder.feature_embedding import FeatureEmbedding
 from coverage_env.rl.encoder.relation_gat import RelationGATLayer
+from coverage_env.rl.encoder.component_ablation import (
+    NodeLocalResidual, reference_gat_parameter_count,
+)
 
 
 class BoundaryInterEncoder(nn.Module):
@@ -135,9 +138,13 @@ class CoverageGraphEncoder(nn.Module):
         boundary_input_dim: int = 5,
         uav_input_dim: int = 11,
         relation_input_dim: int = 4,
+        variant: str = "chanet",
     ) -> None:
         super().__init__()
         self.hidden_dim = int(hidden_dim)
+        if variant not in ("chanet", "no_cross_field_boundary", "no_intra_boundary"):
+            raise ValueError(f"Unknown encoder variant: {variant}")
+        self.variant = variant
         self.feature_embedding = FeatureEmbedding(
             field_input_dim=field_input_dim,
             boundary_input_dim=boundary_input_dim,
@@ -145,12 +152,22 @@ class CoverageGraphEncoder(nn.Module):
             hidden_dim=hidden_dim,
             dropout=dropout,
         )
-        self.boundary_inter_encoder = BoundaryInterEncoder(
-            hidden_dim, relation_input_dim, num_heads, dropout
-        )
-        self.boundary_intra_encoder = BoundaryIntraEncoder(
-            hidden_dim, relation_input_dim, num_heads, dropout
-        )
+        inter_count = reference_gat_parameter_count(hidden_dim, relation_input_dim, num_heads)
+        intra_count = reference_gat_parameter_count(hidden_dim, relation_input_dim, num_heads)
+        if variant == "no_cross_field_boundary":
+            self.boundary_inter_encoder = NodeLocalResidual(
+                hidden_dim, inter_count, num_heads, dropout)
+        else:
+            self.boundary_inter_encoder = BoundaryInterEncoder(
+                hidden_dim, relation_input_dim, num_heads, dropout
+            )
+        if variant == "no_intra_boundary":
+            self.boundary_intra_encoder = NodeLocalResidual(
+                hidden_dim, intra_count, num_heads, dropout)
+        else:
+            self.boundary_intra_encoder = BoundaryIntraEncoder(
+                hidden_dim, relation_input_dim, num_heads, dropout
+            )
         self.field_boundary_encoder = FieldBoundaryEncoder(
             hidden_dim, relation_input_dim, num_heads, dropout
         )
@@ -171,12 +188,13 @@ class CoverageGraphEncoder(nn.Module):
                 hidden_dim=int(values.get("hidden_dim", 128)),
                 num_heads=int(values.get("num_heads", 4)),
                 dropout=float(values.get("dropout", 0.0)))
-        if variant != "chanet":
+        if variant not in ("chanet", "no_cross_field_boundary", "no_intra_boundary"):
             raise ValueError(f"Unknown encoder variant: {variant}")
         return cls(
             hidden_dim=int(values.get("hidden_dim", 128)),
             num_heads=int(values.get("num_heads", 4)),
             dropout=float(values.get("dropout", 0.0)),
+            variant=variant,
         )
 
     def forward(self, graph):

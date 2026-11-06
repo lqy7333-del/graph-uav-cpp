@@ -142,10 +142,10 @@ def _worker(rank, world, args):
             paired_metadata = saved['training_metadata'].get('paired_initialization')
         else:
             variant = variant or 'chanet'
-            if variant == 'node_mlp' and reference is None:
-                raise ValueError('node_mlp experiment requires --paired-init A ckpt_update_0.pt')
+            if variant in ('node_mlp', 'no_cross_field_boundary', 'no_intra_boundary') and reference is None:
+                raise ValueError(f'{variant} requires --paired-init A ckpt_update_0.pt')
             if variant == 'chanet' and reference is not None:
-                raise ValueError('paired-init is reserved for the node_mlp ablation')
+                raise ValueError('paired-init is reserved for ablations, not full CHANet')
         config=json.loads(json.dumps(config))
         if saved is None:
             config['environment']['num_fields']={'min':10,'max':10}
@@ -153,7 +153,7 @@ def _worker(rank, world, args):
                                  max_episode_steps=args.max_episode_steps, randomize_uav=False,
                                  value_gate=True, actor_learning_rate=args.actor_lr,
                                  critic_learning_rate=args.critic_lr)
-        if saved is None and variant == 'node_mlp':
+        if saved is None and variant != 'chanet':
             config['rl']['encoder']['variant'] = variant
         torch.manual_seed(args.seed)
         agent=PPOAgent(CoveragePolicy(environment,config=config),config,device=device)
@@ -233,7 +233,7 @@ def main():
     p.add_argument('--checkpoint-every',type=int,default=10)
     p.add_argument('--eval-every',type=int,default=20)
     p.add_argument('--device',choices=('cuda','cpu'),default='cuda')
-    p.add_argument('--encoder-variant', choices=('chanet', 'node_mlp'), default=None)
+    p.add_argument('--encoder-variant', choices=('chanet', 'node_mlp', 'no_cross_field_boundary', 'no_intra_boundary'), default=None)
     p.add_argument('--paired-init', default=None, help='A update-0 checkpoint for shared random weights only')
     p.add_argument('--stop-at', type=int, default=None, help='bounded smoke; schedules keep num-updates horizon')
     args=p.parse_args()
