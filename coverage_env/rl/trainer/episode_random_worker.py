@@ -130,6 +130,22 @@ def _worker(rank, world, args):
             config=json.loads((Path(args.diagnostic_bank)/'manifest.json').read_text())['config']
             environment=load_bank(args.diagnostic_bank)[1][0]  # policy template only
             stream_state=None; start_update=1
+        variant = getattr(args, 'encoder_variant', None)
+        reference = getattr(args, 'paired_init', None)
+        paired_metadata = None
+        if saved is not None:
+            actual = config['rl']['encoder'].get('variant', 'chanet')
+            if variant is not None and variant != actual:
+                raise ValueError('resume encoder variant changed')
+            if reference is not None:
+                raise ValueError('resume uses saved weights; do not pass paired-init')
+            paired_metadata = saved['training_metadata'].get('paired_initialization')
+        else:
+            variant = variant or 'chanet'
+            if variant == 'node_mlp' and reference is None:
+                raise ValueError('node_mlp experiment requires --paired-init A ckpt_update_0.pt')
+            if variant == 'chanet' and reference is not None:
+                raise ValueError('paired-init is reserved for the node_mlp ablation')
         config=json.loads(json.dumps(config))
         if saved is None:
             config['environment']['num_fields']={'min':10,'max':10}
@@ -137,11 +153,23 @@ def _worker(rank, world, args):
                                  max_episode_steps=args.max_episode_steps, randomize_uav=False,
                                  value_gate=True, actor_learning_rate=args.actor_lr,
                                  critic_learning_rate=args.critic_lr)
+        if saved is None and variant == 'node_mlp':
+            config['rl']['encoder']['variant'] = variant
         torch.manual_seed(args.seed)
         agent=PPOAgent(CoveragePolicy(environment,config=config),config,device=device)
         if saved is not None:
             agent.load_checkpoint(args.resume,map_location=device,restore_rng=False,load_optimizers=True)
             restore_rng_state(saved['rank_runtime'][rank]['rng'])
+        if saved is None and reference is not None:
+            from coverage_env.rl.trainer.chanet_ablation import initialize_from_a_zero
+            paired_metadata = initialize_from_a_zero(agent, reference, config, {
+                'seed': args.seed, 'num_updates': args.num_updates, 'world_size': world,
+                'episodes_per_rank': args.episodes_per_rank, 'num_fields': 10,
+                'instance_mode': 'random_instances', 'collection_mode': 'complete_episodes',
+                'instance_seed_base': args.instance_seed_base, 'max_episode_steps': args.max_episode_steps,
+                'eval_every': args.eval_every,
+                'diagnostic_bank_sha': file_sha256(Path(args.diagnostic_bank)/'manifest.json'),
+                'validation_bank_sha': file_sha256(Path(args.validation_bank)/'manifest.json')})
         validate_optimizer_lrs(agent, config)
         initial_hash=(saved['training_metadata']['initial_actor_sha256'] if saved is not None
                       else parameter_sha256(agent.actor))
@@ -169,7 +197,9 @@ def _worker(rank, world, args):
             'diagnostic_bank_sha':file_sha256(Path(args.diagnostic_bank)/'manifest.json'),
             'validation_bank_sha':file_sha256(Path(args.validation_bank)/'manifest.json'),
             'initial_actor_sha256':initial_hash,'initialization':None,
-            'purpose':'random_instance_fixed_10field_generalization'}
+            'purpose':'random_instance_fixed_10field_generalization',
+            'encoder_variant': config['rl']['encoder'].get('variant', 'chanet'),
+            'paired_initialization': paired_metadata}
         if saved is None:
             random.seed(args.seed+rank); np.random.seed(args.seed+rank); torch.manual_seed(args.seed+rank)
         preparation_error = None
@@ -185,7 +215,8 @@ def _worker(rank, world, args):
             preparation_error = {"rank": rank, "error": repr(exc)}
         trainer._all_rank_phase_check(preparation_error, update_idx=start_update,
                                       phase="resume_history")
-        trainer.train(args.num_updates,None,start_update=start_update)
+        stop_options = {} if getattr(args, 'stop_at', None) is None else {'stop_at': args.stop_at}
+        trainer.train(args.num_updates,None,start_update=start_update, **stop_options)
         if distributed: dist.barrier()
     finally:
         if distributed and dist.is_initialized(): dist.destroy_process_group()
@@ -202,6 +233,9 @@ def main():
     p.add_argument('--checkpoint-every',type=int,default=10)
     p.add_argument('--eval-every',type=int,default=20)
     p.add_argument('--device',choices=('cuda','cpu'),default='cuda')
+    p.add_argument('--encoder-variant', choices=('chanet', 'node_mlp'), default=None)
+    p.add_argument('--paired-init', default=None, help='A update-0 checkpoint for shared random weights only')
+    p.add_argument('--stop-at', type=int, default=None, help='bounded smoke; schedules keep num-updates horizon')
     args=p.parse_args()
     ck = torch.load(args.resume, map_location='cpu', weights_only=False) if args.resume else None
     resolve_run_arguments(args, ck)

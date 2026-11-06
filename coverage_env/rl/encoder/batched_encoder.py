@@ -228,6 +228,13 @@ def encode_graph_batch(encoder, batch: BatchedGraph) -> dict:
     therefore never crosses a component, and the destination softmax stays
     per-node.
     """
+    from .node_mlp import NodeMLPEncoder
+    if isinstance(encoder, NodeMLPEncoder):
+        result = encoder(batch)
+        result.update(graph_context=batched_graph_context(
+            result['field_embedding'], result['boundary_embedding'], batch),
+            attention={}, attended_edges={}, batch=batch)
+        return result
     x_field = batch.x_field
     x_boundary = batch.x_boundary
     x_uav_node = batch.x_uav_node

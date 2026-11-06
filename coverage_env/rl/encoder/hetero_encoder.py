@@ -164,6 +164,15 @@ class CoverageGraphEncoder(nn.Module):
         """Create an encoder from the ``rl.encoder`` YAML section."""
         config = config.get("rl", config)
         values = config.get("encoder", config)
+        variant = values.get("variant", "chanet")
+        if variant == "node_mlp":
+            from .node_mlp import NodeMLPEncoder
+            return NodeMLPEncoder(
+                hidden_dim=int(values.get("hidden_dim", 128)),
+                num_heads=int(values.get("num_heads", 4)),
+                dropout=float(values.get("dropout", 0.0)))
+        if variant != "chanet":
+            raise ValueError(f"Unknown encoder variant: {variant}")
         return cls(
             hidden_dim=int(values.get("hidden_dim", 128)),
             num_heads=int(values.get("num_heads", 4)),
