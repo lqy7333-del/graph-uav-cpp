@@ -88,3 +88,7 @@ Model files remain in the persistent experiment directories:
 - B: `episode10/ablation_node_mlp_s42/ckpt_update_760.pt`, `ckpt_update_1200.pt`
 
 Machine-readable comparison: [`comparison.json`](comparison.json).
+
+Fresh independent confirmation (20 new 10-field instances, frozen models):
+[`fresh_confirm/README.md`](fresh_confirm/README.md). It preserves the gap:
+B−A selected +118.0 s, final +136.7 s; A better on 17/20 and 19/20.
