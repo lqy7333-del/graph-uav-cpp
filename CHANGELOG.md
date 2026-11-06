@@ -1,5 +1,18 @@
 ## 2026-11-06
 
+### 123. **CHANet 主消融 B/node_mlp seed42 完成**
+
+- A 复用 `formal_random_instances_s42`；B 从 A update0 配对初始化，`node_mlp`
+  去除消息传递/边属性；B encoder 982,630 params vs A 983,296。
+- B 4-GPU smoke、update3→4 恢复、1,200-update 正式训练均通过；无失败/截断/NaN/门禁失败。
+- 固定验证面板：A best u1060 3280.0 s，B best u760 3383.6 s；B−A +103.61 s
+  [63.25,142.93]，A 24/30。A u1200 3314.3 vs B 3397.3，B−A +82.96 s
+  [47.12,117.53]，A 24/30。
+- 诊断面板（仅观察）：A best u1180 3374.9，B best u760 3468.0；不用于选模型。
+- 差异主要是 nonwork：selected B−A work +0.4 s、nonwork +86.7 s、maneuver +16.6 s。
+- A wall 9h23m40s，B 8h40m57s；两臂各 19,200 episodes，0 failures/truncations。
+- 单配对训练 seed；未运行 sealed test，不增加种子/预算。
+
 ### 124. CHANet 主消融：配对随机初始化的逐节点 MLP 基线
 
 - 新增 `rl.encoder.variant=node_mlp`，默认 `chanet` 行为保持不变。
