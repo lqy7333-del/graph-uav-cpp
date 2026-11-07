@@ -35,8 +35,8 @@ def resolve_run_arguments(args, saved=None):
         if saved is not None and requested is not None and requested != expected:
             raise ValueError(f"resume {name} changed: {requested!r} != {expected!r}")
         setattr(args, name, expected if requested is None else requested)
-    if args.num_fields != 10:
-        raise ValueError("this protocol requires exactly 10 fields")
+    if args.num_fields not in (10, 30):
+        raise ValueError("this protocol supports exactly 10 or 30 fields")
     if saved is not None:
         if saved['training_metadata'].get('collection_mode') != 'complete_episodes':
             raise ValueError('collection mode changed')
@@ -148,7 +148,7 @@ def _worker(rank, world, args):
                 raise ValueError('paired-init is reserved for ablations, not full CHANet')
         config=json.loads(json.dumps(config))
         if saved is None:
-            config['environment']['num_fields']={'min':10,'max':10}
+            config['environment']['num_fields']={'min':args.num_fields,'max':args.num_fields}
             config['ppo'].update(collection_mode='complete_episodes', episodes_per_rank=args.episodes_per_rank,
                                  max_episode_steps=args.max_episode_steps, randomize_uav=False,
                                  value_gate=True, actor_learning_rate=args.actor_lr,
@@ -164,7 +164,7 @@ def _worker(rank, world, args):
             from coverage_env.rl.trainer.chanet_ablation import initialize_from_a_zero
             paired_metadata = initialize_from_a_zero(agent, reference, config, {
                 'seed': args.seed, 'num_updates': args.num_updates, 'world_size': world,
-                'episodes_per_rank': args.episodes_per_rank, 'num_fields': 10,
+                'episodes_per_rank': args.episodes_per_rank, 'num_fields': args.num_fields,
                 'instance_mode': 'random_instances', 'collection_mode': 'complete_episodes',
                 'instance_seed_base': args.instance_seed_base, 'max_episode_steps': args.max_episode_steps,
                 'eval_every': args.eval_every,
@@ -179,7 +179,7 @@ def _worker(rank, world, args):
             environment,agent,rank=rank,world_size=world,checkpoint_dir=args.output,
             checkpoint_every=args.checkpoint_every,config=config,
             diagnostic_bank=args.diagnostic_bank,validation_bank=args.validation_bank,
-            instance_seed_base=args.instance_seed_base,num_fields=10,
+            instance_seed_base=args.instance_seed_base,num_fields=args.num_fields,
             episodes_per_rank=args.episodes_per_rank,max_episode_steps=args.max_episode_steps,
             eval_every=args.eval_every)
         if stream_state:
@@ -190,14 +190,14 @@ def _worker(rank, world, args):
         trainer.run_metadata={
             'seed':args.seed,'num_updates':args.num_updates,'world_size':world,
             'collection_mode':'complete_episodes','instance_mode':'random_instances',
-            'num_fields':10,'episodes_per_rank':args.episodes_per_rank,
+            'num_fields':args.num_fields,'episodes_per_rank':args.episodes_per_rank,
             'max_episode_steps':args.max_episode_steps,'instance_seed_base':args.instance_seed_base,
             'eval_every':args.eval_every,
             'generator_config_sha':trainer.generator_config_sha,
             'diagnostic_bank_sha':file_sha256(Path(args.diagnostic_bank)/'manifest.json'),
             'validation_bank_sha':file_sha256(Path(args.validation_bank)/'manifest.json'),
             'initial_actor_sha256':initial_hash,'initialization':None,
-            'purpose':'random_instance_fixed_10field_generalization',
+            'purpose':f'random_instance_fixed_{args.num_fields}field_generalization',
             'encoder_variant': config['rl']['encoder'].get('variant', 'chanet'),
             'paired_initialization': paired_metadata}
         if saved is None:

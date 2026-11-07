@@ -121,3 +121,35 @@ class RandomInstanceModeTests(unittest.TestCase):
 
 
 if __name__=='__main__': unittest.main()
+
+
+class Random30FieldModeTests(RandomInstanceModeTests):
+    """The same complete-episode trainer must support explicit 30-field mode."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.c30 = {**cls.config,
+                   'environment': {**cls.config['environment'],
+                                   'num_fields': {'min': 30, 'max': 30}}}
+
+    def test_new_instances_are_30_fields_and_stream_disjoint(self):
+        envs = [InstanceGenerator(self.c30).generate(
+            num_fields=30, seed=1_300_000 + i,
+            randomize_each_reset=False, randomize_uav=False) for i in range(2)]
+        self.assertTrue(all(len(e.fields) == 30 for e in envs))
+        bank = self.root / 'panel30'
+        write_bank(bank, self.c30, envs, [1_300_000, 1_300_001])
+        env0 = load_bank(bank)[1][0]
+        agent = PPOAgent(CoveragePolicy(env0, config=self.c30), self.c30, device='cpu')
+        trainer = RandomInstanceEpisodeTrainer(
+            env0, agent, rank=0, world_size=1, checkpoint_dir=None,
+            config=self.c30, diagnostic_bank=bank, validation_bank=bank,
+            instance_seed_base=1_330_000_000, num_fields=30,
+            episodes_per_rank=2, max_episode_steps=300)
+        trainer.train(1, rollout_steps=1)
+        records = trainer._episode_records
+        self.assertEqual(len(records), 2)
+        self.assertTrue(all(r['field_count'] == 30 for r in records))
+        self.assertEqual(len({r['fingerprint'] for r in records}), 2)
+        self.assertEqual(len({r['instance_seed'] for r in records}), 2)

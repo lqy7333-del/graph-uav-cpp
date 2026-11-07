@@ -1,4 +1,4 @@
-"""Random-instance (fixed 10-field size) complete-episode PPO trainer.
+"""Random-instance complete-episode PPO trainer for a fixed field count.
 
 Each training episode is generated from a deterministic per-rank instance seed
 stream.  The fixed diagnostic/validation banks are evaluation panels only and
@@ -62,7 +62,7 @@ class RandomInstanceStream:
 
 
 class RandomInstanceEpisodeTrainer(EpisodeRolloutTrainer):
-    """Complete episodes from freshly generated 10-field instances."""
+    """Complete episodes from freshly generated fixed-count instances."""
     def __init__(self, environment, agent, *, rank=0, world_size=1,
                  checkpoint_dir=None, checkpoint_every=10, config=None,
                  diagnostic_bank=None, validation_bank=None,
@@ -93,8 +93,8 @@ class RandomInstanceEpisodeTrainer(EpisodeRolloutTrainer):
         self.environment.directory = None
 
     def _new_environment(self):
-        if self.num_fields != 10:
-            raise ValueError("random-instance training requires exactly 10 fields")
+        if self.num_fields < 1:
+            raise ValueError("random-instance training requires a positive field count")
         counter = self.stream.next_episode()
         last_error = None
         for attempt in range(RandomInstanceStream.MAX_ATTEMPTS):
@@ -125,7 +125,7 @@ class RandomInstanceEpisodeTrainer(EpisodeRolloutTrainer):
                 "stream_counter": counter,
             }
             return env
-        raise RuntimeError(f"could not generate 10-field instance after "
+        raise RuntimeError(f"could not generate {self.num_fields}-field instance after "
                            f"{RandomInstanceStream.MAX_ATTEMPTS} attempts: {last_error!r}")
 
     def _record_generation_retry(self, seed, counter, attempt, error):
