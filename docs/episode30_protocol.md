@@ -1,8 +1,10 @@
 # Random 30-field full-episode CHANet, seed42
 
 Status: implementation, geometry audit and real 4-GPU smoke complete.  
-**Formal training not started** because the measured projection exceeds the
-authorized 36-hour wall-clock limit.
+**Budget authorization accepted 2026-11-07:** the user explicitly approved the
+measured 40–42-hour wall clock and removed the earlier 36-hour auto-start cap.
+Formal training is authorized; this document records the frozen configuration
+and the authorization before launch.
 
 ## Branch and baseline
 
@@ -121,16 +123,17 @@ Kept `num-updates=1200` and `eval-every=20`; used `stop-at=3`,
   field count, stream counter16, optimizer state, LR and gates preserved;
   no new initialization
 
-### Measured cost and stop decision
+### Measured cost and authorization
 
 Smoke training accounting: **323.88 s for 3 updates = 107.96 s/update**.
 1200 updates therefore require **≈35 h 59 m of training** before panel
 evaluation. Update0 panel evaluation/startup adds roughly 5–6 minutes; 61
 evaluation points at that scale imply several additional hours. The projected
-total is **>36 hours** (roughly 40–42 h depending on later evaluation cost).
+total is roughly **40–42 hours**.
 
-Per the task's resource rule, formal training was **not auto-started** and no
-budget/evaluation frequency was reduced. No formal checkpoints were created.
+The user explicitly accepted this duration on 2026-11-07 and authorized the
+formal run without reducing evaluation frequency, episodes or budget. The
+formal launch SHA and actual first-20-update timing are appended below.
 
 ## Planned formal command (not executed)
 
@@ -150,3 +153,14 @@ PYTHONPATH=. /home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/bin/python \
 ```
 
 No sealed test, additional seed, or budget extension is authorized.
+
+## Budget authorization and formal launch record
+
+- Authorization: user accepted 40–42 h wall clock, removed 36 h cap.
+- Pre-launch commit: recorded in `formal_launch_record.json` next to the
+  persistent output; the commit hash is the launch SHA.
+- Start: recorded in `formal_random_instances_s42.started_at`.
+- No old 10-field actor/critic/optimizer is loaded; random initialization.
+- No smoke checkpoint is resumed.
+- First-20-update measured timing and refined ETA: see
+  `formal_random_instances_s42/first20_timing.json` after update20.
