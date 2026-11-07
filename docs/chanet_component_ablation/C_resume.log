@@ -1,0 +1,16 @@
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+[episode] rank0 collected 4 episodes, transitions=79, completed=4, failed=0, truncated=0
+[episode] update 4 episodes=4 transitions=79 global=328 actor_loss=-0.09511 critic_loss=40.26500 updates=8
+[rank 0] saved checkpoint -> /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_inter_s42_smoke_resume/ckpt_update_4.pt
+[rank 0] wrote run summary -> /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_inter_s42_smoke_resume/run_summary.json
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:83: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  return func(*args, **kwargs)

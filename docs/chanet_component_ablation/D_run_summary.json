@@ -1,0 +1,102 @@
+{
+  "training_metadata": {
+    "seed": 42,
+    "num_updates": 1200,
+    "world_size": 4,
+    "collection_mode": "complete_episodes",
+    "instance_mode": "random_instances",
+    "num_fields": 10,
+    "episodes_per_rank": 4,
+    "max_episode_steps": 500,
+    "instance_seed_base": 900000000,
+    "eval_every": 20,
+    "generator_config_sha": "b73d8367d26a1d2276a3bdb6267298dacbe8d812cd4a4a2aa5511c10368561eb",
+    "diagnostic_bank_sha": "a46c00d5ee50ca8ed63eaa6cd240c9115b0c0f05c39898d6465ee4d9581a1338",
+    "validation_bank_sha": "72d1ae92c73a8fc394c47a2e66d9d889c5a3ffcdb0624e811c32023ffddb2a29",
+    "initial_actor_sha256": "4fca7d42b72b9d9097673174a4568ba78df32d8e013f41170ac1f3c385a351b1",
+    "initialization": null,
+    "purpose": "random_instance_fixed_10field_generalization",
+    "encoder_variant": "no_intra_boundary",
+    "paired_initialization": {
+      "reference_path": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_instances_s42/ckpt_update_0.pt",
+      "reference_sha256": "114d11190d1282edc9377db2f846244a1420792a9cf11542ee3553189f7443db",
+      "copied_actor_tensors": 85,
+      "copied_critic": true,
+      "source_update": 0,
+      "encoder_variant": "no_intra_boundary",
+      "replaced_modules": [
+        "encoder.boundary_intra_encoder."
+      ],
+      "reference_actor_parameters": 1252227,
+      "actor_parameters": 1252105,
+      "encoder_parameters": 983174,
+      "reference_encoder_parameters": 983296
+    },
+    "diagnostic_bank": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/train10",
+    "validation_bank": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/valid30"
+  },
+  "per_rank": [
+    {
+      "transitions": 88191,
+      "episodes": 4800,
+      "optimizer_steps": 9600,
+      "updates": 1200,
+      "wall_seconds": 26698.58886385293,
+      "instances_drawn": 4800,
+      "distinct_geometries": 4800,
+      "field_counts": {
+        "10": 4800
+      },
+      "rank": 0
+    },
+    {
+      "transitions": 87928,
+      "episodes": 4800,
+      "optimizer_steps": 9600,
+      "updates": 1200,
+      "wall_seconds": 26716.158487754976,
+      "instances_drawn": 4800,
+      "distinct_geometries": 4800,
+      "field_counts": {
+        "10": 4800
+      },
+      "rank": 1
+    },
+    {
+      "transitions": 88343,
+      "episodes": 4800,
+      "optimizer_steps": 9600,
+      "updates": 1200,
+      "wall_seconds": 26715.20944796907,
+      "instances_drawn": 4800,
+      "distinct_geometries": 4800,
+      "field_counts": {
+        "10": 4800
+      },
+      "rank": 2
+    },
+    {
+      "transitions": 88015,
+      "episodes": 4800,
+      "optimizer_steps": 9600,
+      "updates": 1200,
+      "wall_seconds": 26715.149372114145,
+      "instances_drawn": 4800,
+      "distinct_geometries": 4800,
+      "field_counts": {
+        "10": 4800
+      },
+      "rank": 3
+    }
+  ],
+  "global": {
+    "transitions": 352477,
+    "episodes": 19200,
+    "optimizer_steps_global_synchronous": 9600,
+    "optimizer_steps_per_rank_sum": 38400,
+    "wall_seconds_max": 26716.158487754976,
+    "field_counts": {
+      "10": 19200
+    }
+  }
+}

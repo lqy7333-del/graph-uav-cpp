@@ -1,0 +1,25 @@
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+[rank 0] saved checkpoint -> /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_inter_s42_smoke/ckpt_update_0.pt
+[diagnostic] update=0 complete=10/10 time=3860.482367237076
+[validation] update=0 complete=30/30 time=3671.8211870117875
+[episode] rank0 collected 4 episodes, transitions=76, completed=4, failed=0, truncated=0
+[episode] update 1 episodes=4 transitions=76 global=322 actor_loss=-0.15505 critic_loss=55.13085 updates=8
+[rank 0] saved checkpoint -> /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_inter_s42_smoke/ckpt_update_1.pt
+[episode] rank0 collected 4 episodes, transitions=81, completed=8, failed=0, truncated=0
+[episode] update 2 episodes=4 transitions=81 global=320 actor_loss=-0.19522 critic_loss=42.40733 updates=8
+[rank 0] saved checkpoint -> /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_inter_s42_smoke/ckpt_update_2.pt
+[episode] rank0 collected 4 episodes, transitions=87, completed=12, failed=0, truncated=0
+[episode] update 3 episodes=4 transitions=87 global=333 actor_loss=0.00904 critic_loss=52.26479 updates=8
+[rank 0] saved checkpoint -> /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_inter_s42_smoke/ckpt_update_3.pt
+[rank 0] wrote run summary -> /home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_inter_s42_smoke/run_summary.json
+/home/ps/Desktop/Graph_planning/graph-uav-cpp/.venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:83: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  return func(*args, **kwargs)
