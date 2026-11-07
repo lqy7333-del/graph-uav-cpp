@@ -82,6 +82,34 @@ Files:
 - `A_train_log.csv` … `D_train_log.csv`
 - `validation_ABCD_curve.png`, `diagnostic_ABCD_curve.png`
 
+## Four-curve comparison
+
+![combined A/B/C/D](/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/docs/chanet_component_ablation/ABCD_combined_curves.png)
+
+Raw validation milestones (seconds; lower is better):
+
+| update | A | B | C | D |
+|---:|---:|---:|---:|---:|
+| 0 | 3698.1 | 3793.1 | 3671.8 | 3736.8 |
+| 200 | 3517.9 | 3472.8 | 3460.2 | 3541.8 |
+| 400 | 3409.8 | 3436.4 | 3384.2 | 3377.1 |
+| 600 | 3328.8 | 3419.6 | 3387.8 | 3370.9 |
+| 800 | 3338.5 | 3427.3 | 3363.4 | 3324.9 |
+| 1000 | 3290.3 | 3447.5 | 3354.1 | 3313.6 |
+| 1200 | 3314.3 | 3397.3 | 3348.4 | 3352.2 |
+
+Readout:
+
+- All four arms improve rapidly through roughly update 200–400.
+- B falls early but plateaus near 3400 s and remains the slowest arm.
+- C and D are often below A between updates 200–500, then A crosses and
+  generally stays below them after about update 600.
+- D is the stronger of the two component ablations, but its final u1200 rises
+  to 3352.2 s; A is lower at both its selected point and u1200.
+- C ends closest to D at u1200, while A's selected point remains the clear best.
+- Markers in the lower diagnostic panel are validation-selected checkpoints,
+  not diagnostic minima. No marker or panel changed model selection.
+
 ## Model size and inference
 
 | model | actor params | encoder params | replaced module params | median inference |
