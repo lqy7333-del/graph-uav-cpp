@@ -43,7 +43,8 @@
       "optimizer_steps": 9600,
       "training_wall_seconds": 26323.314174830717,
       "failures": 0,
-      "truncations": 0
+      "truncations": 0,
+      "wall_seconds": 32493
     },
     "D": {
       "start": "2026-11-07T07:20:11+08:00",
@@ -53,7 +54,8 @@
       "optimizer_steps": 9600,
       "training_wall_seconds": 26716.158487754976,
       "failures": 0,
-      "truncations": 0
+      "truncations": 0,
+      "wall_seconds": 32954
     }
   },
   "panels": {

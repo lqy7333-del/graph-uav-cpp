@@ -1,0 +1,1020 @@
+{
+  "panel": "existing A/B fresh 10-field panel (seeds 1,100,000-1,100,019); not used for model selection",
+  "instances": 20,
+  "models": {
+    "A_best": {
+      "mean": 3310.2043136380626,
+      "completed": 20,
+      "work": 1495.024555519893,
+      "nonwork": 1444.0718756428028,
+      "maneuver": 371.1078824753667,
+      "service": 0.0,
+      "checkpoint": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_instances_s42/ckpt_update_1060.pt",
+      "sha256": "82d67f410750cc525e1a9d23a9a542bea3bdd51ce789669cd16067818d70bc14"
+    },
+    "A_final": {
+      "mean": 3265.7117265248035,
+      "completed": 20,
+      "work": 1500.4800428075937,
+      "nonwork": 1406.1655191028333,
+      "maneuver": 359.0661646143772,
+      "service": 0.0,
+      "checkpoint": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_instances_s42/ckpt_update_1200.pt",
+      "sha256": "10adbffca211cbb711793d3b2d19182a0ec66329cf40151ce8523185d0c63ab4"
+    },
+    "B_best": {
+      "mean": 3428.2343374726684,
+      "completed": 20,
+      "work": 1498.2758824735638,
+      "nonwork": 1548.355878499361,
+      "maneuver": 381.6025764997431,
+      "service": 0.0,
+      "checkpoint": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_node_mlp_s42/ckpt_update_760.pt",
+      "sha256": "c3997af6ce80c9afaed1713692816d40e09d29d7850c41977273cca682654230"
+    },
+    "B_final": {
+      "mean": 3402.418679763464,
+      "completed": 20,
+      "work": 1495.9738071189265,
+      "nonwork": 1528.501091393406,
+      "maneuver": 377.94378125113076,
+      "service": 0.0,
+      "checkpoint": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_node_mlp_s42/ckpt_update_1200.pt",
+      "sha256": "87d2c186f597c296e80423b397ca93fb73b3fcb1c249cc8bdbfa61a25ea93fc2"
+    },
+    "C_best": {
+      "mean": 3343.41095317219,
+      "completed": 20,
+      "work": 1500.8081069972386,
+      "nonwork": 1462.5912279598772,
+      "maneuver": 380.01161821507384,
+      "service": 0.0,
+      "checkpoint": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_inter_s42/ckpt_update_1020.pt",
+      "sha256": "1be72b1d00c2c3fca006b943730eacaa14e2d29616bb227d197e9bb386d8e732"
+    },
+    "C_final": {
+      "mean": 3321.4518381305925,
+      "completed": 20,
+      "work": 1499.2706434075467,
+      "nonwork": 1455.876850932714,
+      "maneuver": 366.3043437903318,
+      "service": 0.0,
+      "checkpoint": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_inter_s42/ckpt_update_1200.pt",
+      "sha256": "58db3d0d071678c0d3e5b898f0bf3ea8c874aa2fe1823065353c7422ad4ec783"
+    },
+    "D_best": {
+      "mean": 3286.305459509251,
+      "completed": 20,
+      "work": 1498.7604494650645,
+      "nonwork": 1419.786860602557,
+      "maneuver": 367.758149441629,
+      "service": 0.0,
+      "checkpoint": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_intra_s42/ckpt_update_900.pt",
+      "sha256": "d701a536bcdf36a15f2e7a2ecbe954bdf803ba3d2fa3b6d6dd0a8bad373933be"
+    },
+    "D_final": {
+      "mean": 3317.4831905860447,
+      "completed": 20,
+      "work": 1500.5628069485267,
+      "nonwork": 1448.082543883847,
+      "maneuver": 368.83783975367146,
+      "service": 0.0,
+      "checkpoint": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/ablation_no_intra_s42/ckpt_update_1200.pt",
+      "sha256": "81acbaaa1410b081e1664f0d614adeab161198d673eb3515e54fe06f89fb1877"
+    },
+    "NN": {
+      "mean": 3377.2812546832843,
+      "completed": 20,
+      "work": 1502.881607238247,
+      "nonwork": 1486.179208073279,
+      "maneuver": 388.22043937175886,
+      "service": 0.0
+    }
+  },
+  "pairs": {
+    "A_best_vs_C_best": {
+      "A": "A_best",
+      "other": "C_best",
+      "other_minus_A": 33.206639534126836,
+      "ci95_instance_bootstrap": [
+        -8.777617136310104,
+        73.72900572282471
+      ],
+      "A_better_count": 13,
+      "other_better_count": 7,
+      "ties": 0,
+      "per_instance": [
+        {
+          "index": 0,
+          "seed": 1100000,
+          "A_time": 3686.0307836672537,
+          "other_time": 3691.4954621771885,
+          "difference": 5.464678509934856
+        },
+        {
+          "index": 1,
+          "seed": 1100001,
+          "A_time": 3458.4450078602345,
+          "other_time": 3656.7058500491557,
+          "difference": 198.2608421889213
+        },
+        {
+          "index": 2,
+          "seed": 1100002,
+          "A_time": 3905.0664928311476,
+          "other_time": 3907.9335047860704,
+          "difference": 2.867011954922873
+        },
+        {
+          "index": 3,
+          "seed": 1100003,
+          "A_time": 3296.9477643862483,
+          "other_time": 3396.532790366978,
+          "difference": 99.58502598072982
+        },
+        {
+          "index": 4,
+          "seed": 1100004,
+          "A_time": 2675.5017243285565,
+          "other_time": 2764.077523570772,
+          "difference": 88.57579924221545
+        },
+        {
+          "index": 5,
+          "seed": 1100005,
+          "A_time": 2590.966544860524,
+          "other_time": 2758.6229270737854,
+          "difference": 167.65638221326117
+        },
+        {
+          "index": 6,
+          "seed": 1100006,
+          "A_time": 3223.9251194747003,
+          "other_time": 3189.7539291213197,
+          "difference": -34.17119035338055
+        },
+        {
+          "index": 7,
+          "seed": 1100007,
+          "A_time": 2695.5450467375713,
+          "other_time": 2656.377627812908,
+          "difference": -39.16741892466325
+        },
+        {
+          "index": 8,
+          "seed": 1100008,
+          "A_time": 3320.4965955220364,
+          "other_time": 3484.9841856332678,
+          "difference": 164.48759011123138
+        },
+        {
+          "index": 9,
+          "seed": 1100009,
+          "A_time": 3099.0950268879005,
+          "other_time": 3151.3416977122897,
+          "difference": 52.246670824389184
+        },
+        {
+          "index": 10,
+          "seed": 1100010,
+          "A_time": 2862.655492614612,
+          "other_time": 2931.2625621484285,
+          "difference": 68.60706953381668
+        },
+        {
+          "index": 11,
+          "seed": 1100011,
+          "A_time": 3418.8532181438695,
+          "other_time": 3264.3346145212736,
+          "difference": -154.51860362259595
+        },
+        {
+          "index": 12,
+          "seed": 1100012,
+          "A_time": 3193.04843949222,
+          "other_time": 3094.216307143154,
+          "difference": -98.83213234906589
+        },
+        {
+          "index": 13,
+          "seed": 1100013,
+          "A_time": 3241.4518121133115,
+          "other_time": 3293.858502236523,
+          "difference": 52.40669012321132
+        },
+        {
+          "index": 14,
+          "seed": 1100014,
+          "A_time": 3945.5774211495836,
+          "other_time": 4022.2825828079854,
+          "difference": 76.70516165840172
+        },
+        {
+          "index": 15,
+          "seed": 1100015,
+          "A_time": 3403.5022434821713,
+          "other_time": 3523.2833046189776,
+          "difference": 119.78106113680633
+        },
+        {
+          "index": 16,
+          "seed": 1100016,
+          "A_time": 4503.1116874191475,
+          "other_time": 4447.850618321694,
+          "difference": -55.2610690974534
+        },
+        {
+          "index": 17,
+          "seed": 1100017,
+          "A_time": 3323.7440301831634,
+          "other_time": 3294.8022385542154,
+          "difference": -28.941791628948067
+        },
+        {
+          "index": 18,
+          "seed": 1100018,
+          "A_time": 3334.409911331822,
+          "other_time": 3234.1916260711714,
+          "difference": -100.21828526065065
+        },
+        {
+          "index": 19,
+          "seed": 1100019,
+          "A_time": 3025.7119102751794,
+          "other_time": 3104.311208716632,
+          "difference": 78.59929844145245
+        }
+      ]
+    },
+    "A_best_vs_D_best": {
+      "A": "A_best",
+      "other": "D_best",
+      "other_minus_A": -23.8988541288124,
+      "ci95_instance_bootstrap": [
+        -60.048272325157306,
+        12.42082948781996
+      ],
+      "A_better_count": 8,
+      "other_better_count": 12,
+      "ties": 0,
+      "per_instance": [
+        {
+          "index": 0,
+          "seed": 1100000,
+          "A_time": 3686.0307836672537,
+          "other_time": 3638.4084712486974,
+          "difference": -47.62231241855625
+        },
+        {
+          "index": 1,
+          "seed": 1100001,
+          "A_time": 3458.4450078602345,
+          "other_time": 3483.1800832639487,
+          "difference": 24.73507540371429
+        },
+        {
+          "index": 2,
+          "seed": 1100002,
+          "A_time": 3905.0664928311476,
+          "other_time": 3892.9829685439054,
+          "difference": -12.083524287242199
+        },
+        {
+          "index": 3,
+          "seed": 1100003,
+          "A_time": 3296.9477643862483,
+          "other_time": 3283.525768842539,
+          "difference": -13.421995543709272
+        },
+        {
+          "index": 4,
+          "seed": 1100004,
+          "A_time": 2675.5017243285565,
+          "other_time": 2760.9934665991937,
+          "difference": 85.49174227063713
+        },
+        {
+          "index": 5,
+          "seed": 1100005,
+          "A_time": 2590.966544860524,
+          "other_time": 2631.216542670106,
+          "difference": 40.2499978095816
+        },
+        {
+          "index": 6,
+          "seed": 1100006,
+          "A_time": 3223.9251194747003,
+          "other_time": 3101.727787480905,
+          "difference": -122.19733199379516
+        },
+        {
+          "index": 7,
+          "seed": 1100007,
+          "A_time": 2695.5450467375713,
+          "other_time": 2703.4391722831406,
+          "difference": 7.894125545569295
+        },
+        {
+          "index": 8,
+          "seed": 1100008,
+          "A_time": 3320.4965955220364,
+          "other_time": 3439.19556909342,
+          "difference": 118.6989735713837
+        },
+        {
+          "index": 9,
+          "seed": 1100009,
+          "A_time": 3099.0950268879005,
+          "other_time": 2954.6316581626434,
+          "difference": -144.46336872525717
+        },
+        {
+          "index": 10,
+          "seed": 1100010,
+          "A_time": 2862.655492614612,
+          "other_time": 2748.542695605002,
+          "difference": -114.11279700960995
+        },
+        {
+          "index": 11,
+          "seed": 1100011,
+          "A_time": 3418.8532181438695,
+          "other_time": 3247.1957732485785,
+          "difference": -171.65744489529106
+        },
+        {
+          "index": 12,
+          "seed": 1100012,
+          "A_time": 3193.04843949222,
+          "other_time": 3126.769189883564,
+          "difference": -66.27924960865585
+        },
+        {
+          "index": 13,
+          "seed": 1100013,
+          "A_time": 3241.4518121133115,
+          "other_time": 3277.8707888640074,
+          "difference": 36.41897675069595
+        },
+        {
+          "index": 14,
+          "seed": 1100014,
+          "A_time": 3945.5774211495836,
+          "other_time": 3939.791056421149,
+          "difference": -5.786364728434819
+        },
+        {
+          "index": 15,
+          "seed": 1100015,
+          "A_time": 3403.5022434821713,
+          "other_time": 3517.702963837332,
+          "difference": 114.20072035516068
+        },
+        {
+          "index": 16,
+          "seed": 1100016,
+          "A_time": 4503.1116874191475,
+          "other_time": 4420.946291674193,
+          "difference": -82.16539574495437
+        },
+        {
+          "index": 17,
+          "seed": 1100017,
+          "A_time": 3323.7440301831634,
+          "other_time": 3244.4980863652586,
+          "difference": -79.24594381790484
+        },
+        {
+          "index": 18,
+          "seed": 1100018,
+          "A_time": 3334.409911331822,
+          "other_time": 3239.1720138702062,
+          "difference": -95.23789746161583
+        },
+        {
+          "index": 19,
+          "seed": 1100019,
+          "A_time": 3025.7119102751794,
+          "other_time": 3074.3188422272156,
+          "difference": 48.60693195203612
+        }
+      ]
+    },
+    "A_final_vs_C_final": {
+      "A": "A_final",
+      "other": "C_final",
+      "other_minus_A": 55.74011160578873,
+      "ci95_instance_bootstrap": [
+        26.4783088659519,
+        87.49822524671181
+      ],
+      "A_better_count": 15,
+      "other_better_count": 5,
+      "ties": 0,
+      "per_instance": [
+        {
+          "index": 0,
+          "seed": 1100000,
+          "A_time": 3637.8560104995795,
+          "other_time": 3738.544697038225,
+          "difference": 100.68868653864547
+        },
+        {
+          "index": 1,
+          "seed": 1100001,
+          "A_time": 3495.951447169192,
+          "other_time": 3483.157392634783,
+          "difference": -12.794054534409042
+        },
+        {
+          "index": 2,
+          "seed": 1100002,
+          "A_time": 3857.8345287067673,
+          "other_time": 3828.757151707527,
+          "difference": -29.077376999240187
+        },
+        {
+          "index": 3,
+          "seed": 1100003,
+          "A_time": 3316.459971473075,
+          "other_time": 3348.316784892332,
+          "difference": 31.856813419257378
+        },
+        {
+          "index": 4,
+          "seed": 1100004,
+          "A_time": 2700.7707662308467,
+          "other_time": 2764.920238183044,
+          "difference": 64.14947195219747
+        },
+        {
+          "index": 5,
+          "seed": 1100005,
+          "A_time": 2574.0967579619255,
+          "other_time": 2651.8185123360017,
+          "difference": 77.72175437407623
+        },
+        {
+          "index": 6,
+          "seed": 1100006,
+          "A_time": 3172.0212514146574,
+          "other_time": 3204.552341213677,
+          "difference": 32.53108979901981
+        },
+        {
+          "index": 7,
+          "seed": 1100007,
+          "A_time": 2627.4107907665907,
+          "other_time": 2838.5065111546546,
+          "difference": 211.0957203880639
+        },
+        {
+          "index": 8,
+          "seed": 1100008,
+          "A_time": 3412.9550344553036,
+          "other_time": 3471.0090851097643,
+          "difference": 58.05405065446075
+        },
+        {
+          "index": 9,
+          "seed": 1100009,
+          "A_time": 2994.0082063867994,
+          "other_time": 3024.221681883479,
+          "difference": 30.21347549667962
+        },
+        {
+          "index": 10,
+          "seed": 1100010,
+          "A_time": 2844.0456681756746,
+          "other_time": 2806.215198232243,
+          "difference": -37.83046994343158
+        },
+        {
+          "index": 11,
+          "seed": 1100011,
+          "A_time": 3320.327200399796,
+          "other_time": 3305.1583241657986,
+          "difference": -15.168876233997253
+        },
+        {
+          "index": 12,
+          "seed": 1100012,
+          "A_time": 3007.039800274896,
+          "other_time": 3023.108372342096,
+          "difference": 16.068572067199966
+        },
+        {
+          "index": 13,
+          "seed": 1100013,
+          "A_time": 3202.780459243376,
+          "other_time": 3218.7461833053926,
+          "difference": 15.965724062016761
+        },
+        {
+          "index": 14,
+          "seed": 1100014,
+          "A_time": 3872.1285505405267,
+          "other_time": 3990.5842494351245,
+          "difference": 118.45569889459784
+        },
+        {
+          "index": 15,
+          "seed": 1100015,
+          "A_time": 3421.583887276722,
+          "other_time": 3496.604569890961,
+          "difference": 75.02068261423892
+        },
+        {
+          "index": 16,
+          "seed": 1100016,
+          "A_time": 4393.771638075517,
+          "other_time": 4383.440442152023,
+          "difference": -10.331195923494306
+        },
+        {
+          "index": 17,
+          "seed": 1100017,
+          "A_time": 3232.128487355646,
+          "other_time": 3264.9623055347306,
+          "difference": 32.833818179084574
+        },
+        {
+          "index": 18,
+          "seed": 1100018,
+          "A_time": 3185.662779020672,
+          "other_time": 3386.4343909559484,
+          "difference": 200.77161193527627
+        },
+        {
+          "index": 19,
+          "seed": 1100019,
+          "A_time": 3045.401295068514,
+          "other_time": 3199.978330444046,
+          "difference": 154.57703537553198
+        }
+      ]
+    },
+    "A_final_vs_D_final": {
+      "A": "A_final",
+      "other": "D_final",
+      "other_minus_A": 51.771464061241,
+      "ci95_instance_bootstrap": [
+        20.213817682570088,
+        84.93190857011726
+      ],
+      "A_better_count": 16,
+      "other_better_count": 4,
+      "ties": 0,
+      "per_instance": [
+        {
+          "index": 0,
+          "seed": 1100000,
+          "A_time": 3637.8560104995795,
+          "other_time": 3697.6000602178783,
+          "difference": 59.74404971829881
+        },
+        {
+          "index": 1,
+          "seed": 1100001,
+          "A_time": 3495.951447169192,
+          "other_time": 3545.0658725874655,
+          "difference": 49.11442541827364
+        },
+        {
+          "index": 2,
+          "seed": 1100002,
+          "A_time": 3857.8345287067673,
+          "other_time": 3751.900897358813,
+          "difference": -105.93363134795436
+        },
+        {
+          "index": 3,
+          "seed": 1100003,
+          "A_time": 3316.459971473075,
+          "other_time": 3286.9436797449066,
+          "difference": -29.5162917281682
+        },
+        {
+          "index": 4,
+          "seed": 1100004,
+          "A_time": 2700.7707662308467,
+          "other_time": 2823.1388277263095,
+          "difference": 122.36806149546283
+        },
+        {
+          "index": 5,
+          "seed": 1100005,
+          "A_time": 2574.0967579619255,
+          "other_time": 2600.2823502518936,
+          "difference": 26.1855922899681
+        },
+        {
+          "index": 6,
+          "seed": 1100006,
+          "A_time": 3172.0212514146574,
+          "other_time": 3411.1520225871413,
+          "difference": 239.13077117248395
+        },
+        {
+          "index": 7,
+          "seed": 1100007,
+          "A_time": 2627.4107907665907,
+          "other_time": 2688.5633089438275,
+          "difference": 61.15251817723674
+        },
+        {
+          "index": 8,
+          "seed": 1100008,
+          "A_time": 3412.9550344553036,
+          "other_time": 3470.1577751657023,
+          "difference": 57.20274071039876
+        },
+        {
+          "index": 9,
+          "seed": 1100009,
+          "A_time": 2994.0082063867994,
+          "other_time": 3019.943510187324,
+          "difference": 25.935303800524707
+        },
+        {
+          "index": 10,
+          "seed": 1100010,
+          "A_time": 2844.0456681756746,
+          "other_time": 2888.46986801232,
+          "difference": 44.424199836645585
+        },
+        {
+          "index": 11,
+          "seed": 1100011,
+          "A_time": 3320.327200399796,
+          "other_time": 3324.6368139325723,
+          "difference": 4.309613532776439
+        },
+        {
+          "index": 12,
+          "seed": 1100012,
+          "A_time": 3007.039800274896,
+          "other_time": 2983.600172685201,
+          "difference": -23.439627589695192
+        },
+        {
+          "index": 13,
+          "seed": 1100013,
+          "A_time": 3202.780459243376,
+          "other_time": 3351.1344885978583,
+          "difference": 148.35402935448246
+        },
+        {
+          "index": 14,
+          "seed": 1100014,
+          "A_time": 3872.1285505405267,
+          "other_time": 3910.5896572038077,
+          "difference": 38.46110666328104
+        },
+        {
+          "index": 15,
+          "seed": 1100015,
+          "A_time": 3421.583887276722,
+          "other_time": 3517.533563628981,
+          "difference": 95.94967635225885
+        },
+        {
+          "index": 16,
+          "seed": 1100016,
+          "A_time": 4393.771638075517,
+          "other_time": 4352.82675748419,
+          "difference": -40.94488059132709
+        },
+        {
+          "index": 17,
+          "seed": 1100017,
+          "A_time": 3232.128487355646,
+          "other_time": 3340.0544761209767,
+          "difference": 107.92598876533066
+        },
+        {
+          "index": 18,
+          "seed": 1100018,
+          "A_time": 3185.662779020672,
+          "other_time": 3238.4622506081964,
+          "difference": 52.799471587524295
+        },
+        {
+          "index": 19,
+          "seed": 1100019,
+          "A_time": 3045.401295068514,
+          "other_time": 3147.607458675532,
+          "difference": 102.20616360701797
+        }
+      ]
+    },
+    "A_best_vs_B_best": {
+      "A": "A_best",
+      "other": "B_best",
+      "other_minus_A": 118.0300238346052,
+      "ci95_instance_bootstrap": [
+        63.213095139403094,
+        170.66025744406312
+      ],
+      "A_better_count": 17,
+      "other_better_count": 3,
+      "ties": 0,
+      "per_instance": [
+        {
+          "index": 0,
+          "seed": 1100000,
+          "A_time": 3686.0307836672537,
+          "other_time": 3703.185213076408,
+          "difference": 17.154429409154545
+        },
+        {
+          "index": 1,
+          "seed": 1100001,
+          "A_time": 3458.4450078602345,
+          "other_time": 3799.5501519916807,
+          "difference": 341.1051441314462
+        },
+        {
+          "index": 2,
+          "seed": 1100002,
+          "A_time": 3905.0664928311476,
+          "other_time": 3948.595308642484,
+          "difference": 43.528815811336244
+        },
+        {
+          "index": 3,
+          "seed": 1100003,
+          "A_time": 3296.9477643862483,
+          "other_time": 3456.073803220086,
+          "difference": 159.1260388338378
+        },
+        {
+          "index": 4,
+          "seed": 1100004,
+          "A_time": 2675.5017243285565,
+          "other_time": 2914.097881709309,
+          "difference": 238.59615738075263
+        },
+        {
+          "index": 5,
+          "seed": 1100005,
+          "A_time": 2590.966544860524,
+          "other_time": 2687.8180514154715,
+          "difference": 96.85150655494726
+        },
+        {
+          "index": 6,
+          "seed": 1100006,
+          "A_time": 3223.9251194747003,
+          "other_time": 3368.013901828018,
+          "difference": 144.08878235331758
+        },
+        {
+          "index": 7,
+          "seed": 1100007,
+          "A_time": 2695.5450467375713,
+          "other_time": 2789.9194985861723,
+          "difference": 94.37445184860098
+        },
+        {
+          "index": 8,
+          "seed": 1100008,
+          "A_time": 3320.4965955220364,
+          "other_time": 3555.9656883932266,
+          "difference": 235.46909287119024
+        },
+        {
+          "index": 9,
+          "seed": 1100009,
+          "A_time": 3099.0950268879005,
+          "other_time": 3272.382291002221,
+          "difference": 173.28726411432035
+        },
+        {
+          "index": 10,
+          "seed": 1100010,
+          "A_time": 2862.655492614612,
+          "other_time": 2906.1714575032033,
+          "difference": 43.5159648885915
+        },
+        {
+          "index": 11,
+          "seed": 1100011,
+          "A_time": 3418.8532181438695,
+          "other_time": 3292.153332153046,
+          "difference": -126.69988599082353
+        },
+        {
+          "index": 12,
+          "seed": 1100012,
+          "A_time": 3193.04843949222,
+          "other_time": 3087.5866033300335,
+          "difference": -105.4618361621865
+        },
+        {
+          "index": 13,
+          "seed": 1100013,
+          "A_time": 3241.4518121133115,
+          "other_time": 3527.9594564519457,
+          "difference": 286.50764433863424
+        },
+        {
+          "index": 14,
+          "seed": 1100014,
+          "A_time": 3945.5774211495836,
+          "other_time": 4154.739548261177,
+          "difference": 209.1621271115937
+        },
+        {
+          "index": 15,
+          "seed": 1100015,
+          "A_time": 3403.5022434821713,
+          "other_time": 3524.362601712617,
+          "difference": 120.86035823044585
+        },
+        {
+          "index": 16,
+          "seed": 1100016,
+          "A_time": 4503.1116874191475,
+          "other_time": 4546.371359024418,
+          "difference": 43.25967160527034
+        },
+        {
+          "index": 17,
+          "seed": 1100017,
+          "A_time": 3323.7440301831634,
+          "other_time": 3422.2635167944873,
+          "difference": 98.51948661132383
+        },
+        {
+          "index": 18,
+          "seed": 1100018,
+          "A_time": 3334.409911331822,
+          "other_time": 3326.1182532141665,
+          "difference": -8.291658117655516
+        },
+        {
+          "index": 19,
+          "seed": 1100019,
+          "A_time": 3025.7119102751794,
+          "other_time": 3281.358831143186,
+          "difference": 255.64692086800642
+        }
+      ]
+    },
+    "A_final_vs_B_final": {
+      "A": "A_final",
+      "other": "B_final",
+      "other_minus_A": 136.7069532386594,
+      "ci95_instance_bootstrap": [
+        104.61003295454361,
+        169.25651236881953
+      ],
+      "A_better_count": 19,
+      "other_better_count": 1,
+      "ties": 0,
+      "per_instance": [
+        {
+          "index": 0,
+          "seed": 1100000,
+          "A_time": 3637.8560104995795,
+          "other_time": 3754.423321401288,
+          "difference": 116.56731090170842
+        },
+        {
+          "index": 1,
+          "seed": 1100001,
+          "A_time": 3495.951447169192,
+          "other_time": 3604.2754592332003,
+          "difference": 108.32401206400846
+        },
+        {
+          "index": 2,
+          "seed": 1100002,
+          "A_time": 3857.8345287067673,
+          "other_time": 3981.979502545651,
+          "difference": 124.14497383888374
+        },
+        {
+          "index": 3,
+          "seed": 1100003,
+          "A_time": 3316.459971473075,
+          "other_time": 3467.7237993693407,
+          "difference": 151.26382789626587
+        },
+        {
+          "index": 4,
+          "seed": 1100004,
+          "A_time": 2700.7707662308467,
+          "other_time": 2937.445838894131,
+          "difference": 236.67507266328448
+        },
+        {
+          "index": 5,
+          "seed": 1100005,
+          "A_time": 2574.0967579619255,
+          "other_time": 2663.6948661939446,
+          "difference": 89.59810823201906
+        },
+        {
+          "index": 6,
+          "seed": 1100006,
+          "A_time": 3172.0212514146574,
+          "other_time": 3297.4113727048148,
+          "difference": 125.39012129015737
+        },
+        {
+          "index": 7,
+          "seed": 1100007,
+          "A_time": 2627.4107907665907,
+          "other_time": 2866.237748372338,
+          "difference": 238.82695760574734
+        },
+        {
+          "index": 8,
+          "seed": 1100008,
+          "A_time": 3412.9550344553036,
+          "other_time": 3571.255306163802,
+          "difference": 158.30027170849826
+        },
+        {
+          "index": 9,
+          "seed": 1100009,
+          "A_time": 2994.0082063867994,
+          "other_time": 3161.496008410231,
+          "difference": 167.4878020234314
+        },
+        {
+          "index": 10,
+          "seed": 1100010,
+          "A_time": 2844.0456681756746,
+          "other_time": 3039.13792024834,
+          "difference": 195.09225207266536
+        },
+        {
+          "index": 11,
+          "seed": 1100011,
+          "A_time": 3320.327200399796,
+          "other_time": 3316.4674823449755,
+          "difference": -3.859718054820405
+        },
+        {
+          "index": 12,
+          "seed": 1100012,
+          "A_time": 3007.039800274896,
+          "other_time": 3060.9120538253196,
+          "difference": 53.872253550423466
+        },
+        {
+          "index": 13,
+          "seed": 1100013,
+          "A_time": 3202.780459243376,
+          "other_time": 3489.3948846979933,
+          "difference": 286.6144254546175
+        },
+        {
+          "index": 14,
+          "seed": 1100014,
+          "A_time": 3872.1285505405267,
+          "other_time": 4135.399093842141,
+          "difference": 263.27054330161445
+        },
+        {
+          "index": 15,
+          "seed": 1100015,
+          "A_time": 3421.583887276722,
+          "other_time": 3529.3740220378418,
+          "difference": 107.79013476111959
+        },
+        {
+          "index": 16,
+          "seed": 1100016,
+          "A_time": 4393.771638075517,
+          "other_time": 4445.238216413815,
+          "difference": 51.46657833829795
+        },
+        {
+          "index": 17,
+          "seed": 1100017,
+          "A_time": 3232.128487355646,
+          "other_time": 3347.6350119628337,
+          "difference": 115.50652460718766
+        },
+        {
+          "index": 18,
+          "seed": 1100018,
+          "A_time": 3185.662779020672,
+          "other_time": 3262.307486045434,
+          "difference": 76.64470702476183
+        },
+        {
+          "index": 19,
+          "seed": 1100019,
+          "A_time": 3045.401295068514,
+          "other_time": 3116.56420056183,
+          "difference": 71.16290549331598
+        }
+      ]
+    }
+  }
+}

@@ -30,18 +30,25 @@ All fixed-panel rows were complete: C/D **30/30** validation, 10/10 diagnostic.
 
 Difference is **ablation − A**; **positive means A (full CHANet) is better**.
 
-| comparison | difference | fixed-30 conditional 95% CI | A wins / ablation wins |
+| comparison | difference | instance-level paired bootstrap 95% CI (30 fixed instances) | A wins / ablation wins |
 |---|---:|---:|---:|
 | C selected: C u1020 − A u1060 | **+55.79 s** | **[+26.76, +86.79]** | **22 / 8** |
 | C final: C u1200 − A u1200 | **+34.11 s** | [−0.11, +68.68] | 19 / 11 |
 | D selected: D u900 − A u1060 | **+30.69 s** | **[+5.98, +55.21]** | **22 / 8** |
 | D final: D u1200 − A u1200 | **+37.85 s** | **[+18.51, +58.60]** | **22 / 8** |
 
-- C is slower than A at both validation-selected and final points; the selected
-  gap is clear, the final gap is borderline on this fixed panel.
-- D is slower than A at both points; both intervals exclude zero.
+- On the reused validation panel, C is slower than A at both points; D is also
+  slower at both points. These are selection-on-validation observations.
+- On the fresh 20-instance panel, the **final** comparisons still favor A, but
+  the **selected-checkpoint** comparisons are inconclusive: C best +33.2 s
+  (CI crosses zero), D best −23.9 s (CI crosses zero). This is why the
+  selected-checkpoint result is not a final generalization claim.
 - C and D are separate component ablations. Do **not** add their differences as
   an additive decomposition of CHANet; components can interact.
+- These validation-selected intervals are development evidence: the same
+  validation panel selects the checkpoints. The fresh independent panel shows
+  that the selected-checkpoint C/D gaps are not clearly reproduced (see
+  [`fresh_independent_eval/README.md`](fresh_independent_eval/README.md)).
 
 ## Time components
 
@@ -128,7 +135,7 @@ a substitute for training compute.
 
 | run | start | end | wall | training accounting | episodes | transitions | failures/trunc |
 |---|---|---|---:|---:|---:|---:|---:|
-| C | 2026-11-06 22:18:38 | 2026-11-07 07:20:11 | **8 h 01 m 33 s** | 7 h 18 m 43 s | 19,200 | 347,760 | 0 / 0 |
+| C | 2026-11-06 22:18:38 | 2026-11-07 07:20:11 | **9 h 01 m 33 s** | 7 h 18 m 43 s | 19,200 | 347,760 | 0 / 0 |
 | D | 2026-11-07 07:20:11 | 2026-11-07 16:29:25 | **9 h 09 m 14 s** | 7 h 25 m 16 s | 19,200 | 352,477 | 0 / 0 |
 
 Both use 4 GPUs, 4 complete episodes/rank, 16/update, 1,200 updates, 9,600
@@ -155,7 +162,7 @@ Full SHA256s, per-instance rows and components are in `comparison.json`.
 
 ## Boundary
 
-This is one paired training seed. The intervals are conditional on the fixed
-30-instance validation panel. C/D differences are not additive; they are two
+This is one paired training seed. The intervals are instance-level paired bootstrap intervals over the fixed
+30-instance validation panel; they do not include checkpoint-selection uncertainty. C/D differences are not additive; they are two
 separate structural ablations. No sealed test, new training seed or extra budget
 was run.
