@@ -3,8 +3,8 @@
 Status: implementation, geometry audit and real 4-GPU smoke complete.  
 **Budget authorization accepted 2026-11-07:** the user explicitly approved the
 measured 40–42-hour wall clock and removed the earlier 36-hour auto-start cap.
-Formal training is authorized; this document records the frozen configuration
-and the authorization before launch.
+Formal training is authorized and running; this document records the frozen
+configuration, authorization, launch SHA and measured first-20-update timing.
 
 ## Branch and baseline
 
@@ -135,7 +135,7 @@ The user explicitly accepted this duration on 2026-11-07 and authorized the
 formal run without reducing evaluation frequency, episodes or budget. The
 formal launch SHA and actual first-20-update timing are appended below.
 
-## Planned formal command (not executed)
+## Formal command (executed)
 
 ```bash
 cd /home/ps/Desktop/Graph_planning/graph-uav-episode-10fields
@@ -157,10 +157,25 @@ No sealed test, additional seed, or budget extension is authorized.
 ## Budget authorization and formal launch record
 
 - Authorization: user accepted 40–42 h wall clock, removed 36 h cap.
-- Pre-launch commit: recorded in `formal_launch_record.json` next to the
-  persistent output; the commit hash is the launch SHA.
-- Start: recorded in `formal_random_instances_s42.started_at`.
+- Launch SHA: **`dd4fac9c9c1108ae8358dc2dce4f00eed6cdcfce`**
+- Actual start: **2026-11-07 21:02:30 +08:00**
+- Persistent output: `episode30/formal_random_instances_s42/`
 - No old 10-field actor/critic/optimizer is loaded; random initialization.
 - No smoke checkpoint is resumed.
-- First-20-update measured timing and refined ETA: see
-  `formal_random_instances_s42/first20_timing.json` after update20.
+
+### Measured first 20 updates
+
+- training accounting: **2,004.151 s / 20 updates = 100.21 s/update**
+- projected training: **33.40 h** for 1,200 updates
+- update0 evaluation: **280.55 s** (10 + 30 panels)
+- update20 evaluation: **210.02 s**
+- projected evaluation: **~3.58 h** for 61 points
+- projected total: **~36.98 h**, finish approximately **2026-11-09 10:01 +08:00**
+- at update20: **320 episodes**, **18,841 transitions**, **320 optimizer steps**
+  (16/update); checkpoint size ~35 MB
+- sampling + PPO optimization are jointly included in the 100.21 s/update;
+  evaluation and checkpoint-save are not separately timed in the training log.
+  Checkpoint writes are included in the update wall time.
+- no failure/truncation/NaN or gate failure through update20.
+
+The formal command in the next section was executed with the launch SHA above.
