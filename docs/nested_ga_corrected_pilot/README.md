@@ -15,9 +15,10 @@ That made the old “partial quotas = 0” claim a logging artifact, not evidenc
 The old data are retained as a development trial but cannot support a
 “fully evolved nested GA” claim.
 
-The algorithm base is `136074e`. The recording changes were applied to the
+The algorithm base is `136074e`. Recording-only changes were applied to the
 working tree for this pilot; the run metadata records that dirty source state.
-The instrumentation commit is recorded separately after this run.
+Those changes were committed as `d10628b` after the run; search rules were not
+changed.
 
 The instrumentation was fixed (records only; no search-rule changes):
 

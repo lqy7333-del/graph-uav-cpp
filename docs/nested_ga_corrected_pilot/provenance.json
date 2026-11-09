@@ -2,5 +2,6 @@
   "algorithm_base_sha": "136074ee3bdc4c7cf7fb62845fb3de60156558ed",
   "run_metadata_code_sha": "41fbe6bea0d96008be4533b13929d2590de8df96",
   "run_source_status": " M coverage_env/baseline/nested_ga.py\n M coverage_env/rl/evaluation/nested_ga.py\n M coverage_env/tests/test_nested_ga.py\n?? scripts/maneuver_time/benchmark_ablation_inference.py\n?? scripts/maneuver_time/plot_component_ablation.py\n",
-  "note": "Recording-only changes were present in the worktree; search rules unchanged. Commit hash added after commit."
+  "note": "Logging-only changes; search rules unchanged. Corrected pilot ran from the pre-commit worktree and records the dirty source state.",
+  "instrumentation_commit": "d10628b074edb5067232253885a9667bcbfc34da"
 }
