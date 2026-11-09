@@ -1,0 +1,88 @@
+{
+  "training_metadata": {
+    "seed": 42,
+    "num_updates": 1200,
+    "world_size": 4,
+    "collection_mode": "complete_episodes",
+    "instance_mode": "random_instances",
+    "num_fields": 30,
+    "episodes_per_rank": 4,
+    "max_episode_steps": 500,
+    "instance_seed_base": 1330000000,
+    "eval_every": 20,
+    "generator_config_sha": "67bb57ef825ac6f4b15e4fc860654489a60ba321bf810f390ab4ede354558af1",
+    "diagnostic_bank_sha": "0961e68bb6397cfc1e24e57aaf26ea256371f44a90fd1ba3012e78be840d2e2a",
+    "validation_bank_sha": "0f611488b3dbfc295161097811124480c53bafb2512fc01554e20ed317be4178",
+    "initial_actor_sha256": "fe5771ddc9cc9158518b54fa8541fa7bfe1cdeef184b500edc328fea53ec06f9",
+    "initialization": null,
+    "purpose": "random_instance_fixed_30field_generalization",
+    "encoder_variant": "chanet",
+    "paired_initialization": null,
+    "diagnostic_bank": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode30/diagnostic10",
+    "validation_bank": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode30/validation30"
+  },
+  "per_rank": [
+    {
+      "transitions": 270340,
+      "episodes": 4800,
+      "optimizer_steps": 19200,
+      "updates": 1200,
+      "wall_seconds": 116177.7497764692,
+      "instances_drawn": 4800,
+      "distinct_geometries": 4800,
+      "field_counts": {
+        "30": 4800
+      },
+      "rank": 0
+    },
+    {
+      "transitions": 270642,
+      "episodes": 4800,
+      "optimizer_steps": 19200,
+      "updates": 1200,
+      "wall_seconds": 116249.22490981818,
+      "instances_drawn": 4800,
+      "distinct_geometries": 4800,
+      "field_counts": {
+        "30": 4800
+      },
+      "rank": 1
+    },
+    {
+      "transitions": 270548,
+      "episodes": 4800,
+      "optimizer_steps": 19200,
+      "updates": 1200,
+      "wall_seconds": 116248.22247988249,
+      "instances_drawn": 4800,
+      "distinct_geometries": 4800,
+      "field_counts": {
+        "30": 4800
+      },
+      "rank": 2
+    },
+    {
+      "transitions": 270514,
+      "episodes": 4800,
+      "optimizer_steps": 19200,
+      "updates": 1200,
+      "wall_seconds": 116248.97305457135,
+      "instances_drawn": 4800,
+      "distinct_geometries": 4800,
+      "field_counts": {
+        "30": 4800
+      },
+      "rank": 3
+    }
+  ],
+  "global": {
+    "transitions": 1082044,
+    "episodes": 19200,
+    "optimizer_steps_global_synchronous": 19200,
+    "optimizer_steps_per_rank_sum": 76800,
+    "wall_seconds_max": 116249.22490981818,
+    "field_counts": {
+      "30": 19200
+    }
+  }
+}

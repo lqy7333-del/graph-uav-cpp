@@ -1,0 +1,109 @@
+{
+  "models": {},
+  "panels": {
+    "diagnostic10": {
+      "NN": {
+        "count": 10,
+        "completed": 10,
+        "mean": 10929.263478599198,
+        "components": {
+          "time_work_base": 4219.513634603804,
+          "time_nonwork_base": 5768.108272251287,
+          "time_maneuver_extra": 941.6415717441078,
+          "time_service": 0.0
+        },
+        "distance": 79900.97525484073,
+        "visits": 60.5,
+        "resupplies": 19.9,
+        "replay_all_match": true
+      },
+      "A10_u1060": {
+        "count": 10,
+        "completed": 10,
+        "mean": 10716.532906251616,
+        "components": {
+          "time_work_base": 4215.196752397602,
+          "time_nonwork_base": 5623.16487820365,
+          "time_maneuver_extra": 878.1712756503636,
+          "time_service": 0.0
+        },
+        "distance": 78706.89304481001,
+        "visits": 53.8,
+        "resupplies": 19.9,
+        "replay_all_match": true
+      },
+      "A10_u1200": {
+        "count": 10,
+        "completed": 10,
+        "mean": 10657.259135778786,
+        "components": {
+          "time_work_base": 4225.384352826225,
+          "time_nonwork_base": 5564.851875941432,
+          "time_maneuver_extra": 867.0229070111284,
+          "time_service": 0.0
+        },
+        "distance": 78321.88983014128,
+        "visits": 55.1,
+        "resupplies": 19.9,
+        "replay_all_match": true
+      }
+    },
+    "validation30": {
+      "NN": {
+        "count": 30,
+        "completed": 30,
+        "mean": 11349.205574575231,
+        "components": {
+          "time_work_base": 4391.508969596395,
+          "time_nonwork_base": 5989.756899607531,
+          "time_maneuver_extra": 967.9397053713078,
+          "time_service": 0.0
+        },
+        "distance": 83050.1269536314,
+        "visits": 61.2,
+        "resupplies": 20.766666666666666,
+        "replay_all_match": true
+      },
+      "A10_u1060": {
+        "count": 30,
+        "completed": 30,
+        "mean": 11059.264399036969,
+        "components": {
+          "time_work_base": 4389.846857752295,
+          "time_nonwork_base": 5756.25046282156,
+          "time_maneuver_extra": 913.1670784631136,
+          "time_service": 0.0
+        },
+        "distance": 81168.77856459083,
+        "visits": 56.233333333333334,
+        "resupplies": 20.766666666666666,
+        "replay_all_match": true
+      },
+      "A10_u1200": {
+        "count": 30,
+        "completed": 30,
+        "mean": 11075.301687694051,
+        "components": {
+          "time_work_base": 4390.6030168627485,
+          "time_nonwork_base": 5778.819037909929,
+          "time_maneuver_extra": 905.8796329213745,
+          "time_service": 0.0
+        },
+        "distance": 81355.37643818143,
+        "visits": 56.43333333333333,
+        "resupplies": 20.766666666666666,
+        "replay_all_match": true
+      }
+    }
+  },
+  "checkpoints": {
+    "A10_u1060": {
+      "path": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_instances_s42/ckpt_update_1060.pt",
+      "sha256": "82d67f410750cc525e1a9d23a9a542bea3bdd51ce789669cd16067818d70bc14"
+    },
+    "A10_u1200": {
+      "path": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_instances_s42/ckpt_update_1200.pt",
+      "sha256": "10adbffca211cbb711793d3b2d19182a0ec66329cf40151ce8523185d0c63ab4"
+    }
+  }
+}
