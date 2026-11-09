@@ -17,7 +17,7 @@
 ## Frozen setup
 
 - Full CHANet, random initialization, no old model and no smoke resume
-- 30 fresh 30-field instances per update, 4 complete episodes/rank × 4 GPUs
+- **16 fresh 30-field instances per update** (4 complete episodes/rank × 4 GPUs)
 - actor LR 1e-4; critic LR 0.003; LR schedule none
 - time reward; gamma 1.0; original GAE/PPO/entropy schedule
 - UAV randomize off; speed 8 m/s; coverage width 10 m
