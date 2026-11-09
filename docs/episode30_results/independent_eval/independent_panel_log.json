@@ -1,0 +1,282 @@
+{
+  "base_seed": 1340000,
+  "accepted": 30,
+  "rejected": 3,
+  "failures": [
+    {
+      "seed": 1340002,
+      "internal_attempts": 8,
+      "error": "Field placement failed after 8 attempts for num_fields=30; the workspace is too crowded for this field count."
+    },
+    {
+      "seed": 1340012,
+      "internal_attempts": 8,
+      "error": "Field placement failed after 8 attempts for num_fields=30; the workspace is too crowded for this field count."
+    },
+    {
+      "seed": 1340019,
+      "internal_attempts": 8,
+      "error": "Field placement failed after 8 attempts for num_fields=30; the workspace is too crowded for this field count."
+    }
+  ],
+  "seeds": [
+    1340000,
+    1340001,
+    1340003,
+    1340004,
+    1340005,
+    1340006,
+    1340007,
+    1340008,
+    1340009,
+    1340010,
+    1340011,
+    1340013,
+    1340014,
+    1340015,
+    1340016,
+    1340017,
+    1340018,
+    1340020,
+    1340021,
+    1340022,
+    1340023,
+    1340024,
+    1340025,
+    1340026,
+    1340027,
+    1340028,
+    1340029,
+    1340030,
+    1340031,
+    1340032
+  ],
+  "fingerprints": [
+    "b512e7f42c9ccbc4b243d64582f7fffb193403072aac4f7ca2e45449ad6f31d1",
+    "c85d1354d2f64e9e779b1a0d31b8d9aeac472450b72f32049e8da470d54bba50",
+    "2ca7008f45a5cf091d1840914505593661035648012fa20ab0e12982103730a8",
+    "97df9f11df8599c339d8ba1c650cc6135b0b00c9d437bf63596a64fc0027557b",
+    "17d9df6f9ba92ec609f80ca668b3ec7f55d93c3992e66d59bbde13463a893304",
+    "1fa1395a31972228df160acfe639e45f3388b5d6f88e48c45e81bd70df3b152e",
+    "6bff7ceb21ab09852bc88c0982ed3b63f5a525d916e04f65e3b1e8c8e298da7c",
+    "cbb6bd3c127993ae8ed6f4e20a17032a85a8982db81abfb6bacc6909b52dcbab",
+    "36ed9ef0787a7a2267dee0faaf6778adeeb4b013c3fea00d1114bda1b9d6e68c",
+    "23c02a59cc5885a69ffab5c8f017d95a6b86f0e12eed111e2564349a12a715c6",
+    "f76006275d57644f6ee9b8f8596a9e446b56474ad897d666d4a959d306fb0c8f",
+    "fd84c8861f0b54a15b79b82f0ecea2f7e59fa365d2b65110d677bb31ead3b0e2",
+    "06c270346ff9df364d734f537a5c3b845c36910fe4f9b8ac38999d83929ff3c9",
+    "bb6087606d9e73b352f29acd2dcb7e9867500d77c78254e88e9d65710feb6023",
+    "273c0a14750042d72ead58f2f45f0a86dcdd5cc4d3d755b97960f2f7d850c041",
+    "61ee5d4840e26360623b10b0dca5720adea6eb8f8bb194343a4704470d9ae9d1",
+    "2e8c6af885f74d6bdfa4eae7e03399b7386817938b12e53776e4683d35fb3960",
+    "a94d4b00263827cccae6f6de0f03bdd65f615022ad9253679c1c2663c8985f81",
+    "c6111070c200e57b0dccad5db867918c2b79bc1f48b24097b70b07358665c44b",
+    "52ca152cd00717e1d8002676495a8f5fc278b5bac00135cfead88a43c3d31751",
+    "94ee8661cdce3f607ff8435e61bfc6a0c8d791fe103ebf281638cb1ba7c70aac",
+    "2a2f5c2c39aa1a62d5667170fa05321180e7fc2963342d65deb8752d12a15bea",
+    "305c5b08868ec8a9b46413c7ff20678203c40b56222804cc2140cc253437ed48",
+    "94d1e7a09feea04179b0acdcb2071add88c2c2c63f83dbe95f62b8639cb69927",
+    "ca04c09430d4c288b5afb61863005265b5a7350d666f6bf78cc7fc51f93dfe39",
+    "ec7907c1ba88288cad784ff3d349d5fe5bf4ed0390c70022b308571e7dafb415",
+    "9cbd9dfc9068e01b0b0279fe599f317c729c5e7a43edd1a8e912a17209c98e7a",
+    "dfd88f62c56577db3c4f06345a5ca6380b52b62196f511b57687d6e6f713cd0b",
+    "66a20eb69d3bf223937b0d804262dbbb4f2343efca2af3fa44d19cad3282e744",
+    "892a8d9a129475992cc9fe59cf69512b2f6560e0b47e000cf140947915318cea"
+  ],
+  "manifest_sha256": "76809904f9a16c5fa6841869f81c71135204f3eb0eb6bb4d27ed5ccafef3baf3",
+  "instances_sha256": "895ad23617bed0e6efc2ae0add02f914050f9cea80dbff7d942c9ae16b5192a5",
+  "config": {
+    "environment": {
+      "coordinate_system": {
+        "type": "WGS84"
+      },
+      "num_fields": {
+        "min": 30,
+        "max": 30
+      },
+      "num_fields_strategy": "uniform",
+      "workspace": {
+        "min_lat": 31.21,
+        "max_lat": 31.24,
+        "min_lon": 121.455,
+        "max_lon": 121.485
+      },
+      "random_seed": 20261012,
+      "max_episode_steps_per_field": 12
+    },
+    "field_generator": {
+      "field_size": {
+        "min_area": 5000.0,
+        "max_area": 20000.0
+      },
+      "shape": {
+        "min_vertices": 3,
+        "max_vertices": 5,
+        "irregularity": 0.22
+      },
+      "min_field_spacing": 15.0,
+      "layout": {
+        "mode": "tessellated",
+        "parcel_gap_m": 8.0,
+        "tessellated_oversample": 2.0,
+        "gap_m": 15.0,
+        "cluster_min": 2,
+        "cluster_max": 4,
+        "cluster_inner_gap_m": 4.0,
+        "cluster_gap_m": 90.0,
+        "pool_oversample": 1.5,
+        "growth_attempts": 60,
+        "depot_offset_m": {
+          "min": 50.0,
+          "max": 400.0
+        }
+      },
+      "resolution": {
+        "grid_resolution": 10.0
+      }
+    },
+    "depot": {
+      "type": "random",
+      "position": null
+    },
+    "uav": {
+      "num_uav": 1,
+      "max_energy": 1500.0,
+      "speed": 8.0,
+      "coverage_width": 10.0,
+      "sensor_width": 5.0,
+      "max_payload": 50.0,
+      "payload_per_area": 0.003,
+      "energy": {
+        "alpha": 0.08,
+        "beta": 0.02,
+        "energy_margin": 0.2
+      },
+      "ranges": {
+        "max_energy": {
+          "min": 1200.0,
+          "max": 1800.0
+        },
+        "max_payload": {
+          "min": 40.0,
+          "max": 60.0
+        },
+        "speed": {
+          "min": 6.0,
+          "max": 10.0
+        },
+        "coverage_width": {
+          "min": 8.0,
+          "max": 12.0
+        },
+        "alpha": {
+          "min": 0.06,
+          "max": 0.1
+        },
+        "beta": {
+          "min": 0.016,
+          "max": 0.024
+        },
+        "payload_per_area": {
+          "min": 0.002,
+          "max": 0.004
+        }
+      }
+    },
+    "coverage": {
+      "default_workload": 0.45,
+      "min_workload": 0.01,
+      "max_workload": 0.5
+    },
+    "plot": {
+      "show_grid": true,
+      "save_result": true,
+      "show": false,
+      "output_dir": "results",
+      "save_gif": false
+    },
+    "rl": {
+      "grid_resolution": 10.0,
+      "reward": {
+        "mode": "time",
+        "coverage_width": 10.0,
+        "nominal_work_speed": 8.0,
+        "time_scale": 100.0
+      },
+      "time": {
+        "cruise_speed": 8.0,
+        "tau_pi": 3.0,
+        "exponent": 2.0,
+        "service_time": 0.0
+      },
+      "gamma": 1.0,
+      "learning_rate": 0.0003,
+      "batch_size": 64,
+      "workload_options": [
+        0.1,
+        0.2,
+        0.3,
+        0.5
+      ],
+      "return_to_depot": true,
+      "allow_auto_resupply": true,
+      "fast_estimate_safety_factor": 1.25,
+      "failure_penalty": -1.0,
+      "failure_termination_threshold": 5,
+      "reward_scale": 100.0,
+      "graph": {
+        "max_area": 8000.0,
+        "max_perimeter": 500.0,
+        "max_boundary_length": 200.0,
+        "position_scale_m": 1000.0,
+        "global_distance_scale_m": 3000.0,
+        "uav_distance_scale_m": 2500.0,
+        "d_near_m": 1500.0,
+        "max_energy_scale": 1800.0,
+        "max_payload_scale": 60.0,
+        "speed_scale": 10.0,
+        "coverage_width_scale": 12.0,
+        "alpha_scale": 0.1,
+        "beta_scale": 0.024,
+        "payload_per_area_scale": 0.004
+      },
+      "decoder": {
+        "hierarchical_decoding": true,
+        "candidate_attention": false,
+        "attention_heads": 4
+      },
+      "encoder": {
+        "hidden_dim": 128,
+        "num_heads": 4,
+        "dropout": 0.1
+      }
+    },
+    "shaping": {
+      "enable": false,
+      "strength": 1.0
+    },
+    "ppo": {
+      "advantage_mode": "gae",
+      "randomize_uav": false,
+      "learning_rate": 0.0003,
+      "actor_learning_rate": 0.0001,
+      "critic_learning_rate": 0.003,
+      "gamma": 1.0,
+      "gae_lambda": 0.95,
+      "clip_ratio": 0.2,
+      "entropy_coef": 0.01,
+      "entropy_coef_end": 0.0,
+      "entropy_anneal_start": 0.1,
+      "lr_schedule": "none",
+      "lr_final_scale": 0.1,
+      "value_coef": 0.5,
+      "epochs": 4,
+      "batch_size": 64,
+      "max_grad_norm": 0.5,
+      "value_gate": true,
+      "collection_mode": "complete_episodes",
+      "episodes_per_rank": 4,
+      "max_episode_steps": 500
+    }
+  }
+}

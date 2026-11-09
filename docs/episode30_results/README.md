@@ -1,6 +1,7 @@
 # Random 30-field full-episode CHANet — final result
 
-**Single training seed42. Development-panel evaluation. No sealed test.**
+**Single training seed42. Development-panel evaluation plus one independent
+30-instance confirmation panel. No sealed test.**
 
 - Branch: `codex/episode-rollout-30fields`
 - Launch SHA: `dd4fac9c9c1108ae8358dc2dce4f00eed6cdcfce`
@@ -73,14 +74,22 @@ bootstrap over the fixed panel; it does not treat instances as training repeats.
 
 - The 30-field model is **clearly better than NN** at both the selected and final
   points.
-- It **does not clearly beat the old 10-field A model**:
-  - selected checkpoint is 38.8 s faster on average, but the interval crosses
-    zero and only 19/30 instances favor it;
-  - final u1200 is 28.8 s **slower** than A10 u1200, interval also crosses zero.
-- Best and final are not consistent: the validation-selected u1060 is 83.6 s
-  faster than final u1200.
-- Therefore direct 30-field training did not demonstrate a robust same-scale
-  improvement over the frozen 10-field model on this development panel.
+- On the original validation panel, the selected checkpoint is only 38.8 s
+  faster than A10 u1060, with an interval crossing zero; final u1200 is 28.8 s
+  slower than A10 u1200. That validation comparison alone did not confirm an
+  advantage.
+- A separate one-shot independent 30-field panel (30 fresh instances,
+  [`independent_eval/README.md`](independent_eval/README.md)) changed this
+  nuanced result:
+  - **selected u1060 vs A10 u1060: +91.59 s, CI [+32.32,+150.91], 21/30 wins**
+    — the selected-checkpoint advantage is now supported on fresh instances;
+  - **final u1200 vs A10 u1200: −24.52 s, CI [−88.59,+42.40], 12/30 wins**
+    — the final comparison still does not show an advantage.
+- Best and final remain inconsistent: validation-selected u1060 is 83.6 s
+  faster than final u1200 on the validation panel.
+- Therefore 30-field training shows a **selected-checkpoint advantage on the
+  independent panel**, but no consistent final-checkpoint advantage; this is
+  still one training seed and one independent panel.
 
 ## Time components and operational counts — validation
 
