@@ -83,3 +83,36 @@ episode wall separately from model loading and RL offline training.
 This is an adapted nested-GA baseline, not a direct reproduction of the cited
 paper. CHANet has one training seed; GA has three search seeds with different
 meaning. This is not a sealed test.
+
+## Revision 1 — resume after first wall-limit pause
+
+**Timestamp: 2026-11-09 22:40 +08:00. Completed searches at revision: 6 / 90.**
+Revision basis: observed computation-cost heterogeneity and a correctness check;
+not model win/loss.
+
+- The first three consecutive wall-limited searches occurred on instance
+  1,500,001. The queue was paused once for inspection, as originally specified.
+- After inspection, **all subsequent wall-limit outcomes are normal recorded
+  results and do not pause the queue**. Every valid best complete incumbent is
+  retained and included in the final statistics.
+- A normal wall-limit is not a program failure.
+- The queue still stops and preserves diagnostics for: program exceptions,
+  non-finite values, ledger closure failure, replay mismatch, or absence of a
+  feasible complete incumbent.
+- The six already completed searches (three evaluation-limited at 1,500,000,
+  three wall-limited at 1,500,001) are retained unchanged, not rerun, and not
+  given extra budget.
+- No total 18–24 h cap is applied. The remaining 84 searches may consume up to
+  approximately 42 h of search wall time, plus replay/control/postprocessing.
+- The frozen method description is:
+  **“嵌套GA，每次最多385次候选评估或1800秒搜索时间，先到者停止。”**
+- We do not claim that every run completed six outer rounds, and we do not claim
+  search convergence.
+- Three separate reporting fields will be used:
+  1. task-plan completion: incumbent completed and returned;
+  2. planned-search completion: six outer rounds and 24 full inner quotas;
+  3. stop reason: evaluation limit, wall limit, or exception.
+  A wall-limited run with a complete best incumbent is not a failed path.
+- All 30 instances and all 90 searches enter the final statistics. Per-instance
+  GA cost is the mean of three best complete incumbent costs; no completed-only
+  filtering is allowed.
