@@ -47,8 +47,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--panel', required=True, help='GA pilot directory with instance_*.pkl')
     ap.add_argument('--output', required=True)
-    ap.add_argument('--new-best', required=True)
-    ap.add_argument('--new-final', required=True)
+    ap.add_argument('--new-best', default='')
+    ap.add_argument('--new-final', default='')
     ap.add_argument('--a10-best', required=True)
     ap.add_argument('--a10-final', required=True)
     args = ap.parse_args()
@@ -61,7 +61,7 @@ def main():
     }
     rows = []; actions_all = {}
     snapshots = sorted(panel.glob('instance_*.pkl'))
-    if len(snapshots) != 5: raise RuntimeError(f'expected 5 snapshots, got {len(snapshots)}')
+    if len(snapshots) < 1: raise RuntimeError('no snapshots found')
     template = pickle.loads(snapshots[0].read_bytes())
     policies = {label: _load_policy(path, template) for label, path in models.items()}
     controls = {'original_NN': _nn_choice, 'ga_initializer': initializer_choice}
