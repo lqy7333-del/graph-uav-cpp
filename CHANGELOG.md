@@ -1,5 +1,19 @@
 ## 2026-11-09
 
+### 134. **Nested-GA 10 地块、5 实例、3 搜索 seed pilot**
+
+- 验收 `136074e`：指定测试 33 passed；新增同快照对照适配测试 1 passed；
+  独立 smoke（seed1400100，5 evals）完成、返航、重放和时间账本闭合。
+- 开发面板 seeds 1,400,000–1,400,004；15 次有界搜索全部完成。
+  300 s wall cap 全部触发；候选评估 108–243/500，inner quota 全为完整16；
+  fallback 步数平均 20.2%（一次100%），14/15 搜索较初始化有改进。
+- 同快照对照（baseline−GA，正值 GA 更快）：NN +62.7 s（5/5）、GA init
+  +46.5 s（5/5）；A10 u1060 −123.2 s（仅1/5）、A10 u1200 −46.7 s（仅1/5）。
+  GA best-of-3 3077.0 s（三倍预算）仍未稳定超过 A10 best。
+- 明确记录 wall cap 绑定、评估预算未用满与 fallback 混杂；未在事后调参，
+  未运行20/30地块、未训练RL、未运行sealed test。
+- 报告、原始搜索记录、同快照对照、进展曲线、manifest 和环境版本已归档。
+
 ### 126. Independent nested-GA baseline
 
 - Outer repeated field-visit sequence, inner feasible gate random-key GA; same

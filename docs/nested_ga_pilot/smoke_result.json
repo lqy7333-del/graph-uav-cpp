@@ -1,0 +1,376 @@
+{
+  "config": {
+    "outer_population": 2,
+    "outer_generations": 1,
+    "inner_population": 2,
+    "inner_generations": 1,
+    "max_evaluations": 5,
+    "wall_seconds": 180.0,
+    "max_steps": 500,
+    "seed": 42
+  },
+  "baseline": {
+    "completed": true,
+    "reason": "mission_complete",
+    "cost": 2699.084694759757,
+    "actions": [
+      [
+        "field-9",
+        "B3",
+        "B3"
+      ],
+      [
+        "field-5",
+        "B2",
+        "B2"
+      ],
+      [
+        "field-9",
+        "B3",
+        "B3"
+      ],
+      [
+        "field-5",
+        "B2",
+        "B2"
+      ],
+      [
+        "field-6",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-6",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-2",
+        "B1",
+        "B1"
+      ],
+      [
+        "field-3",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-10",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-7",
+        "B1",
+        "B1"
+      ],
+      [
+        "field-1",
+        "B2",
+        "B2"
+      ],
+      [
+        "field-3",
+        "B3",
+        "B3"
+      ],
+      [
+        "field-7",
+        "B3",
+        "B3"
+      ],
+      [
+        "field-7",
+        "B1",
+        "B1"
+      ],
+      [
+        "field-8",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-4",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-3",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-4",
+        "B1",
+        "B1"
+      ]
+    ],
+    "gate_keys": [
+      0.96875,
+      0.65625,
+      0.96875,
+      0.65625,
+      0.03125,
+      0.03125,
+      0.34375,
+      0.03125,
+      0.03125,
+      0.26,
+      0.5,
+      0.96875,
+      0.74,
+      0.26,
+      0.05555555555555555,
+      0.02,
+      0.03125,
+      0.26
+    ],
+    "chromosome_order": [],
+    "chromosome_gates": [],
+    "summary": {
+      "total_time": 2699.084694759757,
+      "total_distance": 19015.216339700277,
+      "time_work_base": 1307.4688081255667,
+      "time_nonwork_base": 1069.4332343369674,
+      "time_maneuver_extra": 322.1826522972233,
+      "time_service": 0.0,
+      "coverage_ratio": 1.0,
+      "resupply_count": 6,
+      "execution_count": 18,
+      "returned_to_depot": true,
+      "time_closure_error": 4.547473508864641e-13
+    },
+    "skipped_slots": 0,
+    "fallback_steps": 18,
+    "label": "action_space_nearest_initialization"
+  },
+  "best": {
+    "completed": true,
+    "reason": "mission_complete",
+    "cost": 2699.084694759757,
+    "actions": [
+      [
+        "field-9",
+        "B3",
+        "B3"
+      ],
+      [
+        "field-5",
+        "B2",
+        "B2"
+      ],
+      [
+        "field-9",
+        "B3",
+        "B3"
+      ],
+      [
+        "field-5",
+        "B2",
+        "B2"
+      ],
+      [
+        "field-6",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-6",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-2",
+        "B1",
+        "B1"
+      ],
+      [
+        "field-3",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-10",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-7",
+        "B1",
+        "B1"
+      ],
+      [
+        "field-1",
+        "B2",
+        "B2"
+      ],
+      [
+        "field-3",
+        "B3",
+        "B3"
+      ],
+      [
+        "field-7",
+        "B3",
+        "B3"
+      ],
+      [
+        "field-7",
+        "B1",
+        "B1"
+      ],
+      [
+        "field-8",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-4",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-3",
+        "B0",
+        "B0"
+      ],
+      [
+        "field-4",
+        "B1",
+        "B1"
+      ]
+    ],
+    "gate_keys": [
+      0.96875,
+      0.65625,
+      0.96875,
+      0.65625,
+      0.03125,
+      0.03125,
+      0.34375,
+      0.03125,
+      0.03125,
+      0.26,
+      0.5,
+      0.96875,
+      0.74,
+      0.26,
+      0.05555555555555555,
+      0.02,
+      0.03125,
+      0.26
+    ],
+    "chromosome_order": [],
+    "chromosome_gates": [],
+    "summary": {
+      "total_time": 2699.084694759757,
+      "total_distance": 19015.216339700277,
+      "time_work_base": 1307.4688081255667,
+      "time_nonwork_base": 1069.4332343369674,
+      "time_maneuver_extra": 322.1826522972233,
+      "time_service": 0.0,
+      "coverage_ratio": 1.0,
+      "resupply_count": 6,
+      "execution_count": 18,
+      "returned_to_depot": true,
+      "time_closure_error": 4.547473508864641e-13
+    },
+    "skipped_slots": 0,
+    "fallback_steps": 18,
+    "label": "action_space_nearest_initialization"
+  },
+  "evaluations": 5,
+  "transitions": 94,
+  "history": [
+    {
+      "evaluation": 1,
+      "seconds": 1.7970267360215075,
+      "completed": true,
+      "cost": 2699.084694759757,
+      "reason": "mission_complete",
+      "fallback_steps": 18,
+      "skipped_slots": 0,
+      "steps": 18,
+      "label": "action_space_nearest_initialization",
+      "best": 2699.084694759757
+    },
+    {
+      "evaluation": 2,
+      "seconds": 3.507547231973149,
+      "completed": true,
+      "cost": 2699.084694759757,
+      "reason": "mission_complete",
+      "fallback_steps": 0,
+      "skipped_slots": 0,
+      "steps": 18,
+      "label": "inner",
+      "best": 2699.084694759757
+    },
+    {
+      "evaluation": 3,
+      "seconds": 5.306621961004566,
+      "completed": true,
+      "cost": 2699.084694759757,
+      "reason": "mission_complete",
+      "fallback_steps": 0,
+      "skipped_slots": 0,
+      "steps": 18,
+      "label": "inner",
+      "best": 2699.084694759757
+    },
+    {
+      "evaluation": 4,
+      "seconds": 6.886478317028377,
+      "completed": true,
+      "cost": 2802.2282081032804,
+      "reason": "mission_complete",
+      "fallback_steps": 6,
+      "skipped_slots": 6,
+      "steps": 20,
+      "label": "inner",
+      "best": 2699.084694759757
+    },
+    {
+      "evaluation": 5,
+      "seconds": 8.462936521973461,
+      "completed": true,
+      "cost": 2770.492977491715,
+      "reason": "mission_complete",
+      "fallback_steps": 6,
+      "skipped_slots": 6,
+      "steps": 20,
+      "label": "inner",
+      "best": 2699.084694759757
+    }
+  ],
+  "inner_quotas": [
+    {
+      "evaluations": 2,
+      "cost": 2699.084694759757,
+      "completed": true
+    },
+    {
+      "evaluations": 2,
+      "cost": 2770.492977491715,
+      "completed": true
+    }
+  ],
+  "search_seconds": 8.463795194984414,
+  "replay_seconds": 1.7966915300348774,
+  "replay_summary": {
+    "total_time": 2699.084694759757,
+    "total_distance": 19015.216339700277,
+    "time_work_base": 1307.4688081255667,
+    "time_nonwork_base": 1069.4332343369674,
+    "time_maneuver_extra": 322.1826522972233,
+    "time_service": 0.0,
+    "coverage_ratio": 1.0,
+    "resupply_count": 6,
+    "execution_count": 18,
+    "returned_to_depot": true,
+    "time_closure_error": 4.547473508864641e-13
+  },
+  "termination": "evaluation_limit",
+  "instance_seed": 1400100,
+  "instance_snapshot_sha256": "19200230d46fb11c80608a4e3ee17bb165760d6dd6a693b92cdfca4a8843fc4a"
+}
