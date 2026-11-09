@@ -73,8 +73,11 @@ inner quotas completed in every search.
 | 1400004 | 2814.9 | 40.7 | 2862.1 | 2855.6 | 2836.2 | 2823.3 |
 
 GA mean: **3085.2 s**. All five improved on initialization.
-Mean improvement: **70.0 s**. 22 incumbent refresh events: initialization plus
-search updates across outer generations 0–5.
+Mean improvement: **70.0 s**. Audit of the raw history: **24 incumbent refresh
+events across the five runs** — **5 initialization events (one per run) and 19
+search improvements**. The first history entry of each run is the initialization
+incumbent; no run is missing it. (The earlier “22 / only 1 initialization”
+wording was a reporting error.)
 
 ### Main comparison — `baseline − GA`
 
