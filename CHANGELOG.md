@@ -1,5 +1,17 @@
 ## 2026-11-09
 
+### 135. **Nested-GA 记录修复与多代修正 pilot**
+
+- 修复 GA 过程记录：保存部分 inner quota、generation/candidate、outer 轮次与
+  fallback 来源（初始化/序列耗尽/跳过槽位），不改变搜索规则；测试 34 passed。
+- 同一 5 个快照重跑 corrected pilot：outer population4 × 6 scored rounds，
+  inner8×2，385 evaluations/search；5/5 搜索均完成 6 轮、24 个 full quota，
+  未触发1200s安全墙。
+- corrected GA 均值 3085.2 s；对 NN +86.1 s（5/5）、GA init +70.0 s（5/5）、
+  A10 u1060 −99.8 s（1/5）、A10 u1200 −23.2 s（3/5）。
+- 旧 8×4 pilot 保留为开发记录并加注：其预算不足、partial quota 未被记录；
+  不用它作“充分双层进化”结论。未训练RL、未跑20/30、未跑sealed test。
+
 ### 134. **Nested-GA 10 地块、5 实例、3 搜索 seed pilot**
 
 - 验收 `136074e`：指定测试 33 passed；新增同快照对照适配测试 1 passed；

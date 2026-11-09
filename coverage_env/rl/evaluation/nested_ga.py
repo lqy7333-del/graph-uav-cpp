@@ -20,6 +20,8 @@ def main():
     p.add_argument('--fields', type=int, default=10)
     p.add_argument('--instances', type=int, default=5)
     p.add_argument('--instance-seed', type=int, default=1400000)
+    p.add_argument('--panel', default=None,
+                   help='reuse instance_<seed>.pkl snapshots from an earlier pilot directory')
     p.add_argument('--search-seeds', type=int, nargs='+', default=[42,43,44])
     p.add_argument('--max-evaluations', type=int, default=500)
     p.add_argument('--wall-seconds', type=float, default=300)
@@ -40,14 +42,25 @@ def main():
     sha = subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip()
     metadata = dict(arguments=vars(args), code_sha=sha,
                     source_status=subprocess.check_output(['git','status','--porcelain'],text=True),
-                    model_usage='none', cache='none', replay_charged_separately=True)
+                    model_usage='none', cache='none', replay_charged_separately=True,
+                    panel=str(Path(args.panel).resolve()) if args.panel else None)
     (out/'metadata.json').write_text(json.dumps(metadata, indent=2), encoding='utf-8')
     for i in range(args.instances):
         seed = args.instance_seed+i
-        # Generation exceptions propagate; do not silently replace the test instance.
-        env = generator.generate(num_fields=args.fields, seed=seed, randomize_each_reset=False)
-        env.reset()
-        snapshot = pickle.dumps(env, protocol=pickle.HIGHEST_PROTOCOL)
+        if args.panel:
+            source = Path(args.panel)/f'instance_{seed}.pkl'
+            if not source.is_file():
+                raise FileNotFoundError(f'missing panel snapshot: {source}')
+            snapshot = source.read_bytes()
+            env = pickle.loads(snapshot)
+            if len(env.fields) != args.fields:
+                raise ValueError(f'panel snapshot {source} has {len(env.fields)} fields')
+            env.reset()
+        else:
+            # Generation exceptions propagate; do not silently replace the test instance.
+            env = generator.generate(num_fields=args.fields, seed=seed, randomize_each_reset=False)
+            env.reset()
+            snapshot = pickle.dumps(env, protocol=pickle.HIGHEST_PROTOCOL)
         (out/f'instance_{seed}.pkl').write_bytes(snapshot)
         fingerprint = hashlib.sha256(snapshot).hexdigest()
         for search_seed in args.search_seeds:

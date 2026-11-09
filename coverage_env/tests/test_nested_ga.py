@@ -38,7 +38,14 @@ def test_nested_budget_replay_elitism_and_determinism():
     result=NestedGA(env,cfg).run()
     other=NestedGA(env,cfg).run()
     assert result['evaluations']==18
-    assert all(q['evaluations']==4 for q in result['inner_quotas'])
+    full=[q for q in result['inner_quotas'] if q['completed']]
+    partial=[q for q in result['inner_quotas'] if not q['completed']]
+    assert all(q['evaluations']==4 for q in full)
+    assert partial and all(0 < q['evaluations'] < 4 for q in partial)
+    # Two full outer rounds occurred; the third was interrupted inside a quota.
+    assert result['outer_generations_completed']==2
+    assert result['outer_generations_attempted']==3
+    assert result['outer_candidates_attempted']==5
     assert result['best']['cost']<=result['baseline']['cost']
     assert result['best']['actions']==other['best']['actions']
     assert result['best']['actions'].count(('a','1','1'))<=2
@@ -60,6 +67,8 @@ def test_decode_skip_completion_and_incomplete_not_rewarded():
     search.started=time.monotonic()
     r=search.evaluate(('missing','b'),(-1.,-1.),'test')
     assert r['completed'] and r['skipped_slots']==1 and r['fallback_steps']==2
+    assert sum(r['fallback_sources'].values()) == r['fallback_steps']
+    assert r['fallback_sources']['sequence_exhausted'] >= 1
     short=NestedGA(TinyEnv(),GAConfig(max_steps=1))
     short.started=time.monotonic()
     r=short.evaluate((),(),'test')

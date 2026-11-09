@@ -1,5 +1,12 @@
 # Nested-GA 10-field pilot: 5 instances × 3 search seeds
 
+> **Post-audit correction (2026-11-09):** these 8×4 results did not reliably
+> complete the initial outer population; only 6–15 full inner quotas were scored,
+> and the old `inner_quotas` logging omitted partially interrupted quotas.
+> They are retained as a development trial, not evidence of a fully evolved
+> nested GA. See [`nested_ga_corrected_pilot/README.md`](../nested_ga_corrected_pilot/README.md)
+> for a six-round pilot on the same five snapshots.
+
 **No RL training. Development pilot, not a sealed test.**
 
 ## Provenance and setup

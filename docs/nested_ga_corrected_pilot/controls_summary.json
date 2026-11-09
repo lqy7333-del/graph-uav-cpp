@@ -1,0 +1,77 @@
+{
+  "panel": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/pilot10_s1400000",
+  "output": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/controls10_s1400000",
+  "checkpoints": {
+    "A10_u1060": {
+      "path": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_instances_s42/ckpt_update_1060.pt",
+      "sha256": "82d67f410750cc525e1a9d23a9a542bea3bdd51ce789669cd16067818d70bc14"
+    },
+    "A10_u1200": {
+      "path": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/episode10/formal_random_instances_s42/ckpt_update_1200.pt",
+      "sha256": "10adbffca211cbb711793d3b2d19182a0ec66329cf40151ce8523185d0c63ab4"
+    }
+  },
+  "models": {
+    "original_NN": {
+      "completed": 5,
+      "mean_total_time": 3171.3841171974273,
+      "mean_components": {
+        "time_work_base": 1440.0530010593495,
+        "time_nonwork_base": 1414.391037074831,
+        "time_maneuver_extra": 316.9400790632467,
+        "time_service": 0.0
+      },
+      "mean_distance": 22835.55230507344,
+      "mean_visits": 21.4,
+      "mean_resupplies": 6.4,
+      "replay_all": true,
+      "mean_eval_wall_seconds": 1.8320215869927778
+    },
+    "ga_initializer": {
+      "completed": 5,
+      "mean_total_time": 3155.270300546891,
+      "mean_components": {
+        "time_work_base": 1444.0590449143824,
+        "time_nonwork_base": 1403.3691615593675,
+        "time_maneuver_extra": 307.8420940731411,
+        "time_service": 0.0
+      },
+      "mean_distance": 22779.42565179,
+      "mean_visits": 20.2,
+      "mean_resupplies": 6.4,
+      "replay_all": true,
+      "mean_eval_wall_seconds": 1.8249376941937954
+    },
+    "A10_u1060": {
+      "completed": 5,
+      "mean_total_time": 2985.477118057078,
+      "mean_components": {
+        "time_work_base": 1423.9058628041346,
+        "time_nonwork_base": 1254.4445907082384,
+        "time_maneuver_extra": 307.12666454470474,
+        "time_service": 0.0
+      },
+      "mean_distance": 21426.803628098987,
+      "mean_visits": 18.0,
+      "mean_resupplies": 6.4,
+      "replay_all": true,
+      "mean_eval_wall_seconds": 1.8309844615869224
+    },
+    "A10_u1200": {
+      "completed": 5,
+      "mean_total_time": 3062.012511425916,
+      "mean_components": {
+        "time_work_base": 1424.0146951674878,
+        "time_nonwork_base": 1322.9286815756655,
+        "time_maneuver_extra": 315.06913468276224,
+        "time_service": 0.0
+      },
+      "mean_distance": 21975.547013945226,
+      "mean_visits": 19.0,
+      "mean_resupplies": 6.4,
+      "replay_all": true,
+      "mean_eval_wall_seconds": 1.7234468431794085
+    }
+  },
+  "rows": 20
+}

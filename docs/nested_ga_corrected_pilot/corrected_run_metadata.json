@@ -1,0 +1,26 @@
+{
+  "arguments": {
+    "config": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/formal10_resolved_config.json",
+    "output": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/pilot10_corrected_s1400000",
+    "fields": 10,
+    "instances": 5,
+    "instance_seed": 1400000,
+    "panel": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/pilot10_s1400000",
+    "search_seeds": [
+      42
+    ],
+    "max_evaluations": 385,
+    "wall_seconds": 1200.0,
+    "max_steps": 500,
+    "outer_population": 4,
+    "outer_generations": 6,
+    "inner_population": 8,
+    "inner_generations": 2
+  },
+  "code_sha": "41fbe6bea0d96008be4533b13929d2590de8df96",
+  "source_status": " M coverage_env/baseline/nested_ga.py\n M coverage_env/rl/evaluation/nested_ga.py\n M coverage_env/tests/test_nested_ga.py\n?? scripts/maneuver_time/benchmark_ablation_inference.py\n?? scripts/maneuver_time/plot_component_ablation.py\n",
+  "model_usage": "none",
+  "cache": "none",
+  "replay_charged_separately": true,
+  "panel": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/pilot10_s1400000"
+}

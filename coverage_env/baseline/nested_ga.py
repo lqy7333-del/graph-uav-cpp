@@ -105,6 +105,9 @@ class NestedGA:
         self.incumbent = None
         self.started = None
         self.inner_records = []
+        self.outer_records = []
+        self._generation = None
+        self._candidate = None
 
     def expired(self):
         return time.monotonic()-self.started >= self.config.wall_seconds
@@ -117,6 +120,8 @@ class NestedGA:
         trace, used_keys = [], []
         cursor = 0
         skipped = fallback = 0
+        fallback_sources = {'initialization': 0, 'sequence_exhausted': 0,
+                            'skipped_slots': 0}
         reason = 'step_limit'
         complete = False
         for _ in range(self.config.max_steps):
@@ -130,6 +135,7 @@ class NestedGA:
                 reason = 'no_feasible_action'
                 break
             chosen = None
+            skipped_before = skipped
             while cursor < len(order):
                 slot = cursor
                 field = order[cursor]
@@ -145,6 +151,12 @@ class NestedGA:
                 chosen = nearest_action(env, feasible)
                 choices = [a for a in feasible if a.field_id == chosen.field_id]
                 fallback += 1
+                if len(order) == 0:
+                    fallback_sources['initialization'] += 1
+                elif skipped > skipped_before:
+                    fallback_sources['skipped_slots'] += 1
+                else:
+                    fallback_sources['sequence_exhausted'] += 1
             # Encode exact selected gate as a bin midpoint for warm-start replay.
             used_keys.append((choices.index(chosen)+0.5)/len(choices))
             trace.append(action_key(chosen))
@@ -162,44 +174,63 @@ class NestedGA:
         result = dict(completed=bool(complete), reason=reason, cost=s['total_time'] if complete else None,
                       actions=trace, gate_keys=used_keys, chromosome_order=list(order),
                       chromosome_gates=list(gates), summary=s, skipped_slots=skipped,
-                      fallback_steps=fallback, label=label)
+                      fallback_steps=fallback, fallback_sources=fallback_sources,
+                      label=label, generation=self._generation, candidate=self._candidate)
+        previous = self.incumbent['cost'] if self.incumbent else None
         if complete and (self.incumbent is None or result['cost'] < self.incumbent['cost']):
             self.incumbent = deepcopy(result)
+        best_source = self.incumbent.get('label') if self.incumbent else None
         self.history.append(dict(evaluation=self.evaluations, seconds=time.monotonic()-self.started,
                                  completed=bool(complete), cost=result['cost'], reason=reason,
                                  fallback_steps=fallback, skipped_slots=skipped, steps=len(trace),
-                                 label=label, best=self.incumbent['cost'] if self.incumbent else None))
+                                 fallback_sources=fallback_sources, generation=self._generation,
+                                 candidate=self._candidate, improved=bool(complete and (previous is None or result['cost'] < previous)),
+                                 best=self.incumbent['cost'] if self.incumbent else None,
+                                 best_source=best_source, label=label))
         return result
 
     @staticmethod
     def fitness(result):
         return result['cost'] if result and result['completed'] else float('inf')
 
-    def inner(self, order, seed_gates):
+    def inner(self, order, seed_gates, *, generation=None, candidate=None):
         p = self.config.inner_population
+        planned = int(p * self.config.inner_generations)
+        self._generation = generation
+        self._candidate = candidate
         population = [tuple(seed_gates), tuple(-1.0 for _ in order)]
         population += [tuple(self.rng.random() for _ in order) for _ in range(p-2)]
         champion, champion_gates = None, None
         count_before = self.evaluations
-        for generation in range(self.config.inner_generations):
+        for inner_generation in range(self.config.inner_generations):
             scored = []
             for gates in population:
                 result = self.evaluate(order, gates, 'inner')
                 if result is None:
+                    # Preserve the partial quota for auditability; it is still
+                    # excluded from outer breeding, exactly as before.
+                    actual = self.evaluations - count_before
+                    reason = ('wall_limit' if self.expired() else 'evaluation_limit')
+                    self.inner_records.append(dict(generation=generation, candidate=candidate,
+                        planned=planned, evaluations=actual, completed=False,
+                        interruption=reason, cost=None,
+                        best_complete=self.incumbent['cost'] if self.incumbent else None))
                     return None  # incomplete quotas never enter outer selection
                 scored.append((self.fitness(result), gates))
                 if champion is None or self.fitness(result) < self.fitness(champion):
                     champion, champion_gates = result, gates
             scored.sort(key=lambda item: item[0])
-            if generation+1 < self.config.inner_generations:
+            if inner_generation+1 < self.config.inner_generations:
                 population = [scored[0][1]]
                 while len(population) < p:
                     a, b = (self.rng.choice(scored[:max(2, p//2)])[1] for _ in range(2))
                     child = [x if self.rng.random()<0.5 else y for x,y in zip(a,b)]
                     child[self.rng.randrange(len(child))] = self.rng.random()
                     population.append(tuple(child))
-        self.inner_records.append(dict(evaluations=self.evaluations-count_before,
-                                       cost=champion['cost'], completed=champion['completed']))
+        self.inner_records.append(dict(generation=generation, candidate=candidate,
+                                       planned=planned, evaluations=self.evaluations-count_before,
+                                       completed=True, interruption=None,
+                                       cost=champion['cost'], best_complete=self.incumbent['cost'] if self.incumbent else None))
         return order, champion_gates, champion
 
     def mutate_outer(self, a, b):
@@ -236,14 +267,27 @@ class NestedGA:
         population = [root]
         while len(population) < self.config.outer_population:
             population.append(self.mutate_outer(root, root))
-        for _ in range(self.config.outer_generations):
+        outer_candidates_attempted = 0
+        for generation in range(self.config.outer_generations):
             scored = []
-            for order, gates in population:
-                result = self.inner(order, gates)
+            attempted = 0
+            for candidate, (order, gates) in enumerate(population):
+                outer_candidates_attempted += 1
+                attempted += 1
+                result = self.inner(order, gates, generation=generation, candidate=candidate)
                 if result is None:
                     break
                 scored.append(result)
-            if len(scored) != self.config.outer_population or self.expired():
+            completed_round = len(scored) == self.config.outer_population and not self.expired()
+            produced = 0
+            if completed_round:
+                produced = self.config.outer_population - 1
+            self.outer_records.append(dict(generation=generation, attempted=attempted,
+                completed_quotas=len(scored),
+                population_size=self.config.outer_population, completed_round=completed_round,
+                produced_children=produced,
+                best_complete=self.incumbent['cost'] if self.incumbent else None))
+            if not completed_round:
                 break
             scored.sort(key=lambda item: self.fitness(item[2]))
             population = [(scored[0][0], scored[0][1])]
@@ -254,7 +298,12 @@ class NestedGA:
         verified = replay(self.initial, self.incumbent['actions'], self.incumbent['cost'], self.config.max_steps)
         return dict(config=asdict(self.config), baseline=baseline, best=self.incumbent,
                     evaluations=self.evaluations, transitions=self.transitions, history=self.history,
-                    inner_quotas=self.inner_records, search_seconds=elapsed,
+                    inner_quotas=self.inner_records, outer_records=self.outer_records,
+                    outer_generations_completed=sum(1 for g in self.outer_records if g['completed_round']),
+                    outer_generations_attempted=len(self.outer_records),
+                    outer_candidates_attempted=outer_candidates_attempted,
+                    outer_candidates_completed=sum(g.get('completed_quotas',0) for g in self.outer_records),
+                    search_seconds=elapsed,
                     replay_seconds=time.monotonic()-self.started-elapsed, replay_summary=verified,
                     termination=('wall_limit' if elapsed>=self.config.wall_seconds else
                                  'evaluation_limit' if self.evaluations>=self.config.max_evaluations else 'generation_limit'))
