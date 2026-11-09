@@ -1,0 +1,37 @@
+{
+  "evaluations": 5,
+  "transitions": 94,
+  "search_seconds": 49.603587199992035,
+  "replay_seconds": 10.222515900037251,
+  "termination": "evaluation_limit",
+  "inner_quotas": [
+    {
+      "evaluations": 2,
+      "cost": 2721.698893069032,
+      "completed": true
+    },
+    {
+      "evaluations": 2,
+      "cost": 2785.7131017829506,
+      "completed": true
+    }
+  ],
+  "instance_seed": 1400100,
+  "instance_snapshot_sha256": "bbcbbe7e85c8d7bb58c187acf04b458f6bccc5cac8e02547015aedfed0d480b8",
+  "baseline_time": 2721.698893069032,
+  "best_time": 2721.698893069032,
+  "replay_summary": {
+    "total_time": 2721.698893069032,
+    "total_distance": 19121.781631825103,
+    "time_work_base": 1306.070390664599,
+    "time_nonwork_base": 1084.1523133135381,
+    "time_maneuver_extra": 331.47618909089516,
+    "time_service": 0.0,
+    "coverage_ratio": 1.0,
+    "resupply_count": 6,
+    "execution_count": 18,
+    "returned_to_depot": true,
+    "time_closure_error": 9.094947017729282e-13
+  },
+  "purpose": "10-field CPU execution smoke only; not comparative performance evidence"
+}

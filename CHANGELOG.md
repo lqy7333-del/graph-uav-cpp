@@ -1,3 +1,14 @@
+## 2026-11-09
+
+### 126. Independent nested-GA baseline
+
+- Outer repeated field-visit sequence, inner feasible gate random-key GA; same
+  environment action mask, workload estimation and full time ledger as RL.
+- Equal inner quotas, bounded evaluation/wall budgets, global complete incumbent,
+  exact action replay and persistent instance snapshots; no learned initialization.
+- Action-space nearest initializer explicitly distinct from legacy NN.
+- Added runner and correctness tests; protocol in docs/nested_ga_protocol.md.
+- No training or full pilot executed by this change.
 ## 2026-11-06
 
 ### 125. **CHANet 组件消融 C/D：去跨地块/去内部边界交互**
