@@ -5,7 +5,7 @@ from pathlib import Path
 from coverage_env.baseline.nested_ga import GAConfig, NestedGA
 
 EXP=Path('/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga')
-PANEL=EXP/'independent10/panel'; OUT=EXP/'independent10/runs'; SEEDS=[42,43,44]
+PANEL=EXP/'independent10/panel'; OUT=EXP/'independent10/runs'; SEEDS=[42]
 CFG=GAConfig(outer_population=4,outer_generations=6,inner_population=8,inner_generations=2,
              max_evaluations=385,wall_seconds=1800.0,max_steps=500)
 def main():

@@ -116,3 +116,21 @@ not model win/loss.
 - All 30 instances and all 90 searches enter the final statistics. Per-instance
   GA cost is the mean of three best complete incumbent costs; no completed-only
   filtering is allowed.
+
+## Revision 2 — single search seed (2026-11-09 23:28 +08:00)
+
+**Completed at revision: 3 seed42 results; 5 historical seed43/44 results.**
+One in-flight seed44 search was safely terminated; no result file was written.
+
+- User reduced the evaluation budget to **30 instances × seed42 only**.
+- Seed42 was the predetermined primary search seed, not selected by observed
+  performance.
+- All completed seed42 results are retained unchanged; no rerun and no extra
+  budget.
+- Completed seed43/44 results are moved to `historical_seed43_44/` as historical
+  extras. They do not enter means, best-of, or any main statistic.
+- No three-seed mean, seed-standard-deviation, or best-of-3 analysis is reported.
+- Controls (NN, GA initializer, CHANet u1060/u1200) are reused unchanged on the
+  same 30 snapshots.
+- Search budget remains **385 evaluations or 1800 s, first reached stops**.
+- Main statistics: 30 instances, one GA search seed, one RL training seed.
