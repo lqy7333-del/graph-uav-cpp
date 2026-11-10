@@ -1,0 +1,16 @@
+{
+  "revision": 2,
+  "timestamp": "2026-11-09T23:28:14+08:00",
+  "completed_at_revision": {
+    "seed42": 3,
+    "seed43_44_historical": 5,
+    "total_completed": 8
+  },
+  "in_flight_terminated": "1500002 seed44 (no result file written; not rerun)",
+  "decision": "30 instances x seed42 only; no seed43/44 in main analysis",
+  "reason": "user reduced computational budget; seed42 was the predetermined primary search seed, not selected by score",
+  "main_statistics": "30 instances, one GA search seed; controls reused same snapshots",
+  "excluded": "all seed43/44 records retained in historical_seed43_44, not used in means/best-of/statistics",
+  "wall_policy": "wall-limit recorded, no pause; 385 evals or 1800s",
+  "controls": "already completed and reused"
+}

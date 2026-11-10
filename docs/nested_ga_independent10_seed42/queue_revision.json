@@ -1,0 +1,12 @@
+{
+  "revision": "方案1",
+  "revision_commit": "092255cfc137977da6d9c9ca3d85477c065ed165",
+  "completed_at_revision": 6,
+  "planned": 90,
+  "wall_policy": "wall-limit recorded, no subsequent pause",
+  "search_wall_seconds": 1800,
+  "max_evaluations": 385,
+  "remaining_max_search_hours": 42,
+  "controls_already_run": true,
+  "method": "嵌套GA，每次最多385次候选评估或1800秒搜索时间，先到者停止。"
+}
