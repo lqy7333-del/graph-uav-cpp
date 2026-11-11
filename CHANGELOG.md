@@ -1,3 +1,13 @@
+## 2026-11-11
+
+### 路径生成框架基线：六段计划与第一段接口契约
+
+- 基于 af12bca 建立独立分支；记录六段实施计划、D→P/P→D 开发协议及共享执行接口审查。
+- 新增纯数据 RegionTask、离散分区完整性校验及覆盖份额归一化；尚未接入生产执行。
+- 明确现有执行器的区域重生成、CC 专属补给触发与事务回滚边界，留待第二段处理。
+- 契约、现有 GA、配置执行器相关测试 30 passed；未运行训练、正式搜索或 GPU 测试。
+- 交接见 docs/framework_baseline_plan.md、framework_baseline_protocol.md、framework_baseline_stage1_review.md。
+
 ## 2026-11-10
 
 ### 137. **独立 10 地块 nested-GA seed42 对照评估完成**
