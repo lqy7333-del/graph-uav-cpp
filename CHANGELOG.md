@@ -1,5 +1,13 @@
 ## 2026-11-11
 
+### 路径生成框架第三段：D→P 固定分区与嵌套 GA
+
+- 新增资源可行预划分、不可变子任务排列及门 key 搜索，复用既有 inner GA 与第二段共享执行器。
+- 预处理计入墙钟；记录分区探测、失败、quota、候选及完整可重放 incumbent，无 CC fallback。
+- 现有 GA CLI 新增 --framework divide_then_plan，默认 CC 不变。
+- 相关测试 50 passed；小面积新 10 地块 smoke 完成 5 次评估及重放，无性能结论。
+- 未正式搜索或训练；第四段 P→D 待实现。
+
 ### 路径生成框架第二段：共享区域规划、执行与重放
 
 - 拆分 CC 规划/执行，新增显式 RegionTask 路径入口与版本化 CoveragePlan。

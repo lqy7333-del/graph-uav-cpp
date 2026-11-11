@@ -15,6 +15,7 @@ from coverage_env.env.instance_generator import InstanceGenerator
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--framework', choices=('cc', 'divide_then_plan'), default='cc')
     p.add_argument('--config', required=True, help='Frozen evaluation YAML/JSON, not a model checkpoint')
     p.add_argument('--output', required=True)
     p.add_argument('--fields', type=int, default=10)
@@ -65,7 +66,11 @@ def main():
         fingerprint = hashlib.sha256(snapshot).hexdigest()
         for search_seed in args.search_seeds:
             settings = GAConfig(**{k:getattr(args,k) for k in asdict(GAConfig()) if k!='seed'}, seed=search_seed)
-            search = NestedGA(env, settings)
+            if args.framework == 'divide_then_plan':
+                from coverage_env.baseline.divide_then_plan import DivideThenPlanGA
+                search = DivideThenPlanGA(env, settings)
+            else:
+                search = NestedGA(env, settings)
             try:
                 result = search.run()
             except Exception as exc:
@@ -77,7 +82,7 @@ def main():
             result.update(instance_seed=seed, instance_snapshot_sha256=fingerprint)
             (out/f'instance_{seed}_ga_{search_seed}.json').write_text(
                 json.dumps(result, indent=2, allow_nan=False), encoding='utf-8')
-            print(f'instance={seed} ga={search_seed} time={result["best"]["cost"]:.3f} evaluations={result["evaluations"]}', flush=True)
+            print(f'instance={seed} ga={search_seed} best={result["best"]["cost"] if result["best"] else None} evaluations={result["evaluations"]}', flush=True)
 
 
 if __name__ == '__main__':

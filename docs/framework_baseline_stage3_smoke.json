@@ -1,0 +1,65 @@
+{
+  "method": "divide_then_plan",
+  "termination": "evaluation_limit",
+  "evaluations": 5,
+  "transitions": 50,
+  "preprocessing_probes": 168,
+  "preprocessing_seconds": 2.495719900005497,
+  "search_seconds": 3.552368300035596,
+  "replay_seconds": 0.04244250000920147,
+  "replay_summary": {
+    "total_time": 1410.5469488083245,
+    "time_work_base": 83.01393335812811,
+    "time_nonwork_base": 1249.5847553040564,
+    "time_maneuver_extra": 77.94826014613986,
+    "time_service": 0.0,
+    "time_resupply_or_return": 265.9990688551798,
+    "time_closure_error": -2.2737367544323206e-13,
+    "total_distance": 10660.789509297478,
+    "total_energy": 1002.8631607437981,
+    "coverage_ratio": 1.0,
+    "covered_area": 7500.0,
+    "remaining_energy": {
+      "UAV-1": 497.136839256202
+    },
+    "total_payload": 22.500000000000004,
+    "remaining_payload": {
+      "UAV-1": 27.50000000000001
+    },
+    "resupply_count": 0,
+    "total_energy_recharged": 0.0,
+    "total_payload_resupplied": 0.0,
+    "completed_fields": [
+      "field-1",
+      "field-2",
+      "field-3",
+      "field-4",
+      "field-5",
+      "field-6",
+      "field-7",
+      "field-8",
+      "field-9",
+      "field-10"
+    ],
+    "execution_count": 10,
+    "returned_to_depot": true
+  },
+  "outer_records": [
+    {
+      "generation": 0,
+      "attempted": 2,
+      "completed_quotas": 2,
+      "completed_round": true
+    }
+  ],
+  "instance_seed": 1900100,
+  "fields": 10,
+  "area_range": [
+    500,
+    800
+  ],
+  "task_count": 10,
+  "best_time": 1410.5469488083245,
+  "initial_time": 1410.5469488083245,
+  "scope": "small-area engineering smoke, not formal performance evaluation"
+}
