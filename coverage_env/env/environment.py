@@ -399,7 +399,16 @@ class CoverageEnvironment(FieldEnvironment):
         if executor is None:
             executor = ConfigurationExecutor()
             self._configuration_executor = executor
-        result = executor.execute(configuration, self)
+        snapshot = self._capture_physical_state()
+        try:
+            result = executor.execute(configuration, self)
+            return self._settle_coverage_result(configuration, result, before_state)
+        except Exception:
+            self._restore_physical_state(snapshot)
+            raise
+
+    def _settle_coverage_result(self, configuration, result, before_state):
+        """Shared measured coverage/heading/time bookkeeping; does not plan."""
         self._execution_records.append({
             "configuration": configuration,
             "field_id": result.field_id,
@@ -671,13 +680,32 @@ class CoverageEnvironment(FieldEnvironment):
                     info["termination_reason"] = self._termination_reason
 
         next_state = self.get_state()
+        self._accumulate_time(info)
+        return EnvironmentStep(next_state, reward, done, info)
+
+    def _accumulate_time(self, info):
+        """One shared ledger accumulation for CC and explicit-region steps."""
         self._time_totals["work"] += float(info.get("time_work_base", 0.0))
         self._time_totals["nonwork"] += float(info.get("time_nonwork_base", 0.0))
         self._time_totals["maneuver"] += float(info.get("time_maneuver_extra", 0.0))
         self._time_totals["service"] += float(info.get("time_service", 0.0))
         self._time_totals["resupply_or_return"] += float(info.get("time_resupply_or_return", 0.0))
         self._time_totals["total"] += float(info.get("time_total", 0.0))
-        return EnvironmentStep(next_state, reward, done, info)
+
+    def plan_region(self, task, entry_boundary_id, exit_boundary_id):
+        from coverage_env.planner.configuration_executor import ConfigurationExecutor
+        return ConfigurationExecutor().plan_region(task, entry_boundary_id, exit_boundary_id, self)
+
+    def step_region_plan(self, plan):
+        """Execute exact stored region geometry, without automatic replanning."""
+        from coverage_env.planner.framework_execution import execute_region_plan
+        return execute_region_plan(self, plan)
+
+    def step_region(self, task, entry_boundary_id, exit_boundary_id, *, allow_resupply=True):
+        """Plan a fixed task; if necessary, explicitly refill and plan from depot."""
+        from coverage_env.planner.framework_execution import execute_region_task
+        return execute_region_task(self, task, entry_boundary_id, exit_boundary_id,
+                                   allow_resupply=allow_resupply)
 
     def _capture_physical_state(self) -> dict:
         """Snapshot mutable mission state so failed execution can roll back."""
@@ -690,6 +718,9 @@ class CoverageEnvironment(FieldEnvironment):
             "trajectories": deepcopy(self._mission_trajectories),
             "records": len(self._execution_records),
             "logs": len(self.episode_logger._transitions),
+            "mission": {name: deepcopy(getattr(self, name)) for name in (
+                "_heading_valid", "_time_totals", "_resupply_count", "_termination_reason",
+                "_consecutive_failures", "_action_estimate_cache", "_growth_area_cache")},
         }
 
     def _restore_physical_state(self, snapshot: dict) -> None:
@@ -703,7 +734,8 @@ class CoverageEnvironment(FieldEnvironment):
         self._mission_trajectories = snapshot["trajectories"]
         del self._execution_records[snapshot["records"]:]
         del self.episode_logger._transitions[snapshot["logs"]:]
-        self._action_estimate_cache.clear()
+        for name, saved in snapshot["mission"].items():
+            setattr(self, name, saved)
 
     def _failed_step(self, action, before_state: dict, reason: str):
         """Return a penalized, non-mutating failure transition for PPO."""
@@ -963,6 +995,13 @@ class CoverageEnvironment(FieldEnvironment):
         if not self._has_feasible_action_at_full_resources():
             self._termination_reason = "no_feasible_action_at_full_resources"
             return None
+        return self._perform_resupply("no_feasible_coverage_action")
+
+    def _perform_resupply(self, reason):
+        """Physical return/refill shared by CC and fixed-region dispatchers.
+
+        The caller checks its own next-task feasibility and policy permission.
+        """
         uav = self.uavs[0]
         from math import hypot
 
@@ -989,7 +1028,7 @@ class CoverageEnvironment(FieldEnvironment):
             "remaining_payload_before_resupply": before_payload,
             "remaining_energy_after_resupply": uav.remaining_energy,
             "remaining_payload_after_resupply": uav.remaining_payload,
-            "resupply_reason": "no_feasible_coverage_action",
+            "resupply_reason": reason,
             "energy_recharged": float(replenished["energy_recharged"]),
             "payload_resupplied": float(replenished["payload_resupplied"]),
         }
