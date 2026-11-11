@@ -1,0 +1,382 @@
+{
+  "format_version": 1,
+  "purpose": "training_set_overfit_not_generalization",
+  "config": {
+    "environment": {
+      "coordinate_system": {
+        "type": "WGS84"
+      },
+      "num_fields": {
+        "min": 20,
+        "max": 20
+      },
+      "num_fields_strategy": "uniform",
+      "workspace": {
+        "min_lat": 31.21,
+        "max_lat": 31.24,
+        "min_lon": 121.455,
+        "max_lon": 121.485
+      },
+      "random_seed": 20261012,
+      "max_episode_steps_per_field": 12
+    },
+    "field_generator": {
+      "field_size": {
+        "min_area": 5000.0,
+        "max_area": 20000.0
+      },
+      "shape": {
+        "min_vertices": 3,
+        "max_vertices": 5,
+        "irregularity": 0.22
+      },
+      "min_field_spacing": 15.0,
+      "layout": {
+        "mode": "tessellated",
+        "parcel_gap_m": 8.0,
+        "tessellated_oversample": 2.0,
+        "gap_m": 15.0,
+        "cluster_min": 2,
+        "cluster_max": 4,
+        "cluster_inner_gap_m": 4.0,
+        "cluster_gap_m": 90.0,
+        "pool_oversample": 1.5,
+        "growth_attempts": 60,
+        "depot_offset_m": {
+          "min": 50.0,
+          "max": 400.0
+        }
+      },
+      "resolution": {
+        "grid_resolution": 10.0
+      }
+    },
+    "depot": {
+      "type": "random",
+      "position": null
+    },
+    "uav": {
+      "num_uav": 1,
+      "max_energy": 1500.0,
+      "speed": 8.0,
+      "coverage_width": 10.0,
+      "sensor_width": 5.0,
+      "max_payload": 50.0,
+      "payload_per_area": 0.003,
+      "energy": {
+        "alpha": 0.08,
+        "beta": 0.02,
+        "energy_margin": 0.2
+      },
+      "ranges": {
+        "max_energy": {
+          "min": 1200.0,
+          "max": 1800.0
+        },
+        "max_payload": {
+          "min": 40.0,
+          "max": 60.0
+        },
+        "speed": {
+          "min": 6.0,
+          "max": 10.0
+        },
+        "coverage_width": {
+          "min": 8.0,
+          "max": 12.0
+        },
+        "alpha": {
+          "min": 0.06,
+          "max": 0.1
+        },
+        "beta": {
+          "min": 0.016,
+          "max": 0.024
+        },
+        "payload_per_area": {
+          "min": 0.002,
+          "max": 0.004
+        }
+      }
+    },
+    "coverage": {
+      "default_workload": 0.45,
+      "min_workload": 0.01,
+      "max_workload": 0.5
+    },
+    "plot": {
+      "show_grid": true,
+      "save_result": true,
+      "show": false,
+      "output_dir": "results",
+      "save_gif": false
+    },
+    "rl": {
+      "grid_resolution": 10.0,
+      "reward": {
+        "mode": "time",
+        "coverage_width": 10.0,
+        "nominal_work_speed": 8.0,
+        "time_scale": 100.0
+      },
+      "time": {
+        "cruise_speed": 8.0,
+        "tau_pi": 3.0,
+        "exponent": 2.0,
+        "service_time": 0.0
+      },
+      "gamma": 1.0,
+      "learning_rate": 0.0003,
+      "batch_size": 64,
+      "workload_options": [
+        0.1,
+        0.2,
+        0.3,
+        0.5
+      ],
+      "return_to_depot": true,
+      "allow_auto_resupply": true,
+      "fast_estimate_safety_factor": 1.25,
+      "failure_penalty": -1.0,
+      "failure_termination_threshold": 5,
+      "reward_scale": 100.0,
+      "graph": {
+        "max_area": 8000.0,
+        "max_perimeter": 500.0,
+        "max_boundary_length": 200.0,
+        "position_scale_m": 1000.0,
+        "global_distance_scale_m": 3000.0,
+        "uav_distance_scale_m": 2500.0,
+        "d_near_m": 1500.0,
+        "max_energy_scale": 1800.0,
+        "max_payload_scale": 60.0,
+        "speed_scale": 10.0,
+        "coverage_width_scale": 12.0,
+        "alpha_scale": 0.1,
+        "beta_scale": 0.024,
+        "payload_per_area_scale": 0.004
+      },
+      "decoder": {
+        "hierarchical_decoding": true,
+        "candidate_attention": false,
+        "attention_heads": 4
+      },
+      "encoder": {
+        "hidden_dim": 128,
+        "num_heads": 4,
+        "dropout": 0.1
+      }
+    },
+    "shaping": {
+      "enable": false,
+      "strength": 1.0
+    },
+    "ppo": {
+      "advantage_mode": "gae",
+      "randomize_uav": false,
+      "learning_rate": 0.0003,
+      "actor_learning_rate": 0.0001,
+      "critic_learning_rate": 0.003,
+      "gamma": 1.0,
+      "gae_lambda": 0.95,
+      "clip_ratio": 0.2,
+      "entropy_coef": 0.01,
+      "entropy_coef_end": 0.0,
+      "entropy_anneal_start": 0.1,
+      "lr_schedule": "none",
+      "lr_final_scale": 0.1,
+      "value_coef": 0.5,
+      "epochs": 4,
+      "batch_size": 64,
+      "max_grad_norm": 0.5,
+      "value_gate": true,
+      "collection_mode": "complete_episodes",
+      "episodes_per_rank": 4,
+      "max_episode_steps": 500
+    }
+  },
+  "initialization": null,
+  "bank_sha256": "6bf96c5d127ca407229a601a0c2ea6d83451058e8ad2e438f0aeb5141f2f7d2a",
+  "instances": [
+    {
+      "index": 0,
+      "seed": 1800000,
+      "field_count": 20,
+      "fingerprint": "97c1c9bcde3b6904d6027633d2a2a454e92fad2d1f1038eb7837155985e618a6"
+    },
+    {
+      "index": 1,
+      "seed": 1800001,
+      "field_count": 20,
+      "fingerprint": "32fc0d0c8bdf945ccd9769e2127d0f3ba96cb5899ac9b3650e0884c4e4f66c3d"
+    },
+    {
+      "index": 2,
+      "seed": 1800002,
+      "field_count": 20,
+      "fingerprint": "402f262ac31ca14fb8185285c9f07241735a83fee97276d399a56d7b4f7cb7c1"
+    },
+    {
+      "index": 3,
+      "seed": 1800003,
+      "field_count": 20,
+      "fingerprint": "18e651832c7bc13e7bbbe27f034eb50710e59e93312228fb96ab497a641b37e3"
+    },
+    {
+      "index": 4,
+      "seed": 1800004,
+      "field_count": 20,
+      "fingerprint": "1cc72661b30846874478bb8af89af69c282a38cb93bde2eb81f65f555d3dc5ea"
+    },
+    {
+      "index": 5,
+      "seed": 1800005,
+      "field_count": 20,
+      "fingerprint": "02b08a8d6db05eae4ca4034e50fd567463a2e5ee4b2544d8845976e4a286bdb8"
+    },
+    {
+      "index": 6,
+      "seed": 1800006,
+      "field_count": 20,
+      "fingerprint": "179d302016fd2971379c29b8fb5f54bec368883059340288588f9cf6896cb70d"
+    },
+    {
+      "index": 7,
+      "seed": 1800007,
+      "field_count": 20,
+      "fingerprint": "6a3ea44bd41bf0730962f794276cb49c4a66b07ed9745df412539106e5a30f98"
+    },
+    {
+      "index": 8,
+      "seed": 1800008,
+      "field_count": 20,
+      "fingerprint": "5ebf1133a71edbc35e16057c24076ccbc7ad13b924bea3ec84f1fbadb49ffed4"
+    },
+    {
+      "index": 9,
+      "seed": 1800009,
+      "field_count": 20,
+      "fingerprint": "0f8ba6872442f49c56225280ea780090bfe9f8c8245b343916e06c96bdfcca89"
+    },
+    {
+      "index": 10,
+      "seed": 1800010,
+      "field_count": 20,
+      "fingerprint": "f64cea0e47d9a7f26bb3d9bc9ecf5bb50605d3f568bfeadc6ff8a20fd71f8418"
+    },
+    {
+      "index": 11,
+      "seed": 1800011,
+      "field_count": 20,
+      "fingerprint": "46f0478e005988ff5796951d6e70c36560d5eeea248b9e503a56a014ee2c096f"
+    },
+    {
+      "index": 12,
+      "seed": 1800012,
+      "field_count": 20,
+      "fingerprint": "759722a6222c1923c550cd0f6ba1c3c69b441b6eff2bccf72f292b6c888a22cf"
+    },
+    {
+      "index": 13,
+      "seed": 1800013,
+      "field_count": 20,
+      "fingerprint": "2724322199551e71050b40d7e106c87520f73e19256f4d5687a8aa9df64b8a88"
+    },
+    {
+      "index": 14,
+      "seed": 1800014,
+      "field_count": 20,
+      "fingerprint": "b6f29afa98ab53821267b9af7cf9d527d4aa7ed616f9b4cb6811b1dc1defce60"
+    },
+    {
+      "index": 15,
+      "seed": 1800015,
+      "field_count": 20,
+      "fingerprint": "47ed0e8ca5d9951d94cbf1c306a8dbd92a76e83bbed9cb118991d24deb055714"
+    },
+    {
+      "index": 16,
+      "seed": 1800016,
+      "field_count": 20,
+      "fingerprint": "ee37232849369b370fb78b7304a5a27eb612d085777ca0f4ff3ac84d9a824cb7"
+    },
+    {
+      "index": 17,
+      "seed": 1800017,
+      "field_count": 20,
+      "fingerprint": "292a0ff2497f033ce4d244dac6532e8b6ee47c19542fa2a8c1fe954ddda87d96"
+    },
+    {
+      "index": 18,
+      "seed": 1800018,
+      "field_count": 20,
+      "fingerprint": "886056eb90eac8c8fca5dcc47edcfb55db03335c2e8a78b980ff60f56e56ba07"
+    },
+    {
+      "index": 19,
+      "seed": 1800019,
+      "field_count": 20,
+      "fingerprint": "d6b6daeb24864404179ddbbba7e36f130c1d5966b976af32fa3dda5b5fdcf84e"
+    },
+    {
+      "index": 20,
+      "seed": 1800020,
+      "field_count": 20,
+      "fingerprint": "b976d17365b4c22b3e3d87de3353a625d083ed1b53f07d186c9954eb35e84bf2"
+    },
+    {
+      "index": 21,
+      "seed": 1800021,
+      "field_count": 20,
+      "fingerprint": "34d3efa8dcb299953f3729bd91fb69b857e24eee56ffd9f457c4fa3e5e70720d"
+    },
+    {
+      "index": 22,
+      "seed": 1800022,
+      "field_count": 20,
+      "fingerprint": "a231e150c053026268970a8bc0bdee2ebc878be34abca02270d3971e08b6185d"
+    },
+    {
+      "index": 23,
+      "seed": 1800023,
+      "field_count": 20,
+      "fingerprint": "3239137e47d075386fee1ef84f0c70357397b540dc52002d09175b68895899f1"
+    },
+    {
+      "index": 24,
+      "seed": 1800024,
+      "field_count": 20,
+      "fingerprint": "be6235734e2a9aa63bbde5474eb632551e8b7fbc329cb3903c3d009b2fc13554"
+    },
+    {
+      "index": 25,
+      "seed": 1800025,
+      "field_count": 20,
+      "fingerprint": "5cc120d5dc7c207d723f05d714c022e8f8bc42cbc1690474fb606571dd2d1e78"
+    },
+    {
+      "index": 26,
+      "seed": 1800026,
+      "field_count": 20,
+      "fingerprint": "8e3b5dcb847e686151ead09a5fdc40c018e09b6c9d0cc1004b1e5ff560648019"
+    },
+    {
+      "index": 27,
+      "seed": 1800027,
+      "field_count": 20,
+      "fingerprint": "91989cd19943da0800cf6c7c09ebf4824bb1eb18949fa7638ed936ea270f03d4"
+    },
+    {
+      "index": 28,
+      "seed": 1800028,
+      "field_count": 20,
+      "fingerprint": "77e75f1379792cfd5e6903da95283685ef0ce690ee369a382b37b90616dc4113"
+    },
+    {
+      "index": 29,
+      "seed": 1800029,
+      "field_count": 20,
+      "fingerprint": "5332eb0a275534cc0a2e4fdb708ab0f992785830f3f2a9e664fff2ccf3ae53a3"
+    }
+  ]
+}

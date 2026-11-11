@@ -1,0 +1,7 @@
+{
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+  "torch": "2.14.1+cu130",
+  "numpy": "2.5.4",
+  "shapely": "2.2.0"
+}

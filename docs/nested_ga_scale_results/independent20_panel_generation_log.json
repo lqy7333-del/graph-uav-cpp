@@ -1,0 +1,300 @@
+{
+  "fields": 20,
+  "base_seed": 1800000,
+  "accepted": 30,
+  "rejected": 0,
+  "seeds": [
+    1800000,
+    1800001,
+    1800002,
+    1800003,
+    1800004,
+    1800005,
+    1800006,
+    1800007,
+    1800008,
+    1800009,
+    1800010,
+    1800011,
+    1800012,
+    1800013,
+    1800014,
+    1800015,
+    1800016,
+    1800017,
+    1800018,
+    1800019,
+    1800020,
+    1800021,
+    1800022,
+    1800023,
+    1800024,
+    1800025,
+    1800026,
+    1800027,
+    1800028,
+    1800029
+  ],
+  "failures": [],
+  "fingerprints": [
+    "97c1c9bcde3b6904d6027633d2a2a454e92fad2d1f1038eb7837155985e618a6",
+    "32fc0d0c8bdf945ccd9769e2127d0f3ba96cb5899ac9b3650e0884c4e4f66c3d",
+    "402f262ac31ca14fb8185285c9f07241735a83fee97276d399a56d7b4f7cb7c1",
+    "18e651832c7bc13e7bbbe27f034eb50710e59e93312228fb96ab497a641b37e3",
+    "1cc72661b30846874478bb8af89af69c282a38cb93bde2eb81f65f555d3dc5ea",
+    "02b08a8d6db05eae4ca4034e50fd567463a2e5ee4b2544d8845976e4a286bdb8",
+    "179d302016fd2971379c29b8fb5f54bec368883059340288588f9cf6896cb70d",
+    "6a3ea44bd41bf0730962f794276cb49c4a66b07ed9745df412539106e5a30f98",
+    "5ebf1133a71edbc35e16057c24076ccbc7ad13b924bea3ec84f1fbadb49ffed4",
+    "0f8ba6872442f49c56225280ea780090bfe9f8c8245b343916e06c96bdfcca89",
+    "f64cea0e47d9a7f26bb3d9bc9ecf5bb50605d3f568bfeadc6ff8a20fd71f8418",
+    "46f0478e005988ff5796951d6e70c36560d5eeea248b9e503a56a014ee2c096f",
+    "759722a6222c1923c550cd0f6ba1c3c69b441b6eff2bccf72f292b6c888a22cf",
+    "2724322199551e71050b40d7e106c87520f73e19256f4d5687a8aa9df64b8a88",
+    "b6f29afa98ab53821267b9af7cf9d527d4aa7ed616f9b4cb6811b1dc1defce60",
+    "47ed0e8ca5d9951d94cbf1c306a8dbd92a76e83bbed9cb118991d24deb055714",
+    "ee37232849369b370fb78b7304a5a27eb612d085777ca0f4ff3ac84d9a824cb7",
+    "292a0ff2497f033ce4d244dac6532e8b6ee47c19542fa2a8c1fe954ddda87d96",
+    "886056eb90eac8c8fca5dcc47edcfb55db03335c2e8a78b980ff60f56e56ba07",
+    "d6b6daeb24864404179ddbbba7e36f130c1d5966b976af32fa3dda5b5fdcf84e",
+    "b976d17365b4c22b3e3d87de3353a625d083ed1b53f07d186c9954eb35e84bf2",
+    "34d3efa8dcb299953f3729bd91fb69b857e24eee56ffd9f457c4fa3e5e70720d",
+    "a231e150c053026268970a8bc0bdee2ebc878be34abca02270d3971e08b6185d",
+    "3239137e47d075386fee1ef84f0c70357397b540dc52002d09175b68895899f1",
+    "be6235734e2a9aa63bbde5474eb632551e8b7fbc329cb3903c3d009b2fc13554",
+    "5cc120d5dc7c207d723f05d714c022e8f8bc42cbc1690474fb606571dd2d1e78",
+    "8e3b5dcb847e686151ead09a5fdc40c018e09b6c9d0cc1004b1e5ff560648019",
+    "91989cd19943da0800cf6c7c09ebf4824bb1eb18949fa7638ed936ea270f03d4",
+    "77e75f1379792cfd5e6903da95283685ef0ce690ee369a382b37b90616dc4113",
+    "5332eb0a275534cc0a2e4fdb708ab0f992785830f3f2a9e664fff2ccf3ae53a3"
+  ],
+  "snapshot_sha256": [
+    "e337db17df362b55b4925f2be61c664ef6e1b6a90ffda91ad61b85a609477976",
+    "c68ea2cafc64dd47ca6423a9d71cefa461de156eb232f56117a30aa61327049d",
+    "91a4103ee8ba1318ff9c7d0f3f2498ceb2b4d6380bdacda8fc291472e73bff3c",
+    "ed51d494cee2953cf8b46cbcdf8b04507ecbfa82fe799314ddff49b7136dd970",
+    "2829c31804dab4e8aa301c7f9cb204f265ccc1415a69bf745c51525ea7c3a4b4",
+    "d70391b0df05fa579a21e0a837914d9de3c1df042d0ad98d0a49a0cdbcf7bf48",
+    "d68eb3a69864d6d01faf17f74f83a3527762eecbfc2650048452edf27938f7c1",
+    "dccc0e416d67c0c49cfeaf99be3547514da2dae74c60c097edf01d0347225aeb",
+    "a6ac77b98488a43bbd5c7f6c5fd1eefbecf02f3cd3151c4f0d9e2ec6dfff4d56",
+    "417115e1723975117e3e866a8ee1d05a5a6209506c9695618ad2cd0cf707f330",
+    "cff64e13ba2f82ffeee9448e38e753262de84ae57e7c4c1119f0343ed9483cca",
+    "39d2381c28ef29a8ece92bc6220045eb16769df7d8aa27dd42c903577190f6d2",
+    "26e192fdbe192a04822da0e57e95d05599b2c88dcd17f256db938e5f2557c361",
+    "d932dec43645a86e3ba0748f2b257144659b2d68bfa526429a453e82b16be009",
+    "6196f7d8699359ef9c1076dd05c5b3df828c5a72cf4b21bb6786c049335a373a",
+    "9f145513ac279c1dbb5e84267833aa55bf921de652508e27b3ac4b24ef4de5e5",
+    "1553c0504d7870ec2fd19b39471fa81e7987defc4b6ab38c17f181e3512eb99c",
+    "30396535d456c57c21a653c0710e6193b8777ead3a6bbe03c4b53bac17fea59c",
+    "fa4acaecbdf8dc007c3a00bde56d61c14aa0617c99724bc960c825d922fe9c3a",
+    "996a1b5541c92041084e1b05ac4da6b29fd2acbea77fca3f57572d4e54af2dd6",
+    "2021829df8d69ab99f6ea7e2a12ce47291f3cfd6f6e26d4e9d715e66db6845dd",
+    "52545c1fe956dde5ad7fef01d514a852c1f05130fb953925698436bb1518a39d",
+    "46fd0338708fc321b43b48c462ad261f8362e75fe62d29fd1d6b539d6f7b2e3f",
+    "177775167a8d8dd0518b8b17a8fdabf34de298dc273aba3db647ed1dbded8578",
+    "511d3f01cdbf8045a894f98f78aafea0bda1a72018d76b6100ba26c5a741d4d6",
+    "e68f1e1e2bab080a9c87cb0e2140a6297573bc6c9275b3fca8343aa7067cf111",
+    "49d57ae47dacd290c29f12b4d80258b541116216e7e060f20246a6cce357499c",
+    "984968d829567e629bb9af819bec6487c2d9219521a84e04fa00451f02eccd7f",
+    "c3a736294895cb9fc8cd47cdd1cb6e8113dac04b78d1998b0e8043f1fc5b5e20",
+    "73c927bc3b1a6dc8fd88f08db2c544923e258e595b6970629658753913878201"
+  ],
+  "manifest_sha256": "8bae2d11cfb4e638658909422e14ec849c8b56358605c5fd7911ffc3aa36de01",
+  "instances_sha256": "6bf96c5d127ca407229a601a0c2ea6d83451058e8ad2e438f0aeb5141f2f7d2a",
+  "config": {
+    "environment": {
+      "coordinate_system": {
+        "type": "WGS84"
+      },
+      "num_fields": {
+        "min": 20,
+        "max": 20
+      },
+      "num_fields_strategy": "uniform",
+      "workspace": {
+        "min_lat": 31.21,
+        "max_lat": 31.24,
+        "min_lon": 121.455,
+        "max_lon": 121.485
+      },
+      "random_seed": 20261012,
+      "max_episode_steps_per_field": 12
+    },
+    "field_generator": {
+      "field_size": {
+        "min_area": 5000.0,
+        "max_area": 20000.0
+      },
+      "shape": {
+        "min_vertices": 3,
+        "max_vertices": 5,
+        "irregularity": 0.22
+      },
+      "min_field_spacing": 15.0,
+      "layout": {
+        "mode": "tessellated",
+        "parcel_gap_m": 8.0,
+        "tessellated_oversample": 2.0,
+        "gap_m": 15.0,
+        "cluster_min": 2,
+        "cluster_max": 4,
+        "cluster_inner_gap_m": 4.0,
+        "cluster_gap_m": 90.0,
+        "pool_oversample": 1.5,
+        "growth_attempts": 60,
+        "depot_offset_m": {
+          "min": 50.0,
+          "max": 400.0
+        }
+      },
+      "resolution": {
+        "grid_resolution": 10.0
+      }
+    },
+    "depot": {
+      "type": "random",
+      "position": null
+    },
+    "uav": {
+      "num_uav": 1,
+      "max_energy": 1500.0,
+      "speed": 8.0,
+      "coverage_width": 10.0,
+      "sensor_width": 5.0,
+      "max_payload": 50.0,
+      "payload_per_area": 0.003,
+      "energy": {
+        "alpha": 0.08,
+        "beta": 0.02,
+        "energy_margin": 0.2
+      },
+      "ranges": {
+        "max_energy": {
+          "min": 1200.0,
+          "max": 1800.0
+        },
+        "max_payload": {
+          "min": 40.0,
+          "max": 60.0
+        },
+        "speed": {
+          "min": 6.0,
+          "max": 10.0
+        },
+        "coverage_width": {
+          "min": 8.0,
+          "max": 12.0
+        },
+        "alpha": {
+          "min": 0.06,
+          "max": 0.1
+        },
+        "beta": {
+          "min": 0.016,
+          "max": 0.024
+        },
+        "payload_per_area": {
+          "min": 0.002,
+          "max": 0.004
+        }
+      }
+    },
+    "coverage": {
+      "default_workload": 0.45,
+      "min_workload": 0.01,
+      "max_workload": 0.5
+    },
+    "plot": {
+      "show_grid": true,
+      "save_result": true,
+      "show": false,
+      "output_dir": "results",
+      "save_gif": false
+    },
+    "rl": {
+      "grid_resolution": 10.0,
+      "reward": {
+        "mode": "time",
+        "coverage_width": 10.0,
+        "nominal_work_speed": 8.0,
+        "time_scale": 100.0
+      },
+      "time": {
+        "cruise_speed": 8.0,
+        "tau_pi": 3.0,
+        "exponent": 2.0,
+        "service_time": 0.0
+      },
+      "gamma": 1.0,
+      "learning_rate": 0.0003,
+      "batch_size": 64,
+      "workload_options": [
+        0.1,
+        0.2,
+        0.3,
+        0.5
+      ],
+      "return_to_depot": true,
+      "allow_auto_resupply": true,
+      "fast_estimate_safety_factor": 1.25,
+      "failure_penalty": -1.0,
+      "failure_termination_threshold": 5,
+      "reward_scale": 100.0,
+      "graph": {
+        "max_area": 8000.0,
+        "max_perimeter": 500.0,
+        "max_boundary_length": 200.0,
+        "position_scale_m": 1000.0,
+        "global_distance_scale_m": 3000.0,
+        "uav_distance_scale_m": 2500.0,
+        "d_near_m": 1500.0,
+        "max_energy_scale": 1800.0,
+        "max_payload_scale": 60.0,
+        "speed_scale": 10.0,
+        "coverage_width_scale": 12.0,
+        "alpha_scale": 0.1,
+        "beta_scale": 0.024,
+        "payload_per_area_scale": 0.004
+      },
+      "decoder": {
+        "hierarchical_decoding": true,
+        "candidate_attention": false,
+        "attention_heads": 4
+      },
+      "encoder": {
+        "hidden_dim": 128,
+        "num_heads": 4,
+        "dropout": 0.1
+      }
+    },
+    "shaping": {
+      "enable": false,
+      "strength": 1.0
+    },
+    "ppo": {
+      "advantage_mode": "gae",
+      "randomize_uav": false,
+      "learning_rate": 0.0003,
+      "actor_learning_rate": 0.0001,
+      "critic_learning_rate": 0.003,
+      "gamma": 1.0,
+      "gae_lambda": 0.95,
+      "clip_ratio": 0.2,
+      "entropy_coef": 0.01,
+      "entropy_coef_end": 0.0,
+      "entropy_anneal_start": 0.1,
+      "lr_schedule": "none",
+      "lr_final_scale": 0.1,
+      "value_coef": 0.5,
+      "epochs": 4,
+      "batch_size": 64,
+      "max_grad_norm": 0.5,
+      "value_gate": true,
+      "collection_mode": "complete_episodes",
+      "episodes_per_rank": 4,
+      "max_episode_steps": 500
+    }
+  },
+  "seed_collision_check": "exact seeds checked against existing manifests before generation; no overlap"
+}

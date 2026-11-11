@@ -1,0 +1,20 @@
+{
+  "code_sha": "6df5ba30bf78b2117d105f26f34e90db515c0fe8",
+  "source_status": "?? scripts/maneuver_time/benchmark_ablation_inference.py\n?? scripts/maneuver_time/plot_component_ablation.py\n?? scripts/maneuver_time/summarize_nested_ga_independent.py\n?? scripts/maneuver_time/summarize_nested_ga_scales.py\n",
+  "config": {
+    "outer_population": 4,
+    "outer_generations": 6,
+    "inner_population": 8,
+    "inner_generations": 2,
+    "max_evaluations": 385,
+    "wall_seconds": 1800.0,
+    "max_steps": 500,
+    "seed": 42
+  },
+  "panel": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent20/panel",
+  "panel_manifest_sha256": "8bae2d11cfb4e638658909422e14ec849c8b56358605c5fd7911ffc3aa36de01",
+  "fields": 20,
+  "instances": 30,
+  "search_seed": 42,
+  "rl_training": "none"
+}
