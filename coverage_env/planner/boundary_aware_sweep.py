@@ -47,6 +47,7 @@ class BoundaryAwareSweepPlanner:
         current_position,
         lane_spacing: float,
         candidate_directions=None,
+        require_point_coverage=False,
     ) -> BoundaryAwareSweepPlan:
         """Return a coverage route whose endpoints satisfy both edge limits."""
         if not region:
@@ -90,6 +91,18 @@ class BoundaryAwareSweepPlanner:
                     )
                 if not strokes:
                     continue
+                if require_point_coverage:
+                    # Feasibility must precede cost ranking: entry position can
+                    # change the cheapest orientation, but not required coverage.
+                    geometry = unary_union([
+                        LineString((a, b))
+                        for a, b in strokes if a != b
+                    ])
+                    if geometry.is_empty or any(
+                        geometry.distance(Point(p.coordinate)) > lane_spacing / 2 + 1e-5
+                        for p in region
+                    ):
+                        continue
                 try:
                     ordered_strokes, lower_bound = self._choose_stroke_order(
                         strokes, orientation, entry_edge, exit_edge,

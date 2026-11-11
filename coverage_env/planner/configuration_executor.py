@@ -160,6 +160,7 @@ class ConfigurationExecutor:
             exit_boundary,
             current_position=uav_start,
             lane_spacing=uav.coverage_width,
+            require_point_coverage=(source == "explicit_region"),
         )
         entry_boundary_point = sweep_plan.entry_point
         coverage_path = sweep_plan.coverage_path
