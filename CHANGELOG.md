@@ -1,5 +1,13 @@
 ## 2026-11-11
 
+### 139. **Framework formal-area acceptance blocked by D→P error**
+
+- Test-only cross-platform float tolerance fix (61 passed); no algorithm change.
+- 3 formal-area acceptance instances 1,900,400–1,900,402; CC search completed.
+- D→P failed with `ValueError: Planned strokes do not cover assigned grid points`
+  on instance 1900400; P→D not started; no acceptance receipt.
+- Formal 10/20 queue stopped and not started; diagnostics preserved.
+
 ### 路径生成框架第四至六段：P→D、联合验收与共同面板工具
 
 - 实现访问/份额驱动的 P→D、有界区域修复及共享执行重放，候选划分开销计入在线预算。
