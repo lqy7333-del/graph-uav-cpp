@@ -18,7 +18,7 @@ class BudgetExpired(Exception):
     pass
 
 
-def strip_order(field):
+def long_axis(field):
     corners = list(field.xy_polygon.minimum_rotated_rectangle.exterior.coords)
     axes = []
     for a, b in zip(corners, corners[1:]):
@@ -30,6 +30,11 @@ def strip_order(field):
         axes.append((-round(length, 8), dx/length, dy/length))
     if not axes: raise PartitionFailure('Degenerate field axis')
     _, x, y = min(axes)
+    return x, y
+
+
+def strip_order(field):
+    x, y = long_axis(field)
     return tuple(p.id for p in sorted(field.grid_points,
         key=lambda p: (-y*p.x+x*p.y, x*p.x+y*p.y, p.id)))
 
@@ -72,12 +77,17 @@ class DivideThenPlanGA(NestedGA):
         if self.expired(): raise BudgetExpired()
 
     def partition(self):
+        return self.partition_regions([(f, strip_order(f)) for f in self.initial.fields])
+
+    def partition_regions(self, regions):
+        """Shared bounded resource repair; preserves the input region ordering."""
         executor = ConfigurationExecutor()
         tasks = []
-        for field in self.initial.fields:
+        self.gate_options = {}
+        for field, region_ids in regions:
             points = {p.id: p for p in field.grid_points}
             if not points: raise PartitionFailure('Empty grid')
-            pending = list(reversed(components(strip_order(field), points)))
+            pending = list(reversed(components(region_ids, points)))
             while pending:
                 self.check_wall()
                 ids = pending.pop()
@@ -128,10 +138,14 @@ class DivideThenPlanGA(NestedGA):
         return min(self.gate_options[task_id], key=key)
 
     def evaluate(self, order, gates, label):
-        if self.evaluations >= self.config.max_evaluations or self.expired(): return None
+        return self._evaluate_decoded(order, gates, label)
+
+    def _evaluate_decoded(self, order, gates, label, *, reserved=False):
+        if not reserved and (self.evaluations >= self.config.max_evaluations or self.expired()): return None
         if len(order) != len(self.tasks) or set(order) != set(self.by_task) or len(gates) != len(order):
             raise ValueError('Chromosome must contain every frozen task exactly once')
-        self.evaluations += 1
+        if not reserved:
+            self.evaluations += 1
         env = deepcopy(self.initial)
         trace, used = [], []
         complete, reason = False, 'step_limit'

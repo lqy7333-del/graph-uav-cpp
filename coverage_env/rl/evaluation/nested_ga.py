@@ -15,7 +15,7 @@ from coverage_env.env.instance_generator import InstanceGenerator
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--framework', choices=('cc', 'divide_then_plan'), default='cc')
+    p.add_argument('--framework', choices=('cc', 'divide_then_plan', 'plan_then_divide'), default='cc')
     p.add_argument('--config', required=True, help='Frozen evaluation YAML/JSON, not a model checkpoint')
     p.add_argument('--output', required=True)
     p.add_argument('--fields', type=int, default=10)
@@ -66,7 +66,10 @@ def main():
         fingerprint = hashlib.sha256(snapshot).hexdigest()
         for search_seed in args.search_seeds:
             settings = GAConfig(**{k:getattr(args,k) for k in asdict(GAConfig()) if k!='seed'}, seed=search_seed)
-            if args.framework == 'divide_then_plan':
+            if args.framework == 'plan_then_divide':
+                from coverage_env.baseline.plan_then_divide import PlanThenDivideGA
+                search = PlanThenDivideGA(env, settings)
+            elif args.framework == 'divide_then_plan':
                 from coverage_env.baseline.divide_then_plan import DivideThenPlanGA
                 search = DivideThenPlanGA(env, settings)
             else:
