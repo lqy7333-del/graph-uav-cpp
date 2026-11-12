@@ -292,6 +292,10 @@ def run_panel(manifest_path, output, settings, *, stage='acceptance', receipt=No
                     excess_time=s['total_time']-s['time_work_base'] if completed else None,
                     search_seconds=result['search_seconds'], evaluations=result['evaluations'],
                     full_outer_rounds=sum(bool(r.get('completed_round')) for r in result['outer_records']),
+                    decode_cache_hits=result.get('decode_cache_hits'),
+                    decode_cache_misses=result.get('decode_cache_misses'),
+                    decode_cache_saved_seconds=result.get('decode_cache_saved_seconds'),
+                    decode_cache_saved_probes=result.get('decode_cache_saved_probes'),
                     termination=result['termination']))
                 write_json(out/'progress.json', dict(completed_searches=len(rows), total_searches=len(panel)*3))
         write_json(out/'rows.json', rows)

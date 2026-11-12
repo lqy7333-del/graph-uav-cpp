@@ -66,19 +66,75 @@ class PlanThenDivideGA(DivideThenPlanGA):
     The bounded split repair cannot move points between original visits.
     Decoding/repair is charged for every candidate; there is no hidden cache.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.decode_cache_enabled = True
+        self._decode_cache = {}
+        self._last_decode_hit = False
+        self._last_decode_probes = 0
+        self._last_decode_saved = 0.0
+        self._last_decode_saved_probes = 0
+
+    def _decode_context(self, visits):
+        """Return deterministic division/repair/gate data for fixed outer visits.
+
+        Only the outer candidate's visit order and weights are cached. Every
+        inner candidate still receives a fresh environment and executes every
+        region independently; state, resource, gate and cost data are never
+        reused across inner candidates.
+        """
+        key = tuple((v[0], float(v[1])) for v in visits)
+        if self.decode_cache_enabled and key in self._decode_cache:
+            cached = self._decode_cache[key]
+            self.tasks = cached['tasks']
+            self.by_task = cached['by_task']
+            self.gate_options = cached['gate_options']
+            self.partition_records = deepcopy(cached['partition_records'])
+            self._last_decode_probes = cached['probes']
+            self._last_decode_hit = True
+            self._last_decode_saved = cached['seconds']
+            self._last_decode_saved_probes = cached['probes']
+            return cached['regions'], deepcopy(cached['audit']), cached['owner']
+        started = time.monotonic()
+        regions, audit = contextual_regions(self.initial, visits)
+        self.partition_records = []
+        self.partition_regions(regions)
+        owner = {(f.field_id, pid): i for i, (f, ids) in enumerate(regions) for pid in ids}
+        if self.decode_cache_enabled:
+            self._decode_cache[key] = dict(
+                regions=regions, audit=audit, tasks=self.tasks,
+                by_task=self.by_task, gate_options=self.gate_options,
+                partition_records=deepcopy(self.partition_records),
+                owner=owner, probes=self.probes, seconds=time.monotonic() - started)
+        self._last_decode_probes = self.probes
+        self._last_decode_hit = False
+        self._last_decode_saved = 0.0
+        self._last_decode_saved_probes = 0
+        return regions, audit, owner
+
+    def inner(self, *args, **kwargs):
+        # Deterministic decode data may only live for one inner quota. A new
+        # outer candidate re-enters with a fresh cache.
+        self._decode_cache = {}
+        return super().inner(*args, **kwargs)
+
     def evaluate(self, visits, gates, label):
         if self.evaluations >= self.config.max_evaluations or self.expired(): return None
         self.evaluations += 1  # includes candidates that fail during division
+        self._last_decode_hit = False
+        self._last_decode_probes = 0
+        self._last_decode_saved = 0.0
+        self._last_decode_saved_probes = 0
         if len(gates) != len(visits): raise ValueError('Visit/key length mismatch')
         start = time.monotonic()
         audit = []
+        decode_seconds = 0.0
         self.partition_records = []
         try:
             self.check_wall()
             if len(visits) > self.config.max_steps: raise PartitionFailure('Visit limit exceeded')
-            regions, audit = contextual_regions(self.initial, visits)
-            self.partition_regions(regions)
-            owner = {(f.field_id, pid): i for i, (f, ids) in enumerate(regions) for pid in ids}
+            regions, audit, owner = self._decode_context(visits)
+            decode_seconds = time.monotonic() - start
             decoded_gates = tuple(gates[owner[t.field_id, t.point_ids[0]]] for t in self.tasks)
             result = self._evaluate_decoded(tuple(t.task_id for t in self.tasks),
                                             decoded_gates, label, reserved=True)
@@ -94,10 +150,20 @@ class PlanThenDivideGA(DivideThenPlanGA):
                 improved=False, generation=self._generation, candidate=self._candidate))
         result.update(chromosome_order=list(visits), chromosome_gates=list(gates),
                       division_audit=audit, repair_records=deepcopy(self.partition_records),
-                      decode_and_execution_seconds=time.monotonic()-start)
+                      decode_and_execution_seconds=time.monotonic()-start,
+                      decode_cache_hit=self._last_decode_hit,
+                      decode_preprocess_seconds=decode_seconds,
+                      decode_probes=self._last_decode_probes,
+                      decode_saved_seconds=self._last_decode_saved,
+                      decode_saved_probes=self._last_decode_saved_probes)
         self.history[-1].update(visits=list(visits),
             repair_added_visits=result.get('repair_added_visits'),
             partition_signature=result.get('partition_signature'),
+            decode_cache_hit=result.get('decode_cache_hit'),
+            decode_preprocess_seconds=result.get('decode_preprocess_seconds'),
+            decode_probes=result.get('decode_probes'),
+            decode_saved_seconds=result.get('decode_saved_seconds'),
+            decode_saved_probes=result.get('decode_saved_probes'),
             area_errors=[a['area_error'] for a in audit])
         # Parent evaluator records the incumbent before these PD-specific fields.
         if self.history[-1]['improved']: self.incumbent = deepcopy(result)
@@ -165,6 +231,10 @@ class PlanThenDivideGA(DivideThenPlanGA):
         return dict(method='plan_then_divide', config=asdict(self.config), baseline=baseline,
             best=self.incumbent, evaluations=self.evaluations, transitions=self.transitions,
             repair_probes=self.probes, encoding_repairs=getattr(self, 'encoding_repairs', []),
+            decode_cache_hits=sum(1 for h in self.history if h.get('decode_cache_hit')),
+            decode_cache_misses=sum(1 for h in self.history if h.get('decode_cache_hit') is False),
+            decode_cache_saved_seconds=sum(h.get('decode_saved_seconds', 0.) for h in self.history if h.get('decode_cache_hit')),
+            decode_cache_saved_probes=sum(h.get('decode_saved_probes', 0) for h in self.history if h.get('decode_cache_hit')),
             history=self.history, inner_quotas=self.inner_records,
             outer_records=self.outer_records, search_seconds=elapsed,
             replay_seconds=time.monotonic()-self.started-elapsed, replay_summary=verified,
