@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "stage": "formal",
+  "manifest_digest": "a93e26daec8033cfdfdce28d16ecaad7f3168c81b7e511a1a99f657072c22adf",
+  "code_digest": "0a23dc0b59f1e975868449d5c4addb9e4868bd397da61e57090896d6944635f2",
+  "config": {
+    "outer_population": 4,
+    "outer_generations": 6,
+    "inner_population": 8,
+    "inner_generations": 2,
+    "max_evaluations": 385,
+    "wall_seconds": 1800.0,
+    "max_steps": 500,
+    "seed": 42
+  },
+  "methods": [
+    "cc",
+    "divide_then_plan",
+    "plan_then_divide"
+  ],
+  "receipt_digest": "88190fe965f89bf52f53fe93180ecb1aa1ac4f4b2b179a3797310dfb43b86ff0"
+}

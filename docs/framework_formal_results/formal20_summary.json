@@ -1,0 +1,52 @@
+{
+  "20": {
+    "methods": {
+      "cc": {
+        "n": 30,
+        "completed": 30,
+        "mean_total_time": 6939.651476335518,
+        "mean_search_seconds": 1491.361100634034
+      },
+      "divide_then_plan": {
+        "n": 30,
+        "completed": 30,
+        "mean_total_time": 7001.725500015381,
+        "mean_search_seconds": 1369.0945876345659
+      },
+      "plan_then_divide": {
+        "n": 30,
+        "completed": 30,
+        "mean_total_time": 7022.281777135298,
+        "mean_search_seconds": 1744.7536538571392
+      }
+    },
+    "comparisons": {
+      "divide_then_plan minus cc": {
+        "n_pairs": 30,
+        "panel_n": 30,
+        "scope": "all paired instances",
+        "mean": 62.074023679863664,
+        "ci95": [
+          -41.53343184595252,
+          168.13964838058246
+        ],
+        "cc_wins": 21,
+        "ties": 0,
+        "other_wins": 9
+      },
+      "plan_then_divide minus cc": {
+        "n_pairs": 30,
+        "panel_n": 30,
+        "scope": "all paired instances",
+        "mean": 82.63030079978088,
+        "ci95": [
+          -14.661790138120908,
+          184.24061764264118
+        ],
+        "cc_wins": 19,
+        "ties": 0,
+        "other_wins": 11
+      }
+    }
+  }
+}

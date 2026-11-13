@@ -1,0 +1,16 @@
+{
+  "instance": "1900401",
+  "contextual_regions_seconds": 0.0005473250057548285,
+  "components_seconds": 0.0012368970783427358,
+  "components_calls": 16,
+  "gate_plan_seconds": 16.921896116051357,
+  "gate_validate_seconds": 3.6809848198317923,
+  "gate_probe_calls": 469,
+  "partition_total_seconds": 16.93004014901817,
+  "other_repair_seconds": -3.674077683943324,
+  "full_execution_seconds": 2.384366760030389,
+  "tasks": 13,
+  "regions": 10,
+  "completed": true,
+  "cost": 3768.180015186167
+}

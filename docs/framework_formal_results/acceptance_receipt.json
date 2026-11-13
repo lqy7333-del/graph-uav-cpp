@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "code_digest": "0a23dc0b59f1e975868449d5c4addb9e4868bd397da61e57090896d6944635f2",
+  "domain_verified": true,
+  "search_exercised": true,
+  "physical_config_fingerprint": "a00615144267c2bd1f303e2cab7f63dd973e31d62701b982c154c87d5d987430",
+  "instance_fingerprints": [
+    "24e09c46f7c9c843fdaf6e7089c8c1c3d8d296e1ed7aebddbee131bed94abb97",
+    "ef2078842d0c5cbc9c9065230b25d3d5191785c68134a74d7e27527a5a6c5210",
+    "05174ef07fda005c1feb765fdefba61fa246122678790038454e6f4b576e9ff3"
+  ],
+  "scope": "engineering completion/replay gate only; inspect search diversity and timing separately",
+  "contract_digest": "66d42040577a44b3896f6cd943463365d49aead634c5e234c6bce1b42e34f11a"
+}

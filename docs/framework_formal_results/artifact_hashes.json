@@ -1,0 +1,9 @@
+{
+  "formal10_manifest.json": "50a1d29497f20c9de7e6ca084e8822ae408daeaa90823a799cab862b5b8dac09",
+  "formal20_manifest.json": "cbd872bf4e3e1b3e36c1790e125739dbca58a2db1ed178075a437705e7d0f649",
+  "formal10_run_file_count": 95,
+  "formal10_run_dir_json_sha256": "54c828e9f4a8a641e013cd1b8df17e4421348f911ff6b66ea88edfe658becb72",
+  "formal20_run_file_count": 95,
+  "formal20_run_dir_json_sha256": "ab12c332919a6f2f839957319d35729ebee719ec92666d1f8bbe6bf187814e0e",
+  "model_note": "No model training or model selection in this formal framework comparison; CC results are historical same-snapshot outputs."
+}

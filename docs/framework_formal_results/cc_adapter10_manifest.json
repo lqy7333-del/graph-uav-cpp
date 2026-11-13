@@ -1,0 +1,606 @@
+{
+  "scale": "independent10",
+  "records": [
+    {
+      "seed": 1500000,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500000_ga_42.json",
+      "source_sha256": "ec3dcca5ff1e6543ca5f75efd23f8d39128083f4dc7ac52037c64415852cc89c",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500000_ga_42.json",
+      "target_sha256": "68988ef16d550da17062e0dffb5cb84e678144770ee0d2fde39e75812920c224",
+      "snapshot_sha256": "208217a7d83a3816275a801d3bb4ee8b1fc929c05627b4476b61cf5cf650f807",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500001,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500001_ga_42.json",
+      "source_sha256": "b27253fc1d801a57f890571b9c37426162f3f2bc839d4cc82694c98ebfc1df47",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500001_ga_42.json",
+      "target_sha256": "52245e67c41d9b0b19fb1a6b041aae14a499a3bb1e603107bc98f0c6fd8b302c",
+      "snapshot_sha256": "3a0341d8c3a2ce88f3c2aae97cf3139e6dcd4d473dee1159c2328516398ae9de",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 259,
+      "termination": "wall_limit"
+    },
+    {
+      "seed": 1500002,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500002_ga_42.json",
+      "source_sha256": "2a88f110c47d2c5319b158281f168e35d1322b3f35d79b9181bdcb384251d44b",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500002_ga_42.json",
+      "target_sha256": "e2bd8811767dae9a2b27171ca45ce76ae7fa6b6c36e13bb31085e973b4654450",
+      "snapshot_sha256": "093d840808463e4c6d73bd36397cdaea2c7a501b4c37b1e7fc854f6304f62f74",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500003,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500003_ga_42.json",
+      "source_sha256": "68e9de3c1b1da7a97f5ba3512e855a3202402044b6753de47ccd73b6d8e49846",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500003_ga_42.json",
+      "target_sha256": "adb0933121e56e3a955f6f79010fc76755b41c634beeb26794c002a25636601c",
+      "snapshot_sha256": "2f700c944b3ff5cafdba592d154e6f72866311ab4b2bbf7061904d4b33b6b016",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500004,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500004_ga_42.json",
+      "source_sha256": "46b82ac870c81187d7b27ca413119a7784080c510acde48136522fea7b1e036c",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500004_ga_42.json",
+      "target_sha256": "76185802ca817766a3fcaf15049e009ee875bba3d50000e2f5d56a51550ed08e",
+      "snapshot_sha256": "d5d8408dbb1b297df0a406c5edbba3cb1e86d6151d9022875ff292451338d129",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500005,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500005_ga_42.json",
+      "source_sha256": "c363268eee082a3c8e9e00648a4699c44089992f1253818240612f7eb85e8bfc",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500005_ga_42.json",
+      "target_sha256": "921c31bca6d6c254296a1e4fc675eb20c81a71d6ddb615bd084e8aa65f404901",
+      "snapshot_sha256": "adc4ccc9b6d122de9f069b76067de56ed8a55d35f46bed03bb321b5af352d593",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500006,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500006_ga_42.json",
+      "source_sha256": "37c45543396fb7fd99682bf1f3e396fe3dbcdff393ead18d91847210d3c5a1b0",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500006_ga_42.json",
+      "target_sha256": "df0499e06ad310d5bb3e515538dc038e7a3b2cc6b26517a5e2d0c7bf03110379",
+      "snapshot_sha256": "7c1986a7fe8ebcf6124224fe090c7412914cd6eb4615ae78c3ddaf0c2b23d468",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500007,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500007_ga_42.json",
+      "source_sha256": "9c21fa56744d19e8d38357aa835d39c78ba63140622be5d96d4078a77e35861c",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500007_ga_42.json",
+      "target_sha256": "ef56450481c1c8350bb1296b81f1200a772adaa960279a5478fc63b93b7b4493",
+      "snapshot_sha256": "9b60703a2d6a2b8d964e2940540d3887c4acd5a5b66840f7f1f38d35f2359a2d",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500008,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500008_ga_42.json",
+      "source_sha256": "5f99b96add203dca8a3bfd15bc3c60545354de612c511e5fb0132cde476f0d82",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500008_ga_42.json",
+      "target_sha256": "7f422e1cd94b38d1a65d07eb13d912ebccc513021fb8dd71fbc9879c042af2a8",
+      "snapshot_sha256": "2e38a0a2596d9063aa1eaf41056152eb12e02e76f9fd5d80b835a822c1ae38e8",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500009,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500009_ga_42.json",
+      "source_sha256": "e671631716d35cd5287af48adc465fbf90adc760bba351ea3d5882b3331f1489",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500009_ga_42.json",
+      "target_sha256": "8c8390f1921f200c6705ac2428e8c99b4b1d64541f9d737f07d68e02e64e47cb",
+      "snapshot_sha256": "396db760d22e0143d233a8ec2132a74047c0085936b6e6df2aa7f13616cddd85",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500010,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500010_ga_42.json",
+      "source_sha256": "ee56069f0136204fb3616e5c895141bb0e87ca8193b555967e3c91b880decd73",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500010_ga_42.json",
+      "target_sha256": "f6f38f871de0cc7a670cdbc38dbe01e1db3c14b27a160b19497cee12c992544c",
+      "snapshot_sha256": "e08645890b6d27e1d068fe3a2b793427a6fcbb532b707c4ba3ef01d384fcb949",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500011,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500011_ga_42.json",
+      "source_sha256": "062858409fa30b7391fa5598bbfdfd1d1424e6e13153739fb26a839ee746a6e1",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500011_ga_42.json",
+      "target_sha256": "432024aa4aef605855ebdc4052b596abd6ff116b6a012d54fd8fe127461e7d63",
+      "snapshot_sha256": "92adccb17dd5017838949a0ad8616cd96c3e9ec80b132aa14263c6f032634fee",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 275,
+      "termination": "wall_limit"
+    },
+    {
+      "seed": 1500012,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500012_ga_42.json",
+      "source_sha256": "16dabd29377b610ec7342b5eb7787e641f833631ddff8060269d1355eea2b2a6",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500012_ga_42.json",
+      "target_sha256": "40dc61236c83fc53de8bd4fa41e8ef8cdeb3816fdf8d1fbf8b29fdf93f6cfa76",
+      "snapshot_sha256": "b36fe2c53109ebcf9c94ba51bd6052b66f95c8a2721f580f23116577debdc46e",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500013,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500013_ga_42.json",
+      "source_sha256": "2aefbc17b525c1a69fcce20ec286636e8d6d2e8511adfc9264ba2ad79911a971",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500013_ga_42.json",
+      "target_sha256": "5cb6adb6f90cf9f534f3901790d0cee27309ebe7b8db506e71fa71f46ffa9185",
+      "snapshot_sha256": "3231c54fa7979a5711e9e14568f14f09779499b17f89498c158beb67fc3ea413",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500014,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500014_ga_42.json",
+      "source_sha256": "609cb111d48d6b01fa661250932abac10dd0be5b588d4be8244e91b18b295811",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500014_ga_42.json",
+      "target_sha256": "02195580923b5f8144dfefc3bf1259bec69fc0e16fb1913e93468c6754e024d2",
+      "snapshot_sha256": "d965d80433b4ecf96cd6be247f9a29aa180d4f8ebd8a523f6a4364021dedddf7",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 367,
+      "termination": "wall_limit"
+    },
+    {
+      "seed": 1500015,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500015_ga_42.json",
+      "source_sha256": "5d5e5c3a76a3c6d285b7a068a8862ea2c5d4db48c10ff0c6d8621412a25730a9",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500015_ga_42.json",
+      "target_sha256": "066f70669dcfde9ea19e2fd8d0e3ad8371645295ab3492543300da635a07a665",
+      "snapshot_sha256": "de997388a19a1d82a40a93e475a4197cbfef3069ab38fc04e27438681ff57c26",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500016,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500016_ga_42.json",
+      "source_sha256": "4110655ac9bb05fe7db14e312de3b19f130488d4e44ea9ef1cc13eced967b83e",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500016_ga_42.json",
+      "target_sha256": "8bea26186dc03f3ef5e0fb8f447703f4543edf0c8ef974a5a71e90a877d4b93b",
+      "snapshot_sha256": "ea4f421396237042abc8020211d0c3aa1b959910b5ca239ac0bb0cb0675b2275",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500017,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500017_ga_42.json",
+      "source_sha256": "c5755a7eb82919a288136af0aefb2fa942d6033c36d55470a7379afb2eda958d",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500017_ga_42.json",
+      "target_sha256": "143275ed8dedfbb8321ae72cd54b360732fa3deaaa73199e72c785e1738b8f84",
+      "snapshot_sha256": "4051564af3ed2c999f4099f4ba3b06f87a4260b10446083e6298d29e3f8ab3a7",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500018,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500018_ga_42.json",
+      "source_sha256": "2740f3ac1302aec0217a6a78d268d7d2045f77bb116048c70beeb38272b6fde7",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500018_ga_42.json",
+      "target_sha256": "47a18ae0be5a7e8fec6cd2338d85146644c070e82241c97261e8e88a0427442c",
+      "snapshot_sha256": "117f19c1fbb4f6da0aec0aebce67c2cfaf6fd107c255b0230694f8059b752604",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 370,
+      "termination": "wall_limit"
+    },
+    {
+      "seed": 1500019,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500019_ga_42.json",
+      "source_sha256": "2967c59174b3559aaa3e56dfe68e78c7b6736c49e6bf54d40503cbf0631b7f1d",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500019_ga_42.json",
+      "target_sha256": "4c98fc688b2bfb98a1bc83afaec5ce2fd54c0e502add6657291859624147a753",
+      "snapshot_sha256": "93d6e3b422a9d1a47779ac77ba7b4b4779060798aff7a0b7cba89e571dd61c3a",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 253,
+      "termination": "wall_limit"
+    },
+    {
+      "seed": 1500020,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500020_ga_42.json",
+      "source_sha256": "f72c23f6306ef2140cc84ca77a1bb2ae061f314be86c3fb1f4e3bde32396f3e9",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500020_ga_42.json",
+      "target_sha256": "45116edcce56d63cc214da2c8676b4ffc520db73c2361b1644f3e8b9ab3f6f0f",
+      "snapshot_sha256": "1392079d4a4a003ab916b3bd3feeebf76586e9239811b569c0527e92fb47c721",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 184,
+      "termination": "wall_limit"
+    },
+    {
+      "seed": 1500021,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500021_ga_42.json",
+      "source_sha256": "4fe0d4509d3cafe02d9450c1cd0e8af4e08e27546525d5610d5a0ab3e56a586d",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500021_ga_42.json",
+      "target_sha256": "ec622bff82115cdc08c3be9278ee2eca5c6b7356910c982e340278bd6a317d16",
+      "snapshot_sha256": "91876793bcfc59c0a5125efb6c31e2b2fa73e075ec6015cac4fac914fbfa63fd",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500022,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500022_ga_42.json",
+      "source_sha256": "458969f2bb82e81863ffa0f600148b1b5b6c1d278ea9d542612874f3e82b9b14",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500022_ga_42.json",
+      "target_sha256": "106215b5d49a8fb3b6182fdc25ea9801a4c68068f6a2a6a16e1008b2f1c489f8",
+      "snapshot_sha256": "dc6bd638951c91c8fc2975392b7ef7c935bec17e6e11a5f37b364a7dbefa18e6",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 292,
+      "termination": "wall_limit"
+    },
+    {
+      "seed": 1500023,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500023_ga_42.json",
+      "source_sha256": "426f16c67fc9a6996beb81a55a053764920a682dd75de2fa4db3b0a14b0caa49",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500023_ga_42.json",
+      "target_sha256": "9cebb0d4bbf95699674e17b565417ef1da74f8e472ac1b8d6b3c23916feb138b",
+      "snapshot_sha256": "2a8bb188d8ea8fdd8e1eec9afef082355427c081b8564918fbe460b93305d795",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500024,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500024_ga_42.json",
+      "source_sha256": "e70fbe20eb825a899b69742356925d1bb1ec2caa84a251efe4942961c022d48e",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500024_ga_42.json",
+      "target_sha256": "d9107f4c0cd661531d30f41b70def3c399d34214d499fc71882ebad9a2146b62",
+      "snapshot_sha256": "58de9ec08e2cb89c0d118ad0dc318284d5f013facac084c95503683772027782",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500025,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500025_ga_42.json",
+      "source_sha256": "ef90cead67e523d4ee2a60456315ca9848993edb1c7578901f06cec65b13b327",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500025_ga_42.json",
+      "target_sha256": "28d666b4cb6c83e582da68b5aeed4460163fb11b9ca25291c33b7e5d16c9e692",
+      "snapshot_sha256": "c605a82cf930d7daae2c3152b833699af33b3a5e8987d3f02f6ac8708513bc15",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500026,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500026_ga_42.json",
+      "source_sha256": "45396317a4a5f8b4f741648c201c5a9ad43069d1de41db1b8e7528025d794b9b",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500026_ga_42.json",
+      "target_sha256": "d1fddee43d3ac57bad3401dfb9491bf665ac04812fc42331bb1f5b4b0f430a42",
+      "snapshot_sha256": "e4eb681953a9ebd8d88cb1f91ec6334cc5bf97b10af28867fb0d58a174ebe8da",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500027,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500027_ga_42.json",
+      "source_sha256": "187626c835f92ca07380c99f2ede4f3d9815ed777f7e2ee54ccaf1926beea0d1",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500027_ga_42.json",
+      "target_sha256": "53538da539a820de788667bc1eb2c04fa6a507cc2c1ddbc81b62dcc4331d86ea",
+      "snapshot_sha256": "01f6718c9c7fa5f6d6589ef8625c2a54cca3c762e4c833d44473e7311078411c",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500028,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500028_ga_42.json",
+      "source_sha256": "dfc4aeccd37b6cbfb604d17cf78ddb29c14e27dd982e09b1ccfc2052dc3b5d01",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500028_ga_42.json",
+      "target_sha256": "82d78a5f6c30408bcf2865df055910f0a294c41f31ba51d25712f874c1965513",
+      "snapshot_sha256": "d12c78a959c35e0d188c5c3c6b4017a62f462a5bc0e80f69a3c8db6aa936b523",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    },
+    {
+      "seed": 1500029,
+      "source": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/nested_ga/independent10/runs/instance_1500029_ga_42.json",
+      "source_sha256": "ba6d2f59b4020ef45aef02cd14fdf2cde7c4acbaf64bb4c17521288af4f0a80e",
+      "target": "/home/ps/Desktop/Graph_planning/graph-uav-experiments/framework/cc_adapter10/instance_1500029_ga_42.json",
+      "target_sha256": "63f569e10d16f4fad9ee188e1808436829a6f631ed99371a975ceb75b6eb8e7d",
+      "snapshot_sha256": "c3e96fc5f3a9e9b78ba2fb711da33cd9da59c0ca4ff81baf9ebe644efff57600",
+      "config": {
+        "outer_population": 4,
+        "outer_generations": 6,
+        "inner_population": 8,
+        "inner_generations": 2,
+        "max_evaluations": 385,
+        "wall_seconds": 1800.0,
+        "max_steps": 500,
+        "seed": 42
+      },
+      "evaluations": 385,
+      "termination": "evaluation_limit"
+    }
+  ],
+  "note": "only added verified instance_snapshot_sha256 alias; source results unchanged"
+}

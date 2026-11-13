@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "physical_config_fingerprint": "a00615144267c2bd1f303e2cab7f63dd973e31d62701b982c154c87d5d987430",
+  "instances": [
+    {
+      "id": "instance_1800000",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800000.pkl",
+      "sha256": "e337db17df362b55b4925f2be61c664ef6e1b6a90ffda91ad61b85a609477976",
+      "cc_result": "cc_adapter20/instance_1800000_ga_42.json",
+      "cc_result_sha256": "4880afe42c569de1136cfe7b457d5e17c71a1ebd37931dbc69064d3958240afd"
+    },
+    {
+      "id": "instance_1800001",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800001.pkl",
+      "sha256": "c68ea2cafc64dd47ca6423a9d71cefa461de156eb232f56117a30aa61327049d",
+      "cc_result": "cc_adapter20/instance_1800001_ga_42.json",
+      "cc_result_sha256": "4f2ed9ead70000ee6eb732645511e70689863d1bded31258622e74b5945435e0"
+    },
+    {
+      "id": "instance_1800002",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800002.pkl",
+      "sha256": "91a4103ee8ba1318ff9c7d0f3f2498ceb2b4d6380bdacda8fc291472e73bff3c",
+      "cc_result": "cc_adapter20/instance_1800002_ga_42.json",
+      "cc_result_sha256": "0c51c881f584a0ba84b3753c3e08a8455daef254957930ce883e268a4b2bea5f"
+    },
+    {
+      "id": "instance_1800003",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800003.pkl",
+      "sha256": "ed51d494cee2953cf8b46cbcdf8b04507ecbfa82fe799314ddff49b7136dd970",
+      "cc_result": "cc_adapter20/instance_1800003_ga_42.json",
+      "cc_result_sha256": "83c34e052c006b12adadcfacc91b8668c2a2ded96d1e85f6ee21a9445e3036f4"
+    },
+    {
+      "id": "instance_1800004",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800004.pkl",
+      "sha256": "2829c31804dab4e8aa301c7f9cb204f265ccc1415a69bf745c51525ea7c3a4b4",
+      "cc_result": "cc_adapter20/instance_1800004_ga_42.json",
+      "cc_result_sha256": "ea3abd2e2d2a92bd5a61b0fc1f0e82925db3a41eec6ff377bfce496fff78f68e"
+    },
+    {
+      "id": "instance_1800005",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800005.pkl",
+      "sha256": "d70391b0df05fa579a21e0a837914d9de3c1df042d0ad98d0a49a0cdbcf7bf48",
+      "cc_result": "cc_adapter20/instance_1800005_ga_42.json",
+      "cc_result_sha256": "197c2472f35d2d218127222af3fdf06e554a3edc95784b7be471a609666f04e2"
+    },
+    {
+      "id": "instance_1800006",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800006.pkl",
+      "sha256": "d68eb3a69864d6d01faf17f74f83a3527762eecbfc2650048452edf27938f7c1",
+      "cc_result": "cc_adapter20/instance_1800006_ga_42.json",
+      "cc_result_sha256": "c4dad723b4f1761b7b5804c4486754380c126dd1f580194de7bdb8138c3d5c45"
+    },
+    {
+      "id": "instance_1800007",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800007.pkl",
+      "sha256": "dccc0e416d67c0c49cfeaf99be3547514da2dae74c60c097edf01d0347225aeb",
+      "cc_result": "cc_adapter20/instance_1800007_ga_42.json",
+      "cc_result_sha256": "b63469fe773187bd3e1bec6c1b535bacb7b1f1ee95514333e6b0cb45c427cb12"
+    },
+    {
+      "id": "instance_1800008",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800008.pkl",
+      "sha256": "a6ac77b98488a43bbd5c7f6c5fd1eefbecf02f3cd3151c4f0d9e2ec6dfff4d56",
+      "cc_result": "cc_adapter20/instance_1800008_ga_42.json",
+      "cc_result_sha256": "104c5bd2900ff42158622fce25e7a0a21f7efcf7224ba114122c6f327704e653"
+    },
+    {
+      "id": "instance_1800009",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800009.pkl",
+      "sha256": "417115e1723975117e3e866a8ee1d05a5a6209506c9695618ad2cd0cf707f330",
+      "cc_result": "cc_adapter20/instance_1800009_ga_42.json",
+      "cc_result_sha256": "e8fa45baa4f8488891bd68af8ea5e439881b4339086fdc5bbb4e6e965d8dbc11"
+    },
+    {
+      "id": "instance_1800010",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800010.pkl",
+      "sha256": "cff64e13ba2f82ffeee9448e38e753262de84ae57e7c4c1119f0343ed9483cca",
+      "cc_result": "cc_adapter20/instance_1800010_ga_42.json",
+      "cc_result_sha256": "47df03861061e7dc18cd77a0e0bc71a24672e12780db554b4d3794eaf79e876c"
+    },
+    {
+      "id": "instance_1800011",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800011.pkl",
+      "sha256": "39d2381c28ef29a8ece92bc6220045eb16769df7d8aa27dd42c903577190f6d2",
+      "cc_result": "cc_adapter20/instance_1800011_ga_42.json",
+      "cc_result_sha256": "d9621406a83022fd5ea1e8db9c6f2b7d9c385b1c9291f319c5bab7063ba778d5"
+    },
+    {
+      "id": "instance_1800012",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800012.pkl",
+      "sha256": "26e192fdbe192a04822da0e57e95d05599b2c88dcd17f256db938e5f2557c361",
+      "cc_result": "cc_adapter20/instance_1800012_ga_42.json",
+      "cc_result_sha256": "a642c612157b384410ffe06b41226871062c3cef4b38aaae1f52649f64e92878"
+    },
+    {
+      "id": "instance_1800013",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800013.pkl",
+      "sha256": "d932dec43645a86e3ba0748f2b257144659b2d68bfa526429a453e82b16be009",
+      "cc_result": "cc_adapter20/instance_1800013_ga_42.json",
+      "cc_result_sha256": "5f20a4cbefadc13df76962eee23beaa6226e22b4afcf16dcf3325300c04cb21f"
+    },
+    {
+      "id": "instance_1800014",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800014.pkl",
+      "sha256": "6196f7d8699359ef9c1076dd05c5b3df828c5a72cf4b21bb6786c049335a373a",
+      "cc_result": "cc_adapter20/instance_1800014_ga_42.json",
+      "cc_result_sha256": "e4b32af0ed5736dd784992cd2fb19410a31934133fcbcf88944edc424d57a04e"
+    },
+    {
+      "id": "instance_1800015",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800015.pkl",
+      "sha256": "9f145513ac279c1dbb5e84267833aa55bf921de652508e27b3ac4b24ef4de5e5",
+      "cc_result": "cc_adapter20/instance_1800015_ga_42.json",
+      "cc_result_sha256": "c7ce7572659d15a13d13a0101967063e29b559a5855acd5bdb07cb412539f4cb"
+    },
+    {
+      "id": "instance_1800016",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800016.pkl",
+      "sha256": "1553c0504d7870ec2fd19b39471fa81e7987defc4b6ab38c17f181e3512eb99c",
+      "cc_result": "cc_adapter20/instance_1800016_ga_42.json",
+      "cc_result_sha256": "99ac614d18536b87c460bd55fc02f175ae88ed54b1340016dab9c0fa6e541d02"
+    },
+    {
+      "id": "instance_1800017",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800017.pkl",
+      "sha256": "30396535d456c57c21a653c0710e6193b8777ead3a6bbe03c4b53bac17fea59c",
+      "cc_result": "cc_adapter20/instance_1800017_ga_42.json",
+      "cc_result_sha256": "4ff80e32b854fea52f30ef371cdfc59c255d9b9deef9085d0632a6b06ae592ee"
+    },
+    {
+      "id": "instance_1800018",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800018.pkl",
+      "sha256": "fa4acaecbdf8dc007c3a00bde56d61c14aa0617c99724bc960c825d922fe9c3a",
+      "cc_result": "cc_adapter20/instance_1800018_ga_42.json",
+      "cc_result_sha256": "845781bc297ae95eb62ceaf8c37bb5254780b6745e375a0de0b010767c0c172b"
+    },
+    {
+      "id": "instance_1800019",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800019.pkl",
+      "sha256": "996a1b5541c92041084e1b05ac4da6b29fd2acbea77fca3f57572d4e54af2dd6",
+      "cc_result": "cc_adapter20/instance_1800019_ga_42.json",
+      "cc_result_sha256": "14a0ae4dc94945c1d289699e1c9f1b4e394d959e91227c0238837cff85a7a603"
+    },
+    {
+      "id": "instance_1800020",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800020.pkl",
+      "sha256": "2021829df8d69ab99f6ea7e2a12ce47291f3cfd6f6e26d4e9d715e66db6845dd",
+      "cc_result": "cc_adapter20/instance_1800020_ga_42.json",
+      "cc_result_sha256": "f1d33778344cb26c7ad3ca16c4c390800e65a645e95c6abfc8a499a83a989d29"
+    },
+    {
+      "id": "instance_1800021",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800021.pkl",
+      "sha256": "52545c1fe956dde5ad7fef01d514a852c1f05130fb953925698436bb1518a39d",
+      "cc_result": "cc_adapter20/instance_1800021_ga_42.json",
+      "cc_result_sha256": "e15bf7038797aa28ce248977c2c08ed9a3b4abf7f497a30670af94305e8b1050"
+    },
+    {
+      "id": "instance_1800022",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800022.pkl",
+      "sha256": "46fd0338708fc321b43b48c462ad261f8362e75fe62d29fd1d6b539d6f7b2e3f",
+      "cc_result": "cc_adapter20/instance_1800022_ga_42.json",
+      "cc_result_sha256": "7bd2277cdd2b7d53fa0d6504d647924963c1feb818db165483ea4eda5b8dca09"
+    },
+    {
+      "id": "instance_1800023",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800023.pkl",
+      "sha256": "177775167a8d8dd0518b8b17a8fdabf34de298dc273aba3db647ed1dbded8578",
+      "cc_result": "cc_adapter20/instance_1800023_ga_42.json",
+      "cc_result_sha256": "3402adb9142b9315986c48195152ccb2fd54bfef29512fd9229cb42db7e93041"
+    },
+    {
+      "id": "instance_1800024",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800024.pkl",
+      "sha256": "511d3f01cdbf8045a894f98f78aafea0bda1a72018d76b6100ba26c5a741d4d6",
+      "cc_result": "cc_adapter20/instance_1800024_ga_42.json",
+      "cc_result_sha256": "72c2b5a8b9835fce06a00b5e0b96257081b139b389983c9754b10a73f3d2d4cf"
+    },
+    {
+      "id": "instance_1800025",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800025.pkl",
+      "sha256": "e68f1e1e2bab080a9c87cb0e2140a6297573bc6c9275b3fca8343aa7067cf111",
+      "cc_result": "cc_adapter20/instance_1800025_ga_42.json",
+      "cc_result_sha256": "fb40a49071728c3bd0254b779bb450c4b6ccc396531221a0464f9b6200b55630"
+    },
+    {
+      "id": "instance_1800026",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800026.pkl",
+      "sha256": "49d57ae47dacd290c29f12b4d80258b541116216e7e060f20246a6cce357499c",
+      "cc_result": "cc_adapter20/instance_1800026_ga_42.json",
+      "cc_result_sha256": "c54e7a3cbc49c4717fcf9c3ade3770e1257f4626a8a1a85439d9dff6e02de170"
+    },
+    {
+      "id": "instance_1800027",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800027.pkl",
+      "sha256": "984968d829567e629bb9af819bec6487c2d9219521a84e04fa00451f02eccd7f",
+      "cc_result": "cc_adapter20/instance_1800027_ga_42.json",
+      "cc_result_sha256": "e2b1d28e586b9820140f92c3000a886e0231131af4e45df57a1670db796e66a4"
+    },
+    {
+      "id": "instance_1800028",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800028.pkl",
+      "sha256": "c3a736294895cb9fc8cd47cdd1cb6e8113dac04b78d1998b0e8043f1fc5b5e20",
+      "cc_result": "cc_adapter20/instance_1800028_ga_42.json",
+      "cc_result_sha256": "2501d433380c33c36cb64f26c4ad99a16d3ef9840eddff0f33175ac61f7493c4"
+    },
+    {
+      "id": "instance_1800029",
+      "fields": 20,
+      "snapshot": "../nested_ga/independent20/panel/instance_1800029.pkl",
+      "sha256": "73c927bc3b1a6dc8fd88f08db2c544923e258e595b6970629658753913878201",
+      "cc_result": "cc_adapter20/instance_1800029_ga_42.json",
+      "cc_result_sha256": "7120630063d2463adfa9c82f1930581deab693eb49fbf8d321da431075363a7b"
+    }
+  ]
+}

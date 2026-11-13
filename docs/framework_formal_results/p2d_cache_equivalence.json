@@ -1,0 +1,21 @@
+{
+  "checks": {
+    "actions": true,
+    "cost": true,
+    "summary": true,
+    "regions": true,
+    "repair": true,
+    "ref_cost": true,
+    "ref_actions": true,
+    "ref_summary": true,
+    "ref_regions": true
+  },
+  "first_hit": false,
+  "second_hit": true,
+  "first_preprocess": 17.205185280006845,
+  "second_preprocess": 0.000718127004802227,
+  "second_saved_seconds": 17.20517013501376,
+  "second_saved_probes": 210,
+  "cost": 3768.180015186167,
+  "actions_count": 13
+}

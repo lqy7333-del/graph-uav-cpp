@@ -1,0 +1,22 @@
+{
+  "elapsed": 56.25488142500399,
+  "inner_completed": true,
+  "evaluations": 16,
+  "history": 16,
+  "cache_hits": 15,
+  "cache_misses": 1,
+  "inner_records": [
+    {
+      "generation": 0,
+      "candidate": 0,
+      "planned": 16,
+      "evaluations": 16,
+      "completed": true,
+      "interruption": null,
+      "cost": 3768.180015186167,
+      "best_complete": 3768.180015186167
+    }
+  ],
+  "champion_cost": 3768.180015186167,
+  "champion_completed": true
+}
