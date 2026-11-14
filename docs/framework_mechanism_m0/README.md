@@ -30,7 +30,7 @@ Trace adapters:
 Measured run:
 
 - 6-trace timing sample: **6.52 s**
-- projected/full 180 replays: **273.62 s** (4.56 min), well under the 4 h threshold
+- projected/full 180 replays: **274.88 s** (4.58 min), well under the 4 h threshold
 - 180/180 archived traces completed and returned to depot
 - maximum archived-summary difference: **0.0** for the tested ledger fields
 - maximum time-closure error: **2.73e-12 s**
@@ -53,12 +53,12 @@ mechanism family; the formal cost tests and their Holm correction are in the for
 
 | scale | method | visits | trips | resupplies | coverage/trip | return distance | return time |
 |---:|---|---:|---:|---:|---:|---:|---:|
-| 10 | CC | 19.13 | 7.43 | 7.43 | 15505 | 3771 | 475 |
-| 10 | D→P | 11.33 | 9.60 | 9.60 | 12114 | 4981 | 629 |
-| 10 | P→D | 11.63 | 9.53 | 9.53 | 12118 | 4900 | 619 |
-| 20 | CC | 38.87 | 14.63 | 14.63 | 16105 | 9975 | 1254 |
-| 20 | D→P | 21.67 | 19.13 | 19.13 | 12355 | 12581 | 1587 |
-| 20 | P→D | 22.00 | 19.07 | 19.07 | 12393 | 12596 | 1591 |
+| 10 | CC | 19.13 | 7.43 | 6.43 | 15505 | 3771 | 475 |
+| 10 | D→P | 11.33 | 9.60 | 8.60 | 12114 | 4981 | 629 |
+| 10 | P→D | 11.63 | 9.53 | 8.53 | 12118 | 4900 | 619 |
+| 20 | CC | 38.87 | 14.63 | 13.63 | 16105 | 9975 | 1254 |
+| 20 | D→P | 21.67 | 19.13 | 18.13 | 12355 | 12581 | 1587 |
+| 20 | P→D | 22.00 | 19.07 | 18.07 | 12393 | 12596 | 1591 |
 
 Paired differences:
 
@@ -74,6 +74,23 @@ Paired differences:
 D→P/P→D have **fewer coverage visits but more depot trips/resupplies**, lower coverage
 per trip, and longer return distance/time. CC has more visits but fewer trips.
 
+### Count audit: departures, resupplies, terminal returns
+
+A trip is a depot-to-next-depot interval, including the final return. The raw totals are:
+ 
+| scale | method | departures/trips | mid-route resupplies | terminal returns |
+|---:|---|---:|---:|---:|
+| 10 | CC | 223 | 193 | 30 |
+| 10 | D→P | 288 | 258 | 30 |
+| 10 | P→D | 286 | 256 | 30 |
+| 20 | CC | 439 | 409 | 30 |
+| 20 | D→P | 574 | 544 | 30 |
+| 20 | P→D | 572 | 542 | 30 |
+
+Every instance/method satisfies `departures = mid-route resupplies + 1` (one terminal
+return). The per-instance audit is `trip_resupply_audit.csv`; it is not inferred from
+`trips == resupplies`. “Trips” in the tables is the departure count.
+
 ### Cost decomposition
 
 | scale | comparison | total | work | nonwork | maneuver | service | total−work |
@@ -83,8 +100,20 @@ per trip, and longer return distance/time. CC has more visits but fewer trips.
 | 20 | D→P−CC | +62.1 [−38.1,+167.9] | −19.7 [−29.8,−9.6] | +169.3 [+76.1,+265.9] | −87.5 [−103.5,−69.7] | 0 | +81.8 [−19.1,+188.1] |
 | 20 | P→D−CC | +82.6 [−11.9,+183.8] | −17.6 [−27.7,−7.5] | +181.0 [+94.4,+272.1] | −80.8 [−94.9,−65.9] | 0 | +100.2 [+5.9,+201.7] |
 
-The components sum to the total difference. D/P's nonwork penalty is partly offset by
-lower work and maneuver; total cost differences are not demonstrated.
+The components sum to the total difference. The nonwork increase is not entirely
+return-to-base time: separating return legs from other nonwork gives:
+
+| scale | comparison | return nonwork | non-return nonwork | total nonwork |
+|---:|---|---:|---:|---:|
+| 10 | D→P−CC | +151.2 | −91.2 | +60.0 |
+| 10 | P→D−CC | +141.0 | −91.4 | +49.7 |
+| 20 | D→P−CC | +325.8 | −156.5 | +169.3 |
+| 20 | P→D−CC | +327.7 | −146.6 | +181.0 |
+
+Thus D/P’s extra depot returns are a real cost, but other non-work movement offsets
+roughly 90 s at 10 fields and 150 s at 20 fields. “Fewer returns” is **not** identical to
+“all nonwork savings.” D/P's lower work and maneuver also offset its nonwork penalty; total
+cost differences remain unproven.
 
 ![cost decomposition](cost_decomposition.png)
 
@@ -105,10 +134,16 @@ unusable for the next fixed/region task under energy or return-reserve constrain
 D→P/P→D resupply triggers are all `fixed_region_requires_refill`; CC triggers are
 `no_feasible_coverage_action`.
 
-### Fragmentation and path structure
+### Shape and path structure
+
+Connectivity and ownership are necessary checks, not a full shape explanation:
 
 - Every assigned region in every best trace has **1 grid-adjacency component**.
 - Assigned-area overlap (`assigned−new` / assigned) is **0** for all methods.
+- Scan segments per visit: CC **9.08/8.54**, D→P **13.72/13.44**, P→D
+  **13.21/13.15** (10/20). D/P regions are fewer per visit but have more scan
+  segments; this is consistent with a different internal sweep/连接 burden even when a
+  point set is connected. CC has more visits, so aggregate maneuver can still be higher.
 - P→D repair adds **1.20 visits (10)** / **1.67 visits (20)** on average, max **4**;
   area-share absolute error mean **1.60/0.49 m²**, max **50 m²**.
 - P→D distinct chromosomes/partitions in the search audit: **17.7/17.3 (10)**,
@@ -121,9 +156,11 @@ D→P/P→D resupply triggers are all `fixed_region_requires_refill`; CC trigger
   per search. This reduces repeated decode/probe work but does not eliminate the
   1800 s budget limitation.
 
-Thus the observed CC maneuver difference is **not** explained by disconnected assigned
-regions or duplicate-area ownership. CC has more visits and higher transfer exposure;
-the data support an association, not a causal decomposition.
+Thus the data **rule out** disconnected assigned regions and duplicate allocation as the
+explanation, but do **not** rule out shape/scan-segment/连接 effects. D/P has more scan
+segments per visit; CC has more visits and higher aggregate maneuver. The archived ledger
+cannot separate turn/geometry effects from visit/transfer effects.
+
 
 ![paired structure](paired_structure.png)
 
@@ -218,15 +255,15 @@ D→P/P→D decoder action. The required probe budget (3600 s) was not used. See
 
 ### A. Mechanisms supported by existing evidence
 
-1. D→P/P→D trade fewer coverage visits for **more depot trips/resupplies**, lower
+1. D→P/P→D trade fewer coverage visits for **more depot departures/resupplies**, lower
    coverage per trip, longer return distance/time, and higher nonwork.
 2. CC fills payload much closer to exhaustion before refilling (payload ratio 0.004 vs
    ~0.26–0.27); D/P return with substantial payload remaining and fixed-region refill
    triggers. This is consistent with the next fixed/contextual region not fitting, but
    does not prove an early-resupply error.
 3. CC has more visits and higher maneuver; D/P has lower work and maneuver that offset
-   much of its nonwork penalty. Total differences remain statistically unresolved in the
-   formal intervals.
+   much of its nonwork penalty. Return nonwork rises while non-return nonwork falls; total
+   differences remain statistically unresolved in the formal intervals.
 4. P→D repair changes visit count modestly and has small average area errors; disconnected
    regions and duplicate ownership are not supported as explanations.
 5. P→D at 20 fields is the most budget-limited (19/30 wall; fewer evaluations and rounds).
@@ -235,9 +272,9 @@ D→P/P→D decoder action. The required probe budget (3600 s) was not used. See
 ### B. Explanations weakened by the data
 
 - “CC simply makes fewer visits”: false; CC has substantially more visits.
-- “CC wins because its regions are more compact/less fragmented”: not supported here;
-  all assigned regions are connected and overlap is zero.
-- “D/P uses fewer trips”: false; D/P uses more trips/resupplies and has lower coverage
+- “CC wins because its regions are less fragmented”: connectivity/overlap are equal, but
+  D/P has more scan segments per visit; shape/scan burden is **not** ruled out.
+- “D/P uses fewer trips”: false; D/P uses more departures/resupplies and has lower coverage
   per trip.
 - “The total-cost gap is uniform and significant”: not supported; formal cost CIs cross
   zero at both scales, and the 20-field D/P signs are mixed across instances.
@@ -256,16 +293,25 @@ D→P/P→D decoder action. The required probe budget (3600 s) was not used. See
 
 ### D. One priority scenario hypothesis for follow-up
 
-**Resource-scarcity hypothesis:** under uniformly reduced payload capacity (or increased
-area/Qmax for the same fleet), D→P/P→D’s extra trips, resupplies and nonwork penalty grow
-relative to CC, while CC’s extra visit/transfer cost grows more slowly; therefore the
-D/P−CC total difference should increase under scarcity.
+**Capacity-match hypothesis:** framework differences depend on how well fixed/contextual
+region tasks match the payload available at the decision point and on the cost of extra
+depot returns. Changing payload capacity may strengthen, weaken, or reverse the D/P−CC
+difference; it is not expected to be monotonic.
 
-**Falsifier:** if the same reduction in Qmax does not increase D/P−CC trips/resupplies or
-total cost, or if CC’s nonwork increases at least as much, the hypothesis is rejected.
-This is a hypothesis for a future resource experiment, not an M0 result. No such
-experiment was run here.
+The M1 experiment should estimate a dose-response curve over at least three payload levels
+on the same maps and energy budget, measuring:
 
+- D/P−CC total cost and total−work;
+- departures, mid-route resupplies, coverage per trip;
+- pre-return and arrival payload/energy;
+- scan segments, maneuver, and return/non-return nonwork.
+
+**Falsifier:** if D/P−CC total/resupply/trips do not vary systematically with payload
+match or return cost across the three levels, or if changes are explained entirely by
+search-budget differences, the hypothesis is rejected. A monotonic “CC wins when payload
+is smaller” result is **not** assumed.
+
+No M1 payload experiment was run in M0.
 ## Reproducibility
 
 Scripts:
@@ -278,7 +324,7 @@ Scripts:
 
 Tests: **67 passed** (framework regression + M0 tests). See `tests_all.log`.
 
-Run time: sample 6.52 s; full 273.62 s. No counterfactual probe time was used.
+Run time: sample 6.52 s; full 274.88 s. No counterfactual probe time was used.
 
 Artifacts include:
 

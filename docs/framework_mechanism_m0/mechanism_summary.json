@@ -92,6 +92,19 @@
         "ties": 0,
         "negative": 30
       },
+      "departures": {
+        "n": 30,
+        "mean": 2.1666666666666665,
+        "median": 2.0,
+        "ci95": [
+          1.8333333333333333,
+          2.533333333333333
+        ],
+        "relative_percent": 29.147982062780265,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
       "trips": {
         "n": 30,
         "mean": 2.1666666666666665,
@@ -106,6 +119,19 @@
         "negative": 0
       },
       "resupplies": {
+        "n": 30,
+        "mean": 2.1666666666666665,
+        "median": 2.0,
+        "ci95": [
+          1.8333333333333333,
+          2.533333333333333
+        ],
+        "relative_percent": 33.67875647668394,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "mid_route_resupplies": {
         "n": 30,
         "mean": 2.1666666666666665,
         "median": 2.0,
@@ -156,6 +182,110 @@
         "positive": 0,
         "ties": 0,
         "negative": 30
+      },
+      "scan_segments_mean": {
+        "n": 30,
+        "mean": 4.637565432105075,
+        "median": 4.494976076555023,
+        "ci95": [
+          4.025241033568156,
+          5.2806234027935
+        ],
+        "relative_percent": 51.06520898543596,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "scan_transit_segments_mean": {
+        "n": 30,
+        "mean": 4.637565432105075,
+        "median": 4.494976076555023,
+        "ci95": [
+          4.025241033568156,
+          5.2806234027935
+        ],
+        "relative_percent": 57.38386739299074,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "path_vertices_mean": {
+        "n": 30,
+        "mean": 12.124691205897793,
+        "median": 11.913576555023921,
+        "ci95": [
+          10.55234049139086,
+          13.796364191607147
+        ],
+        "relative_percent": 48.87661990244972,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "return_nonwork": {
+        "n": 30,
+        "mean": 151.2324336208234,
+        "median": 135.97733571564075,
+        "ci95": [
+          115.04306282145667,
+          187.97427374129725
+        ],
+        "relative_percent": 32.08089620538363,
+        "positive": 27,
+        "ties": 0,
+        "negative": 3
+      },
+      "return_maneuver": {
+        "n": 30,
+        "mean": 2.1141483084143404,
+        "median": 1.964139902220671,
+        "ci95": [
+          0.9306955853914122,
+          3.220655797033324
+        ],
+        "relative_percent": 51.71380976224194,
+        "positive": 24,
+        "ties": 0,
+        "negative": 6
+      },
+      "return_service": {
+        "n": 30,
+        "mean": 0.0,
+        "median": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "relative_percent": null,
+        "positive": 0,
+        "ties": 30,
+        "negative": 0
+      },
+      "nonreturn_nonwork": {
+        "n": 30,
+        "mean": -91.22825661607962,
+        "median": -89.84166931154022,
+        "ci95": [
+          -130.00452643018718,
+          -49.31314541735187
+        ],
+        "relative_percent": -9.557155071028474,
+        "positive": 5,
+        "ties": 0,
+        "negative": 25
+      },
+      "nonreturn_maneuver": {
+        "n": 30,
+        "mean": -33.601286351521644,
+        "median": -45.27180724749891,
+        "ci95": [
+          -49.26890307582854,
+          -17.02702883419034
+        ],
+        "relative_percent": -9.609850998130444,
+        "positive": 7,
+        "ties": 0,
+        "negative": 23
       },
       "coverage": {
         "n": 30,
@@ -486,6 +616,19 @@
         "ties": 0,
         "negative": 30
       },
+      "departures": {
+        "n": 30,
+        "mean": 2.1,
+        "median": 2.0,
+        "ci95": [
+          1.8666666666666667,
+          2.3333333333333335
+        ],
+        "relative_percent": 28.251121076233183,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
       "trips": {
         "n": 30,
         "mean": 2.1,
@@ -500,6 +643,19 @@
         "negative": 0
       },
       "resupplies": {
+        "n": 30,
+        "mean": 2.1,
+        "median": 2.0,
+        "ci95": [
+          1.8666666666666667,
+          2.3333333333333335
+        ],
+        "relative_percent": 32.64248704663213,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "mid_route_resupplies": {
         "n": 30,
         "mean": 2.1,
         "median": 2.0,
@@ -550,6 +706,110 @@
         "positive": 0,
         "ties": 0,
         "negative": 30
+      },
+      "scan_segments_mean": {
+        "n": 30,
+        "mean": 4.128967102330274,
+        "median": 3.796739130434783,
+        "ci95": [
+          3.500654351702213,
+          4.806477256479991
+        ],
+        "relative_percent": 45.464925737722325,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "scan_transit_segments_mean": {
+        "n": 30,
+        "mean": 4.128967102330273,
+        "median": 3.796739130434783,
+        "ci95": [
+          3.500654351702213,
+          4.806477256479991
+        ],
+        "relative_percent": 51.09062160716341,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "path_vertices_mean": {
+        "n": 30,
+        "mean": 10.813529328559445,
+        "median": 9.845626293995862,
+        "ci95": [
+          9.338925885315817,
+          12.41192791873483
+        ],
+        "relative_percent": 43.591111214354136,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "return_nonwork": {
+        "n": 30,
+        "mean": 141.0344935290332,
+        "median": 150.5397564077679,
+        "ci95": [
+          118.69182068678192,
+          163.13724177680822
+        ],
+        "relative_percent": 29.917609866861106,
+        "positive": 29,
+        "ties": 0,
+        "negative": 1
+      },
+      "return_maneuver": {
+        "n": 30,
+        "mean": 2.429136075290804,
+        "median": 2.9550912852137508,
+        "ci95": [
+          1.239521074521076,
+          3.626890426268055
+        ],
+        "relative_percent": 59.418670101912305,
+        "positive": 23,
+        "ties": 0,
+        "negative": 7
+      },
+      "return_service": {
+        "n": 30,
+        "mean": 0.0,
+        "median": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "relative_percent": null,
+        "positive": 0,
+        "ties": 30,
+        "negative": 0
+      },
+      "nonreturn_nonwork": {
+        "n": 30,
+        "mean": -91.36448409254655,
+        "median": -103.39310995115699,
+        "ci95": [
+          -135.034937794775,
+          -45.28718199393919
+        ],
+        "relative_percent": -9.571426385266214,
+        "positive": 5,
+        "ties": 0,
+        "negative": 25
+      },
+      "nonreturn_maneuver": {
+        "n": 30,
+        "mean": -40.49451923808859,
+        "median": -43.65799098576264,
+        "ci95": [
+          -54.79106977690011,
+          -25.890483993826162
+        ],
+        "relative_percent": -11.581291622227894,
+        "positive": 5,
+        "ties": 0,
+        "negative": 25
       },
       "coverage": {
         "n": 30,
@@ -882,6 +1142,19 @@
         "ties": 0,
         "negative": 30
       },
+      "departures": {
+        "n": 30,
+        "mean": 4.5,
+        "median": 4.0,
+        "ci95": [
+          4.1,
+          4.933333333333334
+        ],
+        "relative_percent": 30.751708428246015,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
       "trips": {
         "n": 30,
         "mean": 4.5,
@@ -896,6 +1169,19 @@
         "negative": 0
       },
       "resupplies": {
+        "n": 30,
+        "mean": 4.5,
+        "median": 4.0,
+        "ci95": [
+          4.1,
+          4.933333333333334
+        ],
+        "relative_percent": 33.007334963325185,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "mid_route_resupplies": {
         "n": 30,
         "mean": 4.5,
         "median": 4.0,
@@ -946,6 +1232,110 @@
         "positive": 0,
         "ties": 0,
         "negative": 30
+      },
+      "scan_segments_mean": {
+        "n": 30,
+        "mean": 4.901672871692987,
+        "median": 5.0121499400675615,
+        "ci95": [
+          4.4140651035611755,
+          5.405034827627088
+        ],
+        "relative_percent": 57.38372468699132,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "scan_transit_segments_mean": {
+        "n": 30,
+        "mean": 4.901672871692987,
+        "median": 5.0121499400675615,
+        "ci95": [
+          4.4140651035611755,
+          5.405034827627087
+        ],
+        "relative_percent": 64.99235898924036,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "path_vertices_mean": {
+        "n": 30,
+        "mean": 11.706636061245588,
+        "median": 11.689880952380953,
+        "ci95": [
+          10.559428649855322,
+          12.90784702782283
+        ],
+        "relative_percent": 52.819455758230745,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "return_nonwork": {
+        "n": 30,
+        "mean": 325.8202511201758,
+        "median": 334.15862668913724,
+        "ci95": [
+          277.6830393936484,
+          378.83267430263317
+        ],
+        "relative_percent": 26.131574869349585,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "return_maneuver": {
+        "n": 30,
+        "mean": 6.787222675551846,
+        "median": 6.108145517550311,
+        "ci95": [
+          5.040440966901052,
+          8.493021870370875
+        ],
+        "relative_percent": 89.9754054675697,
+        "positive": 28,
+        "ties": 0,
+        "negative": 2
+      },
+      "return_service": {
+        "n": 30,
+        "mean": 0.0,
+        "median": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "relative_percent": null,
+        "positive": 0,
+        "ties": 30,
+        "negative": 0
+      },
+      "nonreturn_nonwork": {
+        "n": 30,
+        "mean": -156.50168784856592,
+        "median": -138.7502283417955,
+        "ci95": [
+          -215.78784814331553,
+          -98.48322740672505
+        ],
+        "relative_percent": -7.342825083366365,
+        "positive": 5,
+        "ties": 0,
+        "negative": 25
+      },
+      "nonreturn_maneuver": {
+        "n": 30,
+        "mean": -94.30091419765735,
+        "median": -97.45364816486256,
+        "ci95": [
+          -110.79580391539821,
+          -76.05182927604442
+        ],
+        "relative_percent": -15.522407062850615,
+        "positive": 1,
+        "ties": 0,
+        "negative": 29
       },
       "coverage": {
         "n": 30,
@@ -1276,6 +1666,19 @@
         "ties": 0,
         "negative": 30
       },
+      "departures": {
+        "n": 30,
+        "mean": 4.433333333333334,
+        "median": 4.0,
+        "ci95": [
+          4.066666666666666,
+          4.833333333333333
+        ],
+        "relative_percent": 30.296127562642372,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
       "trips": {
         "n": 30,
         "mean": 4.433333333333334,
@@ -1290,6 +1693,19 @@
         "negative": 0
       },
       "resupplies": {
+        "n": 30,
+        "mean": 4.433333333333334,
+        "median": 4.0,
+        "ci95": [
+          4.066666666666666,
+          4.833333333333333
+        ],
+        "relative_percent": 32.518337408312966,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "mid_route_resupplies": {
         "n": 30,
         "mean": 4.433333333333334,
         "median": 4.0,
@@ -1340,6 +1756,110 @@
         "positive": 0,
         "ties": 0,
         "negative": 30
+      },
+      "scan_segments_mean": {
+        "n": 30,
+        "mean": 4.605477501845443,
+        "median": 4.547292143401983,
+        "ci95": [
+          4.192499868839332,
+          5.034450823729918
+        ],
+        "relative_percent": 53.91617513772439,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "scan_transit_segments_mean": {
+        "n": 30,
+        "mean": 4.605477501845443,
+        "median": 4.547292143401983,
+        "ci95": [
+          4.192499868839333,
+          5.034450823729918
+        ],
+        "relative_percent": 61.06503941651794,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "path_vertices_mean": {
+        "n": 30,
+        "mean": 11.149174269414232,
+        "median": 10.799426450742239,
+        "ci95": [
+          10.187286844808941,
+          12.181710064447632
+        ],
+        "relative_percent": 50.30423035133386,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "return_nonwork": {
+        "n": 30,
+        "mean": 327.64666207490495,
+        "median": 312.16039465536426,
+        "ci95": [
+          277.563476026816,
+          384.20892832175815
+        ],
+        "relative_percent": 26.278057460415116,
+        "positive": 30,
+        "ties": 0,
+        "negative": 0
+      },
+      "return_maneuver": {
+        "n": 30,
+        "mean": 8.64169006922748,
+        "median": 8.555459721368575,
+        "ci95": [
+          7.161675918523745,
+          10.054413443290048
+        ],
+        "relative_percent": 114.55931314948258,
+        "positive": 29,
+        "ties": 0,
+        "negative": 1
+      },
+      "return_service": {
+        "n": 30,
+        "mean": 0.0,
+        "median": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "relative_percent": null,
+        "positive": 0,
+        "ties": 30,
+        "negative": 0
+      },
+      "nonreturn_nonwork": {
+        "n": 30,
+        "mean": -146.59947441220257,
+        "median": -169.82054802998687,
+        "ci95": [
+          -202.04935094317062,
+          -88.88566209623522
+        ],
+        "relative_percent": -6.878228041628821,
+        "positive": 5,
+        "ties": 0,
+        "negative": 25
+      },
+      "nonreturn_maneuver": {
+        "n": 30,
+        "mean": -89.47023072487958,
+        "median": -86.40584100759543,
+        "ci95": [
+          -103.44295751362479,
+          -74.66305900019555
+        ],
+        "relative_percent": -14.727252149515701,
+        "positive": 1,
+        "ties": 0,
+        "negative": 29
       },
       "coverage": {
         "n": 30,
@@ -6788,6 +7308,43 @@
     }
   ],
   "max_abs_visit_event_closure_error": 2.7284841053187847e-12,
+  "trip_resupply_formula_all_ok": true,
+  "trip_count_totals": {
+    "10": {
+      "cc": {
+        "departures": 223,
+        "resupplies": 193,
+        "terminal": 30
+      },
+      "divide_then_plan": {
+        "departures": 288,
+        "resupplies": 258,
+        "terminal": 30
+      },
+      "plan_then_divide": {
+        "departures": 286,
+        "resupplies": 256,
+        "terminal": 30
+      }
+    },
+    "20": {
+      "cc": {
+        "departures": 439,
+        "resupplies": 409,
+        "terminal": 30
+      },
+      "divide_then_plan": {
+        "departures": 574,
+        "resupplies": 544,
+        "terminal": 30
+      },
+      "plan_then_divide": {
+        "departures": 572,
+        "resupplies": 542,
+        "terminal": 30
+      }
+    }
+  },
   "max_abs_trip_closure_error": 2.7284841053187847e-12,
   "special": {
     "10": {

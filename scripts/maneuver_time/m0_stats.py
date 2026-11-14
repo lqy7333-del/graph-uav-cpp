@@ -54,9 +54,15 @@ for key,methods in by.items():
         ret=[e for e in es if e['type']=='terminal_return']
         cov=sum(float(v['new_area']) for v in vs); assigned=sum(float(v['assigned_area']) for v in vs)
         comps=[float(v['region_components']) for v in vs if v['region_components'] not in ('','None')]
+        ret_non=sum(float(e['nonwork']) for e in es); ret_man=sum(float(e['maneuver']) for e in es); ret_svc=sum(float(e['service']) for e in es); ret_time=sum(float(e['total']) for e in es)
         metrics[key][m]=dict(total=total,work=work,nonwork=non,maneuver=man,service=svc,total_minus_work=total-work,
-            visits=len(vs),trips=len(ts),resupplies=len(rs),terminal_returns=len(ret),
+            visits=len(vs),departures=len(ts),trips=len(ts),resupplies=len(rs),mid_route_resupplies=len(rs),terminal_returns=len(ret),
             visits_per_trip=len(vs)/len(ts) if ts else None,coverage_per_trip=cov/len(ts) if ts else None,
+            scan_segments_mean=statistics.mean(float(v['scan_segments']) for v in vs) if vs else None,
+            scan_transit_segments_mean=statistics.mean(float(v['scan_transit_segments']) for v in vs) if vs else None,
+            path_vertices_mean=statistics.mean(float(v['path_vertices']) for v in vs) if vs else None,
+            return_nonwork=ret_non,return_maneuver=ret_man,return_service=ret_svc,
+            nonreturn_nonwork=non-ret_non,nonreturn_maneuver=man-ret_man,
             coverage=cov,assigned=assigned,overlap=assigned-cov,overlap_ratio=(assigned-cov)/assigned if assigned else None,
             region_components_mean=statistics.mean(comps) if comps else None,
             multi_component_visit_frac=sum(c>1 for c in comps)/len(comps) if comps else None,
@@ -89,6 +95,14 @@ for (scale,i),ms in sorted(metrics.items()):
     wide.append(rec)
 with open(OUT/'mechanism_instance.csv','w',newline='') as fh:
     keys=sorted({k for r in wide for k in r}); w=csv.DictWriter(fh,fieldnames=keys); w.writeheader(); w.writerows(wide)
+audit=[]
+for (scale,i),ms in sorted(metrics.items()):
+    for m in METHODS:
+        x=ms.get(m)
+        if x is None: continue
+        audit.append({'scale':scale,'instance_id':i,'method':m,'departures':x['departures'],'mid_route_resupplies':x['mid_route_resupplies'],'terminal_returns':x['terminal_returns'],'formula_ok':x['departures']==x['mid_route_resupplies']+x['terminal_returns']})
+with open(OUT/'trip_resupply_audit.csv','w',newline='') as fh:
+    w=csv.DictWriter(fh,fieldnames=list(audit[0])); w.writeheader(); w.writerows(audit)
 with open(OUT/'features_enriched.csv','w',newline='') as fh:
     keys=sorted({k for r in features.values() for k in r}); w=csv.DictWriter(fh,fieldnames=keys); w.writeheader(); w.writerows(features.values())
 
@@ -104,8 +118,8 @@ def effect(scale,other,k):
     return dict(n=len(arr),mean=float(arr.mean()),median=float(np.median(arr)),ci95=[float(lo),float(hi)],
                 relative_percent=float(arr.mean()/cc*100) if cc else None,
                 positive=int((arr>1e-6).sum()),ties=int((abs(arr)<=1e-6).sum()),negative=int((arr<-1e-6).sum()))
-metric_names=['total','total_minus_work','work','nonwork','maneuver','service','visits','trips','resupplies','terminal_returns',
- 'visits_per_trip','coverage_per_trip','coverage','assigned','overlap','overlap_ratio','region_components_mean',
+metric_names=['total','total_minus_work','work','nonwork','maneuver','service','visits','departures','trips','resupplies','mid_route_resupplies','terminal_returns',
+ 'visits_per_trip','coverage_per_trip','scan_segments_mean','scan_transit_segments_mean','path_vertices_mean','return_nonwork','return_maneuver','return_service','nonreturn_nonwork','nonreturn_maneuver','coverage','assigned','overlap','overlap_ratio','region_components_mean',
  'multi_component_visit_frac','resupply_before_energy','resupply_before_energy_ratio','resupply_before_payload',
  'resupply_before_payload_ratio','return_distance','return_time','coverage_distance','transfer_distance','evaluation','search_seconds',
  'full_rounds','wall','repair_added','d2p_probes']
@@ -153,6 +167,8 @@ for (scale,i,m),vs in vm.items():
     if row:
         summary_t=float(row['total_time']); closure.append({'scale':scale,'instance_id':i,'method':m,'visit_event_minus_total':vsum+esum-summary_t,'trip_minus_total':tsum-summary_t})
 summary['max_abs_visit_event_closure_error']=max(abs(x['visit_event_minus_total']) for x in closure)
+summary['trip_resupply_formula_all_ok']=all(a['formula_ok'] for a in audit)
+summary['trip_count_totals']={str(scale):{m:{'departures':sum(a['departures'] for a in audit if str(a['scale'])==str(scale) and a['method']==m),'resupplies':sum(a['mid_route_resupplies'] for a in audit if str(a['scale'])==str(scale) and a['method']==m),'terminal':sum(a['terminal_returns'] for a in audit if str(a['scale'])==str(scale) and a['method']==m)} for m in METHODS} for scale in (10,20)}
 summary['max_abs_trip_closure_error']=max(abs(x['trip_minus_total']) for x in closure)
 # special repair/cache/probe values
 special={}

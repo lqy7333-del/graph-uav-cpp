@@ -35,6 +35,7 @@ def test_resupply_and_terminal_are_separate_and_states_are_not_confused():
     terms = [e for e in x['events'] if e['type'] == 'terminal_return']
     assert len(terms) == 1
     assert len(rs) == x['replay']['resupply_count']
+    assert len(x['trips']) == len(rs) + len(terms)
     for e in rs:
         assert e['before_energy'] >= e['arrival_energy'] - 1e-6
         assert e['arrival_energy'] >= -1e-6
