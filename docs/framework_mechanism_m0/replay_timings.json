@@ -1,0 +1,1087 @@
+{
+  "sample": false,
+  "replays": 180,
+  "total_seconds": 275.8448407649994,
+  "per_replay": [
+    {
+      "instance_id": "instance_1500000",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 1.3150763511657715
+    },
+    {
+      "instance_id": "instance_1500000",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.13909482955932617
+    },
+    {
+      "instance_id": "instance_1500000",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.16487574577331543
+    },
+    {
+      "instance_id": "instance_1500001",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 5.050201654434204
+    },
+    {
+      "instance_id": "instance_1500001",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.22841882705688477
+    },
+    {
+      "instance_id": "instance_1500001",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.22317862510681152
+    },
+    {
+      "instance_id": "instance_1500002",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.4011261463165283
+    },
+    {
+      "instance_id": "instance_1500002",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.12932300567626953
+    },
+    {
+      "instance_id": "instance_1500002",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.15619850158691406
+    },
+    {
+      "instance_id": "instance_1500003",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 1.6685936450958252
+    },
+    {
+      "instance_id": "instance_1500003",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.12615728378295898
+    },
+    {
+      "instance_id": "instance_1500003",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.12459254264831543
+    },
+    {
+      "instance_id": "instance_1500004",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.699782371520996
+    },
+    {
+      "instance_id": "instance_1500004",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.1734480857849121
+    },
+    {
+      "instance_id": "instance_1500004",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.1487891674041748
+    },
+    {
+      "instance_id": "instance_1500005",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.5714571475982666
+    },
+    {
+      "instance_id": "instance_1500005",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.16125965118408203
+    },
+    {
+      "instance_id": "instance_1500005",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.1600654125213623
+    },
+    {
+      "instance_id": "instance_1500006",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 1.4914462566375732
+    },
+    {
+      "instance_id": "instance_1500006",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.14554476737976074
+    },
+    {
+      "instance_id": "instance_1500006",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.13992023468017578
+    },
+    {
+      "instance_id": "instance_1500007",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.7151660919189453
+    },
+    {
+      "instance_id": "instance_1500007",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.16362786293029785
+    },
+    {
+      "instance_id": "instance_1500007",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.1353921890258789
+    },
+    {
+      "instance_id": "instance_1500008",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.921888589859009
+    },
+    {
+      "instance_id": "instance_1500008",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.15332865715026855
+    },
+    {
+      "instance_id": "instance_1500008",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.17884016036987305
+    },
+    {
+      "instance_id": "instance_1500009",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 3.673832416534424
+    },
+    {
+      "instance_id": "instance_1500009",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.19185090065002441
+    },
+    {
+      "instance_id": "instance_1500009",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.16287469863891602
+    },
+    {
+      "instance_id": "instance_1500010",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 3.1148672103881836
+    },
+    {
+      "instance_id": "instance_1500010",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.12748479843139648
+    },
+    {
+      "instance_id": "instance_1500010",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.16040635108947754
+    },
+    {
+      "instance_id": "instance_1500011",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 5.435094594955444
+    },
+    {
+      "instance_id": "instance_1500011",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.19704079627990723
+    },
+    {
+      "instance_id": "instance_1500011",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.2222607135772705
+    },
+    {
+      "instance_id": "instance_1500012",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 1.5365490913391113
+    },
+    {
+      "instance_id": "instance_1500012",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.17090415954589844
+    },
+    {
+      "instance_id": "instance_1500012",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.14556169509887695
+    },
+    {
+      "instance_id": "instance_1500013",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 1.3890619277954102
+    },
+    {
+      "instance_id": "instance_1500013",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.1619868278503418
+    },
+    {
+      "instance_id": "instance_1500013",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.13657736778259277
+    },
+    {
+      "instance_id": "instance_1500014",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 3.1594340801239014
+    },
+    {
+      "instance_id": "instance_1500014",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.12943720817565918
+    },
+    {
+      "instance_id": "instance_1500014",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.15673518180847168
+    },
+    {
+      "instance_id": "instance_1500015",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.6150102615356445
+    },
+    {
+      "instance_id": "instance_1500015",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.14668941497802734
+    },
+    {
+      "instance_id": "instance_1500015",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.1769254207611084
+    },
+    {
+      "instance_id": "instance_1500016",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.757279872894287
+    },
+    {
+      "instance_id": "instance_1500016",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.16773200035095215
+    },
+    {
+      "instance_id": "instance_1500016",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.13978075981140137
+    },
+    {
+      "instance_id": "instance_1500017",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.2774176597595215
+    },
+    {
+      "instance_id": "instance_1500017",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.15713834762573242
+    },
+    {
+      "instance_id": "instance_1500017",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.1932682991027832
+    },
+    {
+      "instance_id": "instance_1500018",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 3.464421510696411
+    },
+    {
+      "instance_id": "instance_1500018",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.15133237838745117
+    },
+    {
+      "instance_id": "instance_1500018",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.14858198165893555
+    },
+    {
+      "instance_id": "instance_1500019",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 10.81183123588562
+    },
+    {
+      "instance_id": "instance_1500019",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.13214755058288574
+    },
+    {
+      "instance_id": "instance_1500019",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.16576266288757324
+    },
+    {
+      "instance_id": "instance_1500020",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 6.487767457962036
+    },
+    {
+      "instance_id": "instance_1500020",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.19917821884155273
+    },
+    {
+      "instance_id": "instance_1500020",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.17055892944335938
+    },
+    {
+      "instance_id": "instance_1500021",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 1.604327917098999
+    },
+    {
+      "instance_id": "instance_1500021",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.18465733528137207
+    },
+    {
+      "instance_id": "instance_1500021",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.15352392196655273
+    },
+    {
+      "instance_id": "instance_1500022",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 3.410538911819458
+    },
+    {
+      "instance_id": "instance_1500022",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.19170141220092773
+    },
+    {
+      "instance_id": "instance_1500022",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.1575157642364502
+    },
+    {
+      "instance_id": "instance_1500023",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.8679237365722656
+    },
+    {
+      "instance_id": "instance_1500023",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.22118616104125977
+    },
+    {
+      "instance_id": "instance_1500023",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.18301749229431152
+    },
+    {
+      "instance_id": "instance_1500024",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.415752649307251
+    },
+    {
+      "instance_id": "instance_1500024",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.19947528839111328
+    },
+    {
+      "instance_id": "instance_1500024",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.1859722137451172
+    },
+    {
+      "instance_id": "instance_1500025",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 0.9643096923828125
+    },
+    {
+      "instance_id": "instance_1500025",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.10425353050231934
+    },
+    {
+      "instance_id": "instance_1500025",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.10785388946533203
+    },
+    {
+      "instance_id": "instance_1500026",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 3.0036792755126953
+    },
+    {
+      "instance_id": "instance_1500026",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.19379186630249023
+    },
+    {
+      "instance_id": "instance_1500026",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.16359686851501465
+    },
+    {
+      "instance_id": "instance_1500027",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 1.8306257724761963
+    },
+    {
+      "instance_id": "instance_1500027",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.150956392288208
+    },
+    {
+      "instance_id": "instance_1500027",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.12515783309936523
+    },
+    {
+      "instance_id": "instance_1500028",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 2.9610812664031982
+    },
+    {
+      "instance_id": "instance_1500028",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.133103609085083
+    },
+    {
+      "instance_id": "instance_1500028",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.17114615440368652
+    },
+    {
+      "instance_id": "instance_1500029",
+      "scale": 10,
+      "method": "cc",
+      "seconds": 1.416863203048706
+    },
+    {
+      "instance_id": "instance_1500029",
+      "scale": 10,
+      "method": "divide_then_plan",
+      "seconds": 0.11628270149230957
+    },
+    {
+      "instance_id": "instance_1500029",
+      "scale": 10,
+      "method": "plan_then_divide",
+      "seconds": 0.11667251586914062
+    },
+    {
+      "instance_id": "instance_1800000",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 3.963453769683838
+    },
+    {
+      "instance_id": "instance_1800000",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.4848780632019043
+    },
+    {
+      "instance_id": "instance_1800000",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5145068168640137
+    },
+    {
+      "instance_id": "instance_1800001",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.5234479904174805
+    },
+    {
+      "instance_id": "instance_1800001",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5692906379699707
+    },
+    {
+      "instance_id": "instance_1800001",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5747091770172119
+    },
+    {
+      "instance_id": "instance_1800002",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.44718861579895
+    },
+    {
+      "instance_id": "instance_1800002",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5285394191741943
+    },
+    {
+      "instance_id": "instance_1800002",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.531822919845581
+    },
+    {
+      "instance_id": "instance_1800003",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 3.8928322792053223
+    },
+    {
+      "instance_id": "instance_1800003",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5264296531677246
+    },
+    {
+      "instance_id": "instance_1800003",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5957679748535156
+    },
+    {
+      "instance_id": "instance_1800004",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 3.7239105701446533
+    },
+    {
+      "instance_id": "instance_1800004",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5196635723114014
+    },
+    {
+      "instance_id": "instance_1800004",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5104062557220459
+    },
+    {
+      "instance_id": "instance_1800005",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 3.598616361618042
+    },
+    {
+      "instance_id": "instance_1800005",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.45506834983825684
+    },
+    {
+      "instance_id": "instance_1800005",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.4546041488647461
+    },
+    {
+      "instance_id": "instance_1800006",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 5.667728662490845
+    },
+    {
+      "instance_id": "instance_1800006",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.6581950187683105
+    },
+    {
+      "instance_id": "instance_1800006",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.7053670883178711
+    },
+    {
+      "instance_id": "instance_1800007",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 3.916837692260742
+    },
+    {
+      "instance_id": "instance_1800007",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.526404619216919
+    },
+    {
+      "instance_id": "instance_1800007",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5225365161895752
+    },
+    {
+      "instance_id": "instance_1800008",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.78546667098999
+    },
+    {
+      "instance_id": "instance_1800008",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5247945785522461
+    },
+    {
+      "instance_id": "instance_1800008",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5140023231506348
+    },
+    {
+      "instance_id": "instance_1800009",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 5.365299224853516
+    },
+    {
+      "instance_id": "instance_1800009",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5626060962677002
+    },
+    {
+      "instance_id": "instance_1800009",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.6328418254852295
+    },
+    {
+      "instance_id": "instance_1800010",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 5.177131652832031
+    },
+    {
+      "instance_id": "instance_1800010",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.6557559967041016
+    },
+    {
+      "instance_id": "instance_1800010",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.57669997215271
+    },
+    {
+      "instance_id": "instance_1800011",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 3.987124443054199
+    },
+    {
+      "instance_id": "instance_1800011",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5367136001586914
+    },
+    {
+      "instance_id": "instance_1800011",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5522060394287109
+    },
+    {
+      "instance_id": "instance_1800012",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.076043128967285
+    },
+    {
+      "instance_id": "instance_1800012",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5359647274017334
+    },
+    {
+      "instance_id": "instance_1800012",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5237276554107666
+    },
+    {
+      "instance_id": "instance_1800013",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 3.666043758392334
+    },
+    {
+      "instance_id": "instance_1800013",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5315637588500977
+    },
+    {
+      "instance_id": "instance_1800013",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.598132848739624
+    },
+    {
+      "instance_id": "instance_1800014",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 3.5453312397003174
+    },
+    {
+      "instance_id": "instance_1800014",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.607623815536499
+    },
+    {
+      "instance_id": "instance_1800014",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5440123081207275
+    },
+    {
+      "instance_id": "instance_1800015",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.447519063949585
+    },
+    {
+      "instance_id": "instance_1800015",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5121216773986816
+    },
+    {
+      "instance_id": "instance_1800015",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5272815227508545
+    },
+    {
+      "instance_id": "instance_1800016",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.731193542480469
+    },
+    {
+      "instance_id": "instance_1800016",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.6182048320770264
+    },
+    {
+      "instance_id": "instance_1800016",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.6785306930541992
+    },
+    {
+      "instance_id": "instance_1800017",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 5.721925973892212
+    },
+    {
+      "instance_id": "instance_1800017",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.7414731979370117
+    },
+    {
+      "instance_id": "instance_1800017",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.6782629489898682
+    },
+    {
+      "instance_id": "instance_1800018",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 3.9374237060546875
+    },
+    {
+      "instance_id": "instance_1800018",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5132808685302734
+    },
+    {
+      "instance_id": "instance_1800018",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5709192752838135
+    },
+    {
+      "instance_id": "instance_1800019",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.9348649978637695
+    },
+    {
+      "instance_id": "instance_1800019",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.6875064373016357
+    },
+    {
+      "instance_id": "instance_1800019",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.6228415966033936
+    },
+    {
+      "instance_id": "instance_1800020",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 5.153566837310791
+    },
+    {
+      "instance_id": "instance_1800020",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.6611065864562988
+    },
+    {
+      "instance_id": "instance_1800020",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.6036155223846436
+    },
+    {
+      "instance_id": "instance_1800021",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 8.288099765777588
+    },
+    {
+      "instance_id": "instance_1800021",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.6019127368927002
+    },
+    {
+      "instance_id": "instance_1800021",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.600651741027832
+    },
+    {
+      "instance_id": "instance_1800022",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 5.386018991470337
+    },
+    {
+      "instance_id": "instance_1800022",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5942895412445068
+    },
+    {
+      "instance_id": "instance_1800022",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.6498348712921143
+    },
+    {
+      "instance_id": "instance_1800023",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.998577356338501
+    },
+    {
+      "instance_id": "instance_1800023",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.6599917411804199
+    },
+    {
+      "instance_id": "instance_1800023",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.602632999420166
+    },
+    {
+      "instance_id": "instance_1800024",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 5.073217391967773
+    },
+    {
+      "instance_id": "instance_1800024",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.6893680095672607
+    },
+    {
+      "instance_id": "instance_1800024",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.641930341720581
+    },
+    {
+      "instance_id": "instance_1800025",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.576861143112183
+    },
+    {
+      "instance_id": "instance_1800025",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5787932872772217
+    },
+    {
+      "instance_id": "instance_1800025",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.6463537216186523
+    },
+    {
+      "instance_id": "instance_1800026",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.208477020263672
+    },
+    {
+      "instance_id": "instance_1800026",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5985045433044434
+    },
+    {
+      "instance_id": "instance_1800026",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.6158535480499268
+    },
+    {
+      "instance_id": "instance_1800027",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.264801025390625
+    },
+    {
+      "instance_id": "instance_1800027",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5320613384246826
+    },
+    {
+      "instance_id": "instance_1800027",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5261745452880859
+    },
+    {
+      "instance_id": "instance_1800028",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.773881435394287
+    },
+    {
+      "instance_id": "instance_1800028",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5432374477386475
+    },
+    {
+      "instance_id": "instance_1800028",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5391199588775635
+    },
+    {
+      "instance_id": "instance_1800029",
+      "scale": 20,
+      "method": "cc",
+      "seconds": 4.341036081314087
+    },
+    {
+      "instance_id": "instance_1800029",
+      "scale": 20,
+      "method": "divide_then_plan",
+      "seconds": 0.5942611694335938
+    },
+    {
+      "instance_id": "instance_1800029",
+      "scale": 20,
+      "method": "plan_then_divide",
+      "seconds": 0.5891833305358887
+    }
+  ]
+}

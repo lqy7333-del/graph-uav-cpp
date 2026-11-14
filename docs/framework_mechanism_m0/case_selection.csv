@@ -1,0 +1,13 @@
+scale,comparison,quantile,difference,instance_id,method_a,method_b
+10,divide_then_plan_minus_cc,0.25,-104.17903791657409,instance_1500000,cc,divide_then_plan
+10,divide_then_plan_minus_cc,0.5,-10.643077774944686,instance_1500015,cc,divide_then_plan
+10,divide_then_plan_minus_cc,0.75,61.364489167010106,instance_1500008,cc,divide_then_plan
+10,plan_then_divide_minus_cc,0.25,-96.97980412370634,instance_1500029,cc,plan_then_divide
+10,plan_then_divide_minus_cc,0.5,-30.75250050735667,instance_1500006,cc,plan_then_divide
+10,plan_then_divide_minus_cc,0.75,72.1849295322063,instance_1500020,cc,plan_then_divide
+20,divide_then_plan_minus_cc,0.25,-151.50636615336225,instance_1800000,cc,divide_then_plan
+20,divide_then_plan_minus_cc,0.5,57.793775450306384,instance_1800010,cc,divide_then_plan
+20,divide_then_plan_minus_cc,0.75,207.07044671786025,instance_1800013,cc,divide_then_plan
+20,plan_then_divide_minus_cc,0.25,-78.12481651120379,instance_1800001,cc,plan_then_divide
+20,plan_then_divide_minus_cc,0.5,44.18947442508761,instance_1800017,cc,plan_then_divide
+20,plan_then_divide_minus_cc,0.75,216.30032271822438,instance_1800018,cc,plan_then_divide

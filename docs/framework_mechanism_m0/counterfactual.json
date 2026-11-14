@@ -1,0 +1,9 @@
+{
+  "status": "not_run",
+  "reason": "No common method-legal action set could be defined across all three frameworks without changing a method's decision space.",
+  "detail": "CC permits a CoverageAction selected from the current action mask. D→P requires a frozen RegionTask and its precomputed feasible gate pair. P→D requires its own contextual region assignment/repair and gate key. A CC CoverageAction on a D→P/P→D pre-resupply state is not a legal D→P/P→D decoder action. Probing it would mix decision spaces and violate the unified-probe requirement.",
+  "what_would_be_needed": "A partitioned common physical-action protocol that all three decoders can evaluate without replanning or changing their encoding; otherwise the probe cannot support a cross-framework statement.",
+  "budget_seconds": 3600,
+  "budget_used_seconds": 0,
+  "conclusion": "No counterfactual early-resupply claim is made. Base 180-trace ledgers remain valid."
+}
