@@ -59,6 +59,9 @@ for key,methods in by.items():
             visits=len(vs),departures=len(ts),trips=len(ts),resupplies=len(rs),mid_route_resupplies=len(rs),terminal_returns=len(ret),
             visits_per_trip=len(vs)/len(ts) if ts else None,coverage_per_trip=cov/len(ts) if ts else None,
             scan_segments_mean=statistics.mean(float(v['scan_segments']) for v in vs) if vs else None,
+            scan_segments_total=sum(float(v['scan_segments']) for v in vs),
+            internal_connections_total=sum(float(v['scan_transit_segments']) for v in vs),
+            maneuver_total=man,
             scan_transit_segments_mean=statistics.mean(float(v['scan_transit_segments']) for v in vs) if vs else None,
             path_vertices_mean=statistics.mean(float(v['path_vertices']) for v in vs) if vs else None,
             return_nonwork=ret_non,return_maneuver=ret_man,return_service=ret_svc,
@@ -119,7 +122,7 @@ def effect(scale,other,k):
                 relative_percent=float(arr.mean()/cc*100) if cc else None,
                 positive=int((arr>1e-6).sum()),ties=int((abs(arr)<=1e-6).sum()),negative=int((arr<-1e-6).sum()))
 metric_names=['total','total_minus_work','work','nonwork','maneuver','service','visits','departures','trips','resupplies','mid_route_resupplies','terminal_returns',
- 'visits_per_trip','coverage_per_trip','scan_segments_mean','scan_transit_segments_mean','path_vertices_mean','return_nonwork','return_maneuver','return_service','nonreturn_nonwork','nonreturn_maneuver','coverage','assigned','overlap','overlap_ratio','region_components_mean',
+ 'visits_per_trip','coverage_per_trip','scan_segments_mean','scan_segments_total','internal_connections_total','scan_transit_segments_mean','path_vertices_mean','maneuver_total','return_nonwork','return_maneuver','return_service','nonreturn_nonwork','nonreturn_maneuver','coverage','assigned','overlap','overlap_ratio','region_components_mean',
  'multi_component_visit_frac','resupply_before_energy','resupply_before_energy_ratio','resupply_before_payload',
  'resupply_before_payload_ratio','return_distance','return_time','coverage_distance','transfer_distance','evaluation','search_seconds',
  'full_rounds','wall','repair_added','d2p_probes']

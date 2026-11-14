@@ -196,6 +196,32 @@
         "ties": 0,
         "negative": 0
       },
+      "scan_segments_total": {
+        "n": 30,
+        "mean": -15.566666666666666,
+        "median": -18.0,
+        "ci95": [
+          -22.366666666666667,
+          -8.866666666666667
+        ],
+        "relative_percent": -9.059165858389912,
+        "positive": 7,
+        "ties": 0,
+        "negative": 23
+      },
+      "internal_connections_total": {
+        "n": 30,
+        "mean": -7.766666666666667,
+        "median": -7.0,
+        "ci95": [
+          -14.5,
+          -1.1
+        ],
+        "relative_percent": -5.086225714909409,
+        "positive": 9,
+        "ties": 0,
+        "negative": 21
+      },
       "scan_transit_segments_mean": {
         "n": 30,
         "mean": 4.637565432105075,
@@ -221,6 +247,19 @@
         "positive": 30,
         "ties": 0,
         "negative": 0
+      },
+      "maneuver_total": {
+        "n": 30,
+        "mean": -31.4871380431073,
+        "median": -41.66372740959977,
+        "ci95": [
+          -47.1854880339804,
+          -15.165403885173138
+        ],
+        "relative_percent": -8.901139606639786,
+        "positive": 7,
+        "ties": 0,
+        "negative": 23
       },
       "return_nonwork": {
         "n": 30,
@@ -720,6 +759,32 @@
         "ties": 0,
         "negative": 0
       },
+      "scan_segments_total": {
+        "n": 30,
+        "mean": -17.966666666666665,
+        "median": -18.5,
+        "ci95": [
+          -24.933333333333334,
+          -10.933333333333334
+        ],
+        "relative_percent": -10.455868089233752,
+        "positive": 4,
+        "ties": 0,
+        "negative": 26
+      },
+      "internal_connections_total": {
+        "n": 30,
+        "mean": -10.466666666666667,
+        "median": -13.0,
+        "ci95": [
+          -17.333333333333332,
+          -3.3666666666666667
+        ],
+        "relative_percent": -6.854398602925126,
+        "positive": 7,
+        "ties": 0,
+        "negative": 23
+      },
       "scan_transit_segments_mean": {
         "n": 30,
         "mean": 4.128967102330273,
@@ -745,6 +810,19 @@
         "positive": 30,
         "ties": 0,
         "negative": 0
+      },
+      "maneuver_total": {
+        "n": 30,
+        "mean": -38.065383162797794,
+        "median": -41.718751436715195,
+        "ci95": [
+          -52.30273144277284,
+          -23.50193879600744
+        ],
+        "relative_percent": -10.760752191845183,
+        "positive": 5,
+        "ties": 0,
+        "negative": 25
       },
       "return_nonwork": {
         "n": 30,
@@ -1246,6 +1324,32 @@
         "ties": 0,
         "negative": 0
       },
+      "scan_segments_total": {
+        "n": 30,
+        "mean": -39.3,
+        "median": -39.5,
+        "ci95": [
+          -47.700833333333335,
+          -30.633333333333333
+        ],
+        "relative_percent": -11.86474791184462,
+        "positive": 1,
+        "ties": 0,
+        "negative": 29
+      },
+      "internal_connections_total": {
+        "n": 30,
+        "mean": -22.1,
+        "median": -22.0,
+        "ci95": [
+          -30.4,
+          -13.566666666666666
+        ],
+        "relative_percent": -7.559001254132938,
+        "positive": 4,
+        "ties": 1,
+        "negative": 25
+      },
       "scan_transit_segments_mean": {
         "n": 30,
         "mean": 4.901672871692987,
@@ -1271,6 +1375,19 @@
         "positive": 30,
         "ties": 0,
         "negative": 0
+      },
+      "maneuver_total": {
+        "n": 30,
+        "mean": -87.51369152210549,
+        "median": -90.15014990676485,
+        "ci95": [
+          -103.53279199839749,
+          -69.71440653543581
+        ],
+        "relative_percent": -14.228522472888077,
+        "positive": 1,
+        "ties": 0,
+        "negative": 29
       },
       "return_nonwork": {
         "n": 30,
@@ -1770,6 +1887,32 @@
         "ties": 0,
         "negative": 0
       },
+      "scan_segments_total": {
+        "n": 30,
+        "mean": -41.86666666666667,
+        "median": -39.0,
+        "ci95": [
+          -49.233333333333334,
+          -34.665833333333346
+        ],
+        "relative_percent": -12.639629666901477,
+        "positive": 1,
+        "ties": 0,
+        "negative": 29
+      },
+      "internal_connections_total": {
+        "n": 30,
+        "mean": -25.0,
+        "median": -22.0,
+        "ci95": [
+          -32.13333333333333,
+          -17.933333333333334
+        ],
+        "relative_percent": -8.550906396077984,
+        "positive": 2,
+        "ties": 0,
+        "negative": 28
+      },
       "scan_transit_segments_mean": {
         "n": 30,
         "mean": 4.605477501845443,
@@ -1795,6 +1938,19 @@
         "positive": 30,
         "ties": 0,
         "negative": 0
+      },
+      "maneuver_total": {
+        "n": 30,
+        "mean": -80.82854065565206,
+        "median": -80.62576400786844,
+        "ci95": [
+          -94.86472647289484,
+          -65.88710330097906
+        ],
+        "relative_percent": -13.141608897611082,
+        "positive": 1,
+        "ties": 0,
+        "negative": 29
       },
       "return_nonwork": {
         "n": 30,

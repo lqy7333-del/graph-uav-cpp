@@ -143,7 +143,24 @@ Connectivity and ownership are necessary checks, not a full shape explanation:
 - Scan segments per visit: CC **9.08/8.54**, D→P **13.72/13.44**, P→D
   **13.21/13.15** (10/20). D/P regions are fewer per visit but have more scan
   segments; this is consistent with a different internal sweep/连接 burden even when a
-  point set is connected. CC has more visits, so aggregate maneuver can still be higher.
+  point set is connected.
+- `scan_transit_paths` is exactly the **n−1 internal inter-stroke connections** for
+  every visit (n=1 gives 0); it is an algebraically related path-layout field, not
+  independent evidence. Entry/exit connections are not included in that counter.
+- Per-instance task totals (not means multiplied together):
+
+| scale | method | scan segments total | internal connections total | maneuver total |
+|---:|---|---:|---:|---:|
+| 10 | CC | 171.8 | 152.7 | 353.7 |
+| 10 | D→P | 156.3 | 144.9 | 322.3 |
+| 10 | P→D | 153.9 | 142.2 | 315.7 |
+| 20 | CC | 331.2 | 292.4 | 615.1 |
+| 20 | D→P | 291.9 | 270.3 | 527.5 |
+| 20 | P→D | 289.4 | 267.4 | 534.2 |
+
+CC therefore has **more total scan segments and higher total maneuver**, driven by its
+larger number of tasks; D/P has **more scan segments per task**. The two facts are
+compatible and neither proves a turn/geometry mechanism.
 - P→D repair adds **1.20 visits (10)** / **1.67 visits (20)** on average, max **4**;
   area-share absolute error mean **1.60/0.49 m²**, max **50 m²**.
 - P→D distinct chromosomes/partitions in the search audit: **17.7/17.3 (10)**,
@@ -257,10 +274,10 @@ D→P/P→D decoder action. The required probe budget (3600 s) was not used. See
 
 1. D→P/P→D trade fewer coverage visits for **more depot departures/resupplies**, lower
    coverage per trip, longer return distance/time, and higher nonwork.
-2. CC fills payload much closer to exhaustion before refilling (payload ratio 0.004 vs
-   ~0.26–0.27); D/P return with substantial payload remaining and fixed-region refill
-   triggers. This is consistent with the next fixed/contextual region not fitting, but
-   does not prove an early-resupply error.
+2. CC fills payload much closer to exhaustion before refilling (pre-return payload ratio
+   0.004 vs ~0.26–0.27); D/P return with substantial payload remaining and fixed-region
+   refill triggers. This is consistent with the next fixed/contextual region not fitting,
+   but does not prove an early-resupply error.
 3. CC has more visits and higher maneuver; D/P has lower work and maneuver that offset
    much of its nonwork penalty. Return nonwork rises while non-return nonwork falls; total
    differences remain statistically unresolved in the formal intervals.
@@ -293,25 +310,25 @@ D→P/P→D decoder action. The required probe budget (3600 s) was not used. See
 
 ### D. One priority scenario hypothesis for follow-up
 
-**Capacity-match hypothesis:** framework differences depend on how well fixed/contextual
-region tasks match the payload available at the decision point and on the cost of extra
-depot returns. Changing payload capacity may strengthen, weaken, or reverse the D/P−CC
-difference; it is not expected to be monotonic.
+Use two separate M1 questions.
 
-The M1 experiment should estimate a dose-response curve over at least three payload levels
-on the same maps and energy budget, measuring:
+**Primary question:** on the same maps and with the same energy/cost model, does changing
+payload capacity change the D/P−CC **total-time difference**? This is a
+framework × capacity interaction. Direction reversal is a possible outcome, not a
+falsification.
 
-- D/P−CC total cost and total−work;
-- departures, mid-route resupplies, coverage per trip;
-- pre-return and arrival payload/energy;
-- scan segments, maneuver, and return/non-return nonwork.
+**Mechanism question:** is any interaction accompanied by corresponding changes in
+pre-resupply remaining payload, resupply/departure counts, return cost, and maneuver?
+If the main difference changes but these mechanism indicators do not, the result supports
+only “capacity affects relative performance,” not the capacity-match explanation. If no
+discernible interaction is detected, report “no interaction detected in this small
+development experiment”; do not conclude that the mechanism is absent.
 
-**Falsifier:** if D/P−CC total/resupply/trips do not vary systematically with payload
-match or return cost across the three levels, or if changes are explained entirely by
-search-budget differences, the hypothesis is rejected. A monotonic “CC wins when payload
-is smaller” result is **not** assumed.
+The M1 payload levels are 0.5×, 1×, 2× original capacity, same map/energy/cost model.
+No direction or CC-winner criterion is imposed. Search-budget variation is reported as
+an observed covariate, not used to declare the mechanism proven or disproven.
 
-No M1 payload experiment was run in M0.
+This remains a development response-screen, not M2.
 ## Reproducibility
 
 Scripts:
