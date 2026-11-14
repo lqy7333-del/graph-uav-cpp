@@ -1,0 +1,529 @@
+{
+  "cells": 27,
+  "maps": 3,
+  "factors": [
+    0.5,
+    1,
+    2
+  ],
+  "global_search_seconds": 38534.71268069942,
+  "completed": 27,
+  "failures": 0,
+  "actual_capacity": [
+    [
+      1970000,
+      0.5,
+      25.0
+    ],
+    [
+      1970000,
+      1.0,
+      50.0
+    ],
+    [
+      1970000,
+      2.0,
+      100.0
+    ],
+    [
+      1970001,
+      0.5,
+      25.0
+    ],
+    [
+      1970001,
+      1.0,
+      50.0
+    ],
+    [
+      1970001,
+      2.0,
+      100.0
+    ],
+    [
+      1970002,
+      0.5,
+      25.0
+    ],
+    [
+      1970002,
+      1.0,
+      50.0
+    ],
+    [
+      1970002,
+      2.0,
+      100.0
+    ]
+  ],
+  "effects": [
+    {
+      "seed": 1970000,
+      "factor": 0.5,
+      "comparison": "divide_then_plan_minus_cc",
+      "cost_diff": 612.0908354110752,
+      "total_minus_work_diff": 654.4329770560134,
+      "resupply_diff": 4,
+      "departure_diff": 4,
+      "payload_residual_diff": 0.21200000000000002,
+      "return_nonwork_diff": 390.8349994423413,
+      "return_time_diff": 406.3702290002477,
+      "nonreturn_nonwork_diff": -20.37429650453214,
+      "maneuver_diff": 283.97227411820313,
+      "scan_segments_diff": 78.0
+    },
+    {
+      "seed": 1970000,
+      "factor": 0.5,
+      "comparison": "plan_then_divide_minus_cc",
+      "cost_diff": 245.5206028988332,
+      "total_minus_work_diff": 264.8247079019857,
+      "resupply_diff": 4,
+      "departure_diff": 4,
+      "payload_residual_diff": 0.21200000000000002,
+      "return_nonwork_diff": 288.9173951389671,
+      "return_time_diff": 297.58466793744446,
+      "nonreturn_nonwork_diff": -52.3566780064707,
+      "maneuver_diff": 28.263990769488714,
+      "scan_segments_diff": -12.0
+    },
+    {
+      "seed": 1970000,
+      "factor": 1.0,
+      "comparison": "divide_then_plan_minus_cc",
+      "cost_diff": -114.48471796183821,
+      "total_minus_work_diff": -69.36298835402658,
+      "resupply_diff": 2,
+      "departure_diff": 2,
+      "payload_residual_diff": 0.1992,
+      "return_nonwork_diff": 212.4094885354897,
+      "return_time_diff": 215.05825190265637,
+      "nonreturn_nonwork_diff": -171.45676393154758,
+      "maneuver_diff": -110.31571295796726,
+      "scan_segments_diff": -50.0
+    },
+    {
+      "seed": 1970000,
+      "factor": 1.0,
+      "comparison": "plan_then_divide_minus_cc",
+      "cost_diff": -126.19905814484991,
+      "total_minus_work_diff": -87.25077875928127,
+      "resupply_diff": 2,
+      "departure_diff": 2,
+      "payload_residual_diff": 0.2226,
+      "return_nonwork_diff": 125.85402488477826,
+      "return_time_diff": 121.49512520099495,
+      "nonreturn_nonwork_diff": -83.52669202285051,
+      "maneuver_diff": -129.57811162120748,
+      "scan_segments_diff": -53.0
+    },
+    {
+      "seed": 1970000,
+      "factor": 2.0,
+      "comparison": "divide_then_plan_minus_cc",
+      "cost_diff": -329.38688910675637,
+      "total_minus_work_diff": -285.3431171525249,
+      "resupply_diff": 0,
+      "departure_diff": 0,
+      "payload_residual_diff": 0.13650000000000004,
+      "return_nonwork_diff": 12.570709317402702,
+      "return_time_diff": 14.084861754288852,
+      "nonreturn_nonwork_diff": -276.12270949115896,
+      "maneuver_diff": -21.791116978768173,
+      "scan_segments_diff": -28.0
+    },
+    {
+      "seed": 1970000,
+      "factor": 2.0,
+      "comparison": "plan_then_divide_minus_cc",
+      "cost_diff": -273.2931001869588,
+      "total_minus_work_diff": -229.24932823272707,
+      "resupply_diff": 0,
+      "departure_diff": 0,
+      "payload_residual_diff": 0.09899999999999998,
+      "return_nonwork_diff": 4.264932694916013,
+      "return_time_diff": 5.508316389895299,
+      "nonreturn_nonwork_diff": -207.61425937700733,
+      "maneuver_diff": -25.900001550635523,
+      "scan_segments_diff": -28.0
+    },
+    {
+      "seed": 1970001,
+      "factor": 0.5,
+      "comparison": "divide_then_plan_minus_cc",
+      "cost_diff": 590.2135928285461,
+      "total_minus_work_diff": 612.2924098740068,
+      "resupply_diff": 7,
+      "departure_diff": 7,
+      "payload_residual_diff": 0.30886956521739134,
+      "return_nonwork_diff": 541.8825518543391,
+      "return_time_diff": 553.2896060772887,
+      "nonreturn_nonwork_diff": -47.07984474457862,
+      "maneuver_diff": 117.48970276424643,
+      "scan_segments_diff": 37.0
+    },
+    {
+      "seed": 1970001,
+      "factor": 0.5,
+      "comparison": "plan_then_divide_minus_cc",
+      "cost_diff": 390.60435266303557,
+      "total_minus_work_diff": 403.6623501012191,
+      "resupply_diff": 7,
+      "departure_diff": 7,
+      "payload_residual_diff": 0.3104347826086957,
+      "return_nonwork_diff": 547.0803282616179,
+      "return_time_diff": 562.1186721530321,
+      "nonreturn_nonwork_diff": -146.70052781929894,
+      "maneuver_diff": 3.2825496588999954,
+      "scan_segments_diff": -29.0
+    },
+    {
+      "seed": 1970001,
+      "factor": 1.0,
+      "comparison": "divide_then_plan_minus_cc",
+      "cost_diff": -108.04996605296719,
+      "total_minus_work_diff": -107.56151530422471,
+      "resupply_diff": 3,
+      "departure_diff": 3,
+      "payload_residual_diff": 0.3016363636363637,
+      "return_nonwork_diff": 153.46227537835966,
+      "return_time_diff": 160.0654827139881,
+      "nonreturn_nonwork_diff": -185.88468069444752,
+      "maneuver_diff": -75.13910998813765,
+      "scan_segments_diff": -36.0
+    },
+    {
+      "seed": 1970001,
+      "factor": 1.0,
+      "comparison": "plan_then_divide_minus_cc",
+      "cost_diff": -97.8013126373362,
+      "total_minus_work_diff": -108.92053162055095,
+      "resupply_diff": 0,
+      "departure_diff": 0,
+      "payload_residual_diff": 0.09375000000000001,
+      "return_nonwork_diff": 5.493986014875247,
+      "return_time_diff": 8.101187924408691,
+      "nonreturn_nonwork_diff": -120.70493438014648,
+      "maneuver_diff": 6.290416744720687,
+      "scan_segments_diff": -11.0
+    },
+    {
+      "seed": 1970001,
+      "factor": 2.0,
+      "comparison": "divide_then_plan_minus_cc",
+      "cost_diff": -208.73067421208498,
+      "total_minus_work_diff": -202.45374786638286,
+      "resupply_diff": 0,
+      "departure_diff": 0,
+      "payload_residual_diff": 0.15750000000000006,
+      "return_nonwork_diff": 95.10028729543251,
+      "return_time_diff": 94.77172355245821,
+      "nonreturn_nonwork_diff": -220.55729030190787,
+      "maneuver_diff": -76.9967448599082,
+      "scan_segments_diff": -47.0
+    },
+    {
+      "seed": 1970001,
+      "factor": 2.0,
+      "comparison": "plan_then_divide_minus_cc",
+      "cost_diff": -186.2831657248703,
+      "total_minus_work_diff": -177.76255556834212,
+      "resupply_diff": 0,
+      "departure_diff": 0,
+      "payload_residual_diff": 0.12000000000000004,
+      "return_nonwork_diff": -35.22842795977334,
+      "return_time_diff": -33.978209679860015,
+      "nonreturn_nonwork_diff": -91.95283413762661,
+      "maneuver_diff": -50.58129347094268,
+      "scan_segments_diff": -24.0
+    },
+    {
+      "seed": 1970002,
+      "factor": 0.5,
+      "comparison": "divide_then_plan_minus_cc",
+      "cost_diff": 554.5534791506707,
+      "total_minus_work_diff": 578.5596434509889,
+      "resupply_diff": 5,
+      "departure_diff": 5,
+      "payload_residual_diff": 0.2568,
+      "return_nonwork_diff": 424.1890221275289,
+      "return_time_diff": 433.37315561200444,
+      "nonreturn_nonwork_diff": 2.028967083045245,
+      "maneuver_diff": 152.3416542404167,
+      "scan_segments_diff": 90.0
+    },
+    {
+      "seed": 1970002,
+      "factor": 0.5,
+      "comparison": "plan_then_divide_minus_cc",
+      "cost_diff": 341.61455899387965,
+      "total_minus_work_diff": 362.55445247465696,
+      "resupply_diff": 5,
+      "departure_diff": 5,
+      "payload_residual_diff": 0.2568,
+      "return_nonwork_diff": 428.1999098415679,
+      "return_time_diff": 432.25436640712815,
+      "nonreturn_nonwork_diff": -118.35392715189573,
+      "maneuver_diff": 52.70846978498719,
+      "scan_segments_diff": 15.0
+    },
+    {
+      "seed": 1970002,
+      "factor": 1.0,
+      "comparison": "divide_then_plan_minus_cc",
+      "cost_diff": -84.0151177746634,
+      "total_minus_work_diff": -110.34283078445605,
+      "resupply_diff": 2,
+      "departure_diff": 2,
+      "payload_residual_diff": 0.242,
+      "return_nonwork_diff": 156.09951468015697,
+      "return_time_diff": 161.9009109182814,
+      "nonreturn_nonwork_diff": -186.5511338824856,
+      "maneuver_diff": -79.89121158212583,
+      "scan_segments_diff": -25.0
+    },
+    {
+      "seed": 1970002,
+      "factor": 1.0,
+      "comparison": "plan_then_divide_minus_cc",
+      "cost_diff": -46.96982204771257,
+      "total_minus_work_diff": -85.55658088855739,
+      "resupply_diff": 2,
+      "departure_diff": 2,
+      "payload_residual_diff": 0.242,
+      "return_nonwork_diff": 230.56905063759712,
+      "return_time_diff": 234.8364864641535,
+      "nonreturn_nonwork_diff": -205.32448490656827,
+      "maneuver_diff": -110.80114661958618,
+      "scan_segments_diff": -37.0
+    },
+    {
+      "seed": 1970002,
+      "factor": 2.0,
+      "comparison": "divide_then_plan_minus_cc",
+      "cost_diff": -203.5298037712755,
+      "total_minus_work_diff": -209.00609878479213,
+      "resupply_diff": 1,
+      "departure_diff": 1,
+      "payload_residual_diff": 0.249,
+      "return_nonwork_diff": -49.51189559921781,
+      "return_time_diff": -48.8711840064999,
+      "nonreturn_nonwork_diff": -112.06681620896916,
+      "maneuver_diff": -47.42738697660451,
+      "scan_segments_diff": -11.0
+    },
+    {
+      "seed": 1970002,
+      "factor": 2.0,
+      "comparison": "plan_then_divide_minus_cc",
+      "cost_diff": -187.56442356370007,
+      "total_minus_work_diff": -189.50987377003662,
+      "resupply_diff": 1,
+      "departure_diff": 1,
+      "payload_residual_diff": 0.2265,
+      "return_nonwork_diff": -17.37633241758749,
+      "return_time_diff": -19.098934190540604,
+      "nonreturn_nonwork_diff": -133.31091093711507,
+      "maneuver_diff": -38.82263041533406,
+      "scan_segments_diff": -3.0
+    }
+  ],
+  "by_factor": {
+    "0.5": {
+      "divide_then_plan": {
+        "cost_diff": 585.6193024634307,
+        "total_minus_work_diff": 615.0950101270031,
+        "resupply_diff": 5.333333333333333,
+        "departure_diff": 5.333333333333333,
+        "payload_residual_diff": 0.2592231884057971,
+        "return_nonwork_diff": 452.3021911414031,
+        "return_time_diff": 464.34433022984695,
+        "nonreturn_nonwork_diff": -21.808391388688506,
+        "maneuver_diff": 184.60121037428874,
+        "scan_segments_diff": 68.33333333333333
+      },
+      "plan_then_divide": {
+        "cost_diff": 325.9131715185828,
+        "total_minus_work_diff": 343.6805034926206,
+        "resupply_diff": 5.333333333333333,
+        "departure_diff": 5.333333333333333,
+        "payload_residual_diff": 0.2597449275362319,
+        "return_nonwork_diff": 421.39921108071763,
+        "return_time_diff": 430.6525688325349,
+        "nonreturn_nonwork_diff": -105.80371099255512,
+        "maneuver_diff": 28.085003404458632,
+        "scan_segments_diff": -8.666666666666666
+      }
+    },
+    "1.0": {
+      "divide_then_plan": {
+        "cost_diff": -102.18326726315627,
+        "total_minus_work_diff": -95.75577814756912,
+        "resupply_diff": 2.3333333333333335,
+        "departure_diff": 2.3333333333333335,
+        "payload_residual_diff": 0.24761212121212123,
+        "return_nonwork_diff": 173.9904261980021,
+        "return_time_diff": 179.00821517830863,
+        "nonreturn_nonwork_diff": -181.29752616949358,
+        "maneuver_diff": -88.44867817607691,
+        "scan_segments_diff": -37.0
+      },
+      "plan_then_divide": {
+        "cost_diff": -90.32339760996622,
+        "total_minus_work_diff": -93.90929708946321,
+        "resupply_diff": 1.3333333333333333,
+        "departure_diff": 1.3333333333333333,
+        "payload_residual_diff": 0.18611666666666665,
+        "return_nonwork_diff": 120.63902051241688,
+        "return_time_diff": 121.47759986318572,
+        "nonreturn_nonwork_diff": -136.51870376985508,
+        "maneuver_diff": -78.02961383202432,
+        "scan_segments_diff": -33.666666666666664
+      }
+    },
+    "2.0": {
+      "divide_then_plan": {
+        "cost_diff": -247.21578903003896,
+        "total_minus_work_diff": -232.2676546012333,
+        "resupply_diff": 0.3333333333333333,
+        "departure_diff": 0.3333333333333333,
+        "payload_residual_diff": 0.18100000000000002,
+        "return_nonwork_diff": 19.386367004539135,
+        "return_time_diff": 19.995133766749053,
+        "nonreturn_nonwork_diff": -202.91560533401199,
+        "maneuver_diff": -48.73841627176029,
+        "scan_segments_diff": -28.666666666666668
+      },
+      "plan_then_divide": {
+        "cost_diff": -215.71356315850971,
+        "total_minus_work_diff": -198.84058585703528,
+        "resupply_diff": 0.3333333333333333,
+        "departure_diff": 0.3333333333333333,
+        "payload_residual_diff": 0.14850000000000002,
+        "return_nonwork_diff": -16.113275894148273,
+        "return_time_diff": -15.856275826835107,
+        "nonreturn_nonwork_diff": -144.292668150583,
+        "maneuver_diff": -38.434641812304086,
+        "scan_segments_diff": -18.333333333333332
+      }
+    }
+  },
+  "divide_then_plan_interaction_vs_1x": {
+    "0.5x": 687.802569726587,
+    "2x": -145.0325217668827
+  },
+  "plan_then_divide_interaction_vs_1x": {
+    "0.5x": 416.23656912854904,
+    "2x": -125.3901655485435
+  },
+  "per_map_cost_diff": [
+    {
+      "seed": 1970000,
+      "factor": 0.5,
+      "other": "divide_then_plan",
+      "diff": 612.0908354110752
+    },
+    {
+      "seed": 1970000,
+      "factor": 0.5,
+      "other": "plan_then_divide",
+      "diff": 245.5206028988332
+    },
+    {
+      "seed": 1970000,
+      "factor": 1.0,
+      "other": "divide_then_plan",
+      "diff": -114.48471796183821
+    },
+    {
+      "seed": 1970000,
+      "factor": 1.0,
+      "other": "plan_then_divide",
+      "diff": -126.19905814484991
+    },
+    {
+      "seed": 1970000,
+      "factor": 2.0,
+      "other": "divide_then_plan",
+      "diff": -329.38688910675637
+    },
+    {
+      "seed": 1970000,
+      "factor": 2.0,
+      "other": "plan_then_divide",
+      "diff": -273.2931001869588
+    },
+    {
+      "seed": 1970001,
+      "factor": 0.5,
+      "other": "divide_then_plan",
+      "diff": 590.2135928285461
+    },
+    {
+      "seed": 1970001,
+      "factor": 0.5,
+      "other": "plan_then_divide",
+      "diff": 390.60435266303557
+    },
+    {
+      "seed": 1970001,
+      "factor": 1.0,
+      "other": "divide_then_plan",
+      "diff": -108.04996605296719
+    },
+    {
+      "seed": 1970001,
+      "factor": 1.0,
+      "other": "plan_then_divide",
+      "diff": -97.8013126373362
+    },
+    {
+      "seed": 1970001,
+      "factor": 2.0,
+      "other": "divide_then_plan",
+      "diff": -208.73067421208498
+    },
+    {
+      "seed": 1970001,
+      "factor": 2.0,
+      "other": "plan_then_divide",
+      "diff": -186.2831657248703
+    },
+    {
+      "seed": 1970002,
+      "factor": 0.5,
+      "other": "divide_then_plan",
+      "diff": 554.5534791506707
+    },
+    {
+      "seed": 1970002,
+      "factor": 0.5,
+      "other": "plan_then_divide",
+      "diff": 341.61455899387965
+    },
+    {
+      "seed": 1970002,
+      "factor": 1.0,
+      "other": "divide_then_plan",
+      "diff": -84.0151177746634
+    },
+    {
+      "seed": 1970002,
+      "factor": 1.0,
+      "other": "plan_then_divide",
+      "diff": -46.96982204771257
+    },
+    {
+      "seed": 1970002,
+      "factor": 2.0,
+      "other": "divide_then_plan",
+      "diff": -203.5298037712755
+    },
+    {
+      "seed": 1970002,
+      "factor": 2.0,
+      "other": "plan_then_divide",
+      "diff": -187.56442356370007
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+Traceback (most recent call last):
+  File "/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/m1_payload.py", line 61, in <module>
+    if __name__=='__main__': main()
+                             ^^^^^^
+  File "/home/ps/Desktop/Graph_planning/graph-uav-episode-10fields/scripts/maneuver_time/m1_payload.py", line 56, in main
+    print(json.dumps({'seed':ent['seed'],'factor':factor,'method':method,'completed':summary['completed'],'cost':summary['cost'],'eval':summary['evaluations'],'term':summary['termination'],'search_s':round(search_seconds,1),'total_search_s':round(total_search,1)},flush=True))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 234, in dumps
+    return cls(
+           ^^^^
+TypeError: JSONEncoder.__init__() got an unexpected keyword argument 'flush'
+{"seed": 1970000, "factor": 0.5, "method": "divide_then_plan", "completed": true, "cost": 7317.458351817642, "eval": 54, "term": "wall_limit", "search_s": 1800.2, "total_search_s": 3600.3}
+{"seed": 1970000, "factor": 0.5, "method": "plan_then_divide", "completed": true, "cost": 6950.8881193054, "eval": 65, "term": "wall_limit", "search_s": 1801.3, "total_search_s": 5401.6}
+{"seed": 1970000, "factor": 1.0, "method": "cc", "completed": true, "cost": 4560.725065555531, "eval": 187, "term": "wall_limit", "search_s": 1802.1, "total_search_s": 7203.7}
+{"seed": 1970000, "factor": 1.0, "method": "divide_then_plan", "completed": true, "cost": 4446.240347593693, "eval": 385, "term": "evaluation_limit", "search_s": 1639.2, "total_search_s": 8842.9}
+{"seed": 1970000, "factor": 1.0, "method": "plan_then_divide", "completed": true, "cost": 4434.526007410681, "eval": 218, "term": "wall_limit", "search_s": 1801.2, "total_search_s": 10644.0}
+{"seed": 1970000, "factor": 2.0, "method": "cc", "completed": true, "cost": 3690.1563360242794, "eval": 310, "term": "wall_limit", "search_s": 1802.4, "total_search_s": 12446.4}
+{"seed": 1970000, "factor": 2.0, "method": "divide_then_plan", "completed": true, "cost": 3360.769446917523, "eval": 385, "term": "evaluation_limit", "search_s": 781.6, "total_search_s": 13228.0}
+{"seed": 1970000, "factor": 2.0, "method": "plan_then_divide", "completed": true, "cost": 3416.8632358373206, "eval": 354, "term": "wall_limit", "search_s": 1800.2, "total_search_s": 15028.2}
+{"seed": 1970001, "factor": 0.5, "method": "cc", "completed": true, "cost": 4839.319421147192, "eval": 305, "term": "wall_limit", "search_s": 1800.2, "total_search_s": 16828.4}
+{"seed": 1970001, "factor": 0.5, "method": "divide_then_plan", "completed": true, "cost": 5429.533013975738, "eval": 298, "term": "wall_limit", "search_s": 1800.0, "total_search_s": 18628.4}
+{"seed": 1970001, "factor": 0.5, "method": "plan_then_divide", "completed": true, "cost": 5229.923773810227, "eval": 182, "term": "wall_limit", "search_s": 1800.1, "total_search_s": 20428.5}
+{"seed": 1970001, "factor": 1.0, "method": "cc", "completed": true, "cost": 3604.2092724989034, "eval": 385, "term": "evaluation_limit", "search_s": 1176.9, "total_search_s": 21605.4}
+{"seed": 1970001, "factor": 1.0, "method": "divide_then_plan", "completed": true, "cost": 3496.159306445936, "eval": 385, "term": "evaluation_limit", "search_s": 673.5, "total_search_s": 22278.9}
+{"seed": 1970001, "factor": 1.0, "method": "plan_then_divide", "completed": true, "cost": 3506.407959861567, "eval": 385, "term": "evaluation_limit", "search_s": 1595.7, "total_search_s": 23874.6}
+{"seed": 1970001, "factor": 2.0, "method": "cc", "completed": true, "cost": 3014.343180929913, "eval": 385, "term": "evaluation_limit", "search_s": 755.5, "total_search_s": 24630.1}
+{"seed": 1970001, "factor": 2.0, "method": "divide_then_plan", "completed": true, "cost": 2805.612506717828, "eval": 385, "term": "evaluation_limit", "search_s": 281.5, "total_search_s": 24911.6}
+{"seed": 1970001, "factor": 2.0, "method": "plan_then_divide", "completed": true, "cost": 2828.060015205043, "eval": 385, "term": "evaluation_limit", "search_s": 654.6, "total_search_s": 25566.2}
+{"seed": 1970002, "factor": 0.5, "method": "cc", "completed": true, "cost": 5335.980597062087, "eval": 154, "term": "wall_limit", "search_s": 1801.2, "total_search_s": 27367.4}
+{"seed": 1970002, "factor": 0.5, "method": "divide_then_plan", "completed": true, "cost": 5890.534076212758, "eval": 159, "term": "wall_limit", "search_s": 1800.1, "total_search_s": 29167.6}
+{"seed": 1970002, "factor": 0.5, "method": "plan_then_divide", "completed": true, "cost": 5677.595156055967, "eval": 85, "term": "wall_limit", "search_s": 1800.1, "total_search_s": 30967.7}
+{"seed": 1970002, "factor": 1.0, "method": "cc", "completed": true, "cost": 3722.652630048854, "eval": 311, "term": "wall_limit", "search_s": 1800.0, "total_search_s": 32767.8}
+{"seed": 1970002, "factor": 1.0, "method": "divide_then_plan", "completed": true, "cost": 3638.6375122741906, "eval": 385, "term": "evaluation_limit", "search_s": 661.7, "total_search_s": 33429.5}
+{"seed": 1970002, "factor": 1.0, "method": "plan_then_divide", "completed": true, "cost": 3675.6828080011414, "eval": 290, "term": "wall_limit", "search_s": 1800.0, "total_search_s": 35229.5}
+{"seed": 1970002, "factor": 2.0, "method": "cc", "completed": true, "cost": 3053.364323679822, "eval": 385, "term": "evaluation_limit", "search_s": 1303.8, "total_search_s": 36533.3}
+{"seed": 1970002, "factor": 2.0, "method": "divide_then_plan", "completed": true, "cost": 2849.8345199085466, "eval": 385, "term": "evaluation_limit", "search_s": 462.7, "total_search_s": 36995.9}
+{"seed": 1970002, "factor": 2.0, "method": "plan_then_divide", "completed": true, "cost": 2865.799900116122, "eval": 385, "term": "evaluation_limit", "search_s": 1538.8, "total_search_s": 38534.7}
+{
+  "cells": 27,
+  "stopped": false,
+  "total_search_seconds": 38534.71268069942
+}
