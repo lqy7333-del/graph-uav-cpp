@@ -48,14 +48,30 @@ Differences are other − CC; positive means CC faster.
 | 1× | **−102.2 s** | **−90.3 s** | all three maps negative |
 | 2× | **−247.2 s** | **−215.7 s** | all three maps negative |
 
-Descriptive interaction relative to 1×:
+Descriptive endpoint interaction (0.5× minus 2×):
 
-- D→P: **+687.8 s at 0.5×**, **−145.0 s at 2×**
-- P→D: **+416.2 s at 0.5×**, **−125.4 s at 2×**
+- D→P: **585.6 − (−247.2) = 832.8 s**
+- P→D: **325.9 − (−215.7) = 541.6 s**
 
-The sign **reverses on every one of the three maps**: at 0.5× CC is faster; at 1×/2×
-D/P is faster. This is a clear small-screen interaction, not a CC-advantage criterion.
-With only three maps, no population p-value or CI is claimed.
+Relative to 1×, the same contrasts are +687.8/−145.0 s (D→P) and +416.2/−125.4 s
+(P→D). The sign **reverses on every one of the three maps**: at 0.5× CC is faster; at
+1×/2× D/P is faster. These are three-map observations, not a confirmed population
+effect. With only three maps, no population p-value or CI is claimed.
+
+### Search budget is a measured confound
+
+Mean candidate evaluations by cell:
+
+| capacity | CC | D→P | P→D |
+|---:|---:|---:|---:|
+| 0.5× | 184.7 | 170.3 | 110.7 |
+| 1× | 294.3 | 385.0 | 297.7 |
+| 2× | 360.0 | 385.0 | 374.7 |
+
+**All nine 0.5× searches hit the 1800 s wall.** On instance 1970000, D→P at 0.5×
+had only **54 evaluations**, below the 65 needed for initialization plus the initial outer
+population. Low-load results are therefore results under the fixed online budget, not a
+clean decomposition of capacity-matching alone.
 
 ![cost response](cost_response.png)
 ![difference response](difference_response.png)
@@ -71,10 +87,12 @@ With only three maps, no population p-value or CI is claimed.
 | 2× | D→P−CC | +0.33 | +19.4 | −48.7 | +0.18 |
 | 2× | P→D−CC | +0.33 | −16.1 | −38.4 | +0.15 |
 
-At 0.5× D/P makes many more resupplies and returns, with higher maneuver; at 2× the
-resupply gap nearly vanishes and D/P maneuver is lower. This is consistent with a
-capacity-match/return-cost mechanism, but the experiment does not prove causality and
-does not establish a monotonic “lower payload favors CC” law.
+At 0.5× D/P makes many more resupplies and returns, and its maneuver cost is *higher*;
+at 2× the resupply gap nearly vanishes and D/P maneuver is lower. The path-cost structure
+itself changes with capacity, so “CC always trades more maneuver for fewer resupplies”
+is not a fixed rule. The pattern is consistent with capacity matching plus return cost,
+but the experiment does not prove causality and does not establish a monotonic
+“lower payload favors CC” law.
 
 ![mechanism response](mechanism_response.png)
 
