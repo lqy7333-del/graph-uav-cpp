@@ -1,0 +1,270 @@
+{
+  "fields": 10,
+  "base_seed": 1980000,
+  "accepted": 20,
+  "rejected": 0,
+  "seeds": [
+    1980000,
+    1980001,
+    1980002,
+    1980003,
+    1980004,
+    1980005,
+    1980006,
+    1980007,
+    1980008,
+    1980009,
+    1980010,
+    1980011,
+    1980012,
+    1980013,
+    1980014,
+    1980015,
+    1980016,
+    1980017,
+    1980018,
+    1980019
+  ],
+  "failures": [],
+  "fingerprints": [
+    "d29b00df94bc49aaa46e941657edf337cbf45d9d639bfa2554f116e7a35c39e3",
+    "6658f367509146c9f9d88b087d65df64031e5c3b519cb1351c78aef2d3baa956",
+    "1703d4d2518d37837efc7cb8da74d880905f680c69983974c6e7ebbd5d3e22f9",
+    "ed3f95490f56a5c05b9d4df47508a1fd90cf2a12af14ec0793f629adef065299",
+    "413d48277ddb1033609e877e86b1dea79fd50f557d63ce684832a3427d91b646",
+    "963365b1d080c64fad4d65bc914e2525517e9a270fc29993d27b2ae08ef71f56",
+    "37a81f4e112e3ed3ec3e82c259386f04101e56953355c98ce42295278bbf46a2",
+    "8ba8d42e52378384c5001f4f2118b501c5c0b0221339dc50439f664747e49fdb",
+    "94bc39d8e6d7d3824c95b88217eaab6a95e5cb2633195c691026b2a5109f5d02",
+    "7985f70b1bb15da6c69c5231f50f3dd82a002d035c96c08da10e4fcec9a15429",
+    "3cd84e36574bfa7033bdde865923b2e50c8f051588ad430a41aa750cc1ea238b",
+    "cd52ea48ebb7bf52771a145355a11de51bf4d5e979e4f90f78c57574222f9def",
+    "d7b0c9a944464f5d2d9654020d2add80cebb2f64cf6a332d8ee7e764310f378d",
+    "437886a6bf28c3e41015a17cf7ae14937d95743a9951f5763ffab924b784a48b",
+    "6458f58fb6528e57576427477095b3b5fbaa7e72899f758fb3ffc37abf8663ed",
+    "1e6f844c0c12df417e50b190fd7cf0c4da53c911c18c166ebd2e26baf0962cb9",
+    "fe5859fdc6ce55f9face4ae95d93270174ab353fc0dfe84d140f2a5d3317bcab",
+    "1ccf8213fefcd759efeade84da41b06030f2cdda51b38078711d59f703829ba1",
+    "f05edf872ce2af4b4ab6de5ea4cfe1bd5a0c9980a1224a7e1aecf04a4cec9c5a",
+    "b4e54525280d2b2a2ac46ffcd518093514bbf5b76d48b66470888bd246f3a301"
+  ],
+  "snapshot_sha256": [
+    "1e1345ac648fb85428bcb8dcb550b4ca179dd2f504627d8692151910308a4c59",
+    "777300ef264b157865636dda744083c3a986cefdda6eb8e3bfada196663df3fa",
+    "13e59edd836e441ad27713a55609e235e0ef0eefbe725bdbde7a577c411c2cae",
+    "eda96e9ad41577d0459e8834570a098b4baf74f7437d926e3ab3b7f044027fb6",
+    "faeadf3b6a6fd843c54fd8ba98a452911e4819e719847bc253408f7b11802095",
+    "35e9bfd05c878c0141a63d4b2ecf7e3e87de0081e8c8ac3e42dd4136f9b9fc33",
+    "80b62f990a53d9c9eded657ad1366502ceb018781df60f5a8543a6c574df7acb",
+    "a0de1041b3aeba50b6f04b824cd0807b1a2e816cdd1fee917fc8ec681167794e",
+    "d1d9ed90236b66ed97ea70eed9417f12e05652ce666094dab38dd84071bbbf76",
+    "1e5405efa193da6178d7ed8faa97638b29b560831402d04d3f76c063f5960c6d",
+    "c631911adea783433f3c066d95f9e82afa6d48e1db51bc365497d06c2b8db07f",
+    "334b7451303448562ee9a042938f910b597a4e6daac68985d70b00412fcb2e9a",
+    "78e78b3a6f5ff566fbcff914e210ed65164e2a748bed74b6d97e009cd1d2ee62",
+    "e3728de32d1d7e485af85e48cf118a29c0695073b3a232f0f36739460c1ed743",
+    "a1e62d3b66f4cc69beac48d7d9b5b94b6affedd02169acf651bc7a38fea6b016",
+    "efdbf5ef7acffba88275f7b4c88f7e8f9782a078c80767e4bae2c426c4da1f58",
+    "515f585b327929636d23de0a36419df31b249040a7f1e3a61344476a91e567d5",
+    "ac63592d6d36087d9880920829ed8d2a82e7e86287b6f083dea1b2262460159f",
+    "aceddac755e0ad5101295a25c608559e4ea683cdca73be6a4d2f4cdae9bc0eb0",
+    "ac749059383b05002ffff967aecd676bd66cb252574f286581a61cbd42dd54cd"
+  ],
+  "manifest_sha256": "6e169c72d12525c91c10625640fe85c91d2c537ff88bf1e7aef048fe10d83889",
+  "instances_sha256": "db98733efc19062141ae511f7df65e0b52dce26b2bbc369241506c636840015c",
+  "config": {
+    "environment": {
+      "coordinate_system": {
+        "type": "WGS84"
+      },
+      "num_fields": {
+        "min": 10,
+        "max": 10
+      },
+      "num_fields_strategy": "uniform",
+      "workspace": {
+        "min_lat": 31.21,
+        "max_lat": 31.24,
+        "min_lon": 121.455,
+        "max_lon": 121.485
+      },
+      "random_seed": 20261012,
+      "max_episode_steps_per_field": 12
+    },
+    "field_generator": {
+      "field_size": {
+        "min_area": 5000.0,
+        "max_area": 20000.0
+      },
+      "shape": {
+        "min_vertices": 3,
+        "max_vertices": 5,
+        "irregularity": 0.22
+      },
+      "min_field_spacing": 15.0,
+      "layout": {
+        "mode": "tessellated",
+        "parcel_gap_m": 8.0,
+        "tessellated_oversample": 2.0,
+        "gap_m": 15.0,
+        "cluster_min": 2,
+        "cluster_max": 4,
+        "cluster_inner_gap_m": 4.0,
+        "cluster_gap_m": 90.0,
+        "pool_oversample": 1.5,
+        "growth_attempts": 60,
+        "depot_offset_m": {
+          "min": 50.0,
+          "max": 400.0
+        }
+      },
+      "resolution": {
+        "grid_resolution": 10.0
+      }
+    },
+    "depot": {
+      "type": "random",
+      "position": null
+    },
+    "uav": {
+      "num_uav": 1,
+      "max_energy": 1500.0,
+      "speed": 8.0,
+      "coverage_width": 10.0,
+      "sensor_width": 5.0,
+      "max_payload": 50.0,
+      "payload_per_area": 0.003,
+      "energy": {
+        "alpha": 0.08,
+        "beta": 0.02,
+        "energy_margin": 0.2
+      },
+      "ranges": {
+        "max_energy": {
+          "min": 1200.0,
+          "max": 1800.0
+        },
+        "max_payload": {
+          "min": 40.0,
+          "max": 60.0
+        },
+        "speed": {
+          "min": 6.0,
+          "max": 10.0
+        },
+        "coverage_width": {
+          "min": 8.0,
+          "max": 12.0
+        },
+        "alpha": {
+          "min": 0.06,
+          "max": 0.1
+        },
+        "beta": {
+          "min": 0.016,
+          "max": 0.024
+        },
+        "payload_per_area": {
+          "min": 0.002,
+          "max": 0.004
+        }
+      }
+    },
+    "coverage": {
+      "default_workload": 0.45,
+      "min_workload": 0.01,
+      "max_workload": 0.5
+    },
+    "plot": {
+      "show_grid": true,
+      "save_result": true,
+      "show": false,
+      "output_dir": "results",
+      "save_gif": false
+    },
+    "rl": {
+      "grid_resolution": 10.0,
+      "reward": {
+        "mode": "time",
+        "coverage_width": 10.0,
+        "nominal_work_speed": 8.0,
+        "time_scale": 100.0
+      },
+      "time": {
+        "cruise_speed": 8.0,
+        "tau_pi": 3.0,
+        "exponent": 2.0,
+        "service_time": 0.0
+      },
+      "gamma": 1.0,
+      "learning_rate": 0.0003,
+      "batch_size": 64,
+      "workload_options": [
+        0.1,
+        0.2,
+        0.3,
+        0.5
+      ],
+      "return_to_depot": true,
+      "allow_auto_resupply": true,
+      "fast_estimate_safety_factor": 1.25,
+      "failure_penalty": -1.0,
+      "failure_termination_threshold": 5,
+      "reward_scale": 100.0,
+      "graph": {
+        "max_area": 8000.0,
+        "max_perimeter": 500.0,
+        "max_boundary_length": 200.0,
+        "position_scale_m": 1000.0,
+        "global_distance_scale_m": 3000.0,
+        "uav_distance_scale_m": 2500.0,
+        "d_near_m": 1500.0,
+        "max_energy_scale": 1800.0,
+        "max_payload_scale": 60.0,
+        "speed_scale": 10.0,
+        "coverage_width_scale": 12.0,
+        "alpha_scale": 0.1,
+        "beta_scale": 0.024,
+        "payload_per_area_scale": 0.004
+      },
+      "decoder": {
+        "hierarchical_decoding": true,
+        "candidate_attention": false,
+        "attention_heads": 4
+      },
+      "encoder": {
+        "hidden_dim": 128,
+        "num_heads": 4,
+        "dropout": 0.1
+      }
+    },
+    "shaping": {
+      "enable": false,
+      "strength": 1.0
+    },
+    "ppo": {
+      "advantage_mode": "gae",
+      "randomize_uav": false,
+      "learning_rate": 0.0003,
+      "actor_learning_rate": 0.0001,
+      "critic_learning_rate": 0.003,
+      "gamma": 1.0,
+      "gae_lambda": 0.95,
+      "clip_ratio": 0.2,
+      "entropy_coef": 0.01,
+      "entropy_coef_end": 0.0,
+      "entropy_anneal_start": 0.1,
+      "lr_schedule": "none",
+      "lr_final_scale": 0.1,
+      "value_coef": 0.5,
+      "epochs": 4,
+      "batch_size": 64,
+      "max_grad_norm": 0.5,
+      "value_gate": true,
+      "collection_mode": "complete_episodes",
+      "episodes_per_rank": 4,
+      "max_episode_steps": 500
+    }
+  },
+  "seed_collision_check": "exact seeds checked against existing manifests before generation; no overlap"
+}
